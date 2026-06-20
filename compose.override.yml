@@ -9,7 +9,7 @@ services:
   # --- Milvus Standalone (RAG 向量数据库) ---
 
   etcd:
-    image: quay.io/coreos/etcd:v3.5.23
+    image: quay.io/coreos/etcd:v3.6.12
     restart: "no"
     ports:
       - "2379:2379"
@@ -40,7 +40,7 @@ services:
       retries: 5
 
   milvus:
-    image: milvusdb/milvus:v2.5.14
+    image: milvusdb/milvus:v2.6.18
     restart: "no"
     ports:
       - "19530:19530"
@@ -65,7 +65,7 @@ services:
   # --- End Milvus Standalone ---
 
   proxy:
-    image: traefik:3.6
+    image: traefik:v3.7.5
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
