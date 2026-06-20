@@ -5,6 +5,65 @@ services:
   # http://dashboard.localhost.tiangolo.com: frontend
   # etc. To enable it, update .env, set:
   # DOMAIN=localhost.tiangolo.com
+
+  # --- Milvus Standalone (RAG 向量数据库) ---
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.23
+    restart: "no"
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    environment:
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://0.0.0.0:2379
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls=http://0.0.0.0:2379 -data-dir=/etcd
+    volumes:
+      - etcd-data:/etcd
+
+  minio:
+    image: minio/minio:RELEASE.2025-06-01T15-20-47Z
+    restart: "no"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  milvus:
+    image: milvusdb/milvus:v2.5.14
+    restart: "no"
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    command: ["milvus", "run", "standalone"]
+    environment:
+      - ETCD_ENDPOINTS=etcd:2379
+      - MINIO_ADDRESS=minio:9000
+    depends_on:
+      etcd:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    volumes:
+      - milvus-data:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  # --- End Milvus Standalone ---
+
   proxy:
     image: traefik:3.6
     volumes:
@@ -59,6 +118,15 @@ services:
     restart: "no"
     ports:
       - "8000:8000"
+    depends_on:
+      milvus:
+        condition: service_healthy
+    environment:
+      - MILVUS_URI=http://milvus:19530
+      - SMTP_HOST=mailcatcher
+      - SMTP_PORT=1025
+      - SMTP_TLS=false
+      - EMAILS_FROM_EMAIL=noreply@example.com
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -81,11 +149,6 @@ services:
     # TODO: remove once coverage is done locally
     volumes:
       - ./backend/htmlcov:/app/backend/htmlcov
-    environment:
-      SMTP_HOST: "mailcatcher"
-      SMTP_PORT: "1025"
-      SMTP_TLS: "false"
-      EMAILS_FROM_EMAIL: "noreply@example.com"
 
   mailcatcher:
     image: schickling/mailcatcher
@@ -128,6 +191,11 @@ services:
       - ./frontend/test-results:/app/frontend/test-results
     ports:
       - 9323:9323
+
+volumes:
+  etcd-data:
+  minio-data:
+  milvus-data:
 
 networks:
   traefik-public:

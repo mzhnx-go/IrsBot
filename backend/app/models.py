@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
 from pydantic import EmailStr
 from sqlalchemy import DateTime
@@ -16,6 +17,8 @@ class UserBase(SQLModel):
     is_active: bool = True
     is_superuser: bool = False
     full_name: str | None = Field(default=None, max_length=255)
+    # 【新增】age 字段 - 用户年龄，可为空（允许不填），最大3位数字
+    age: Optional[str] = Field(default=None, max_length=3)
 
 
 # Properties to receive via API on creation
