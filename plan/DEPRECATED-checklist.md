@@ -1,3 +1,5 @@
+> ⚠️ **本文件已弃用（2026-09-17）**：验收清单基于「IM 机器人框架」旧定位，勾选状态早已失真。当前验收清单以 [istbot-implement-plan.md](./istbot-implement-plan.md) 和 [PROGRESS.md](./PROGRESS.md) 为准。仅作历史参考保留。
+
 # Checklist - IrsBot IM 机器人框架 Implementation
 
 > 技术栈: LangChain + LangGraph, uv, SQLAlchemy 2.0, Alembic, FastAPI, React 19

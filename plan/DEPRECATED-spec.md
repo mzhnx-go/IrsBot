@@ -1,3 +1,5 @@
+> ⚠️ **本文件已弃用（2026-09-17）**：内容仍是「IM 机器人框架」旧定位，与现行「本地部署 Web Agent 应用（不接 IM）」定位严重不符。最新权威计划请看 [istbot-implement-plan.md](./istbot-implement-plan.md)。仅作历史参考保留。
+
 # AstrBot Core Features Replication Spec
 
 > **项目定位（2026-09-16 确立）**

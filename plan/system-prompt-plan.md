@@ -46,8 +46,8 @@
 | B1 | User 模型加列 | `backend/app/core/db/sqlmodel_models.py` | `User.system_prompt: Optional[str] = Field(default=None, sa_column=Text)` |
 | B2 | Alembic 迁移 | `backend/app/alembic/versions/<rev>_add_system_prompt_to_user.py` | `ALTER TABLE user ADD COLUMN system_prompt TEXT NULL`，downgrade 删列 |
 | B3 | 默认提示词 + 解析 | `backend/app/core/agent/prompts.py`（新建） | `DEFAULT_SYSTEM_PROMPT` 常量 + `resolve_system_prompt(custom: str \| None) -> str`（空→默认） |
-| B4 | Agent 注入 | `backend/app/core/agent/agent.py` | 组装消息时在最前插入 `SystemMessage(content=resolve_system_prompt(user.system_prompt))`；`user` 已在调用链可用（providers 解析同样按 user 走） |
-| B5 | API 端点 | `backend/app/api/routes/users.py` | `GET /users/me/system-prompt` → `{system_prompt, is_custom, effective_prompt}`；`PUT /users/me/system-prompt`（body `{system_prompt: str}`，传空串/null 即清空回落默认）→ 返回同 GET |
+| B4 | Agent 注入 | `backend/app/core/agent/agent.py` | `__init__` 时用已有的 `self.session` + `self.user_id` 查库取 `system_prompt`（⚠️ 不能依赖调用链传 user 对象：WS 路由有 `current_user`，但 Pipeline 链路 `ProcessStage` 只有 `context.user_id` 字符串 —— Agent 内部自查则两条链路零改动）；组装消息时在最前插入 `SystemMessage(content=resolve_system_prompt(user.system_prompt))` |
+| B5 | API 端点 | `backend/app/api/routes/users.py` | `GET /users/me/system-prompt` → `{system_prompt, is_custom, effective_prompt}`；`PATCH /users/me/system-prompt`（body `{system_prompt: str}`，传空串/null 即清空回落默认）→ 返回同 GET。用 PATCH 与现有 `/me`、`/me/password` 风格一致 |
 | B6 | Pydantic 模型 | `backend/app/api/models.py` | `SystemPromptPublic` / `SystemPromptUpdate` |
 | B7 | 客户端再生成 | 运行 `openapi-ts` | 前端 `src/client/` 自动更新 |
 
@@ -55,7 +55,7 @@
 
 | # | 改动 | 文件 | 说明 |
 |---|---|---|---|
-| F1 | 设置页加 tab | `frontend/src/routes/_layout/settings.tsx` | 新增「系统提示词」tab（`id: system-prompt`），所有登录用户可见（不限 superuser） |
+| F1 | 设置页加 tab | `frontend/src/routes/_layout/settings.tsx` | 新增「系统提示词」tab（`value: system-prompt`），所有登录用户可见（不限 superuser）。⚠️ **必须同时修掉残留的 `slice(0,4)` 逻辑**（`finalTabs = is_superuser ? tabsConfig.slice(0,4) : tabsConfig`）—— 现有 4 项时等价全显，加第 5 项后 superuser 将看不到新 tab（加末尾）或误切「危险操作」（插中间）。改为直接使用 `tabsConfig`，或按 `value` 过滤 |
 | F2 | 设置组件 | `frontend/src/components/Users/SystemPromptSettings.tsx`（新建） | textarea 编辑 + 三个按钮：保存 / 清空 / 恢复默认（恢复默认=写入 DEFAULT 原文，方便用户在其基础上改；清空=存空串回落默认）；显示"当前生效的是默认/自定义"状态 |
 | F3 | react-query hook | `frontend/src/hooks/useSystemPrompt.ts`（新建） | `systemPromptQuery` / `updateSystemPrompt`，成功后失效缓存 |
 | F4 | 构建校验 | — | `tsc` + `vite build` 通过 |
@@ -75,9 +75,9 @@
 | 步骤 | 内容 | git 提交 |
 |---|---|---|
 | 1 | B1+B2 模型列 + 迁移 | `feat(agent): user 表增加 system_prompt 列与迁移` |
-| 2 | B3+B4+B5+B6 默认提示词/注入/API | `feat(agent): 系统提示词默认值、Agent 注入与 REST 端点` |
+| 2 | B3+B4+B5+B6 + 必做测试 | `feat(agent): 系统提示词默认值、Agent 注入与 REST 端点` |
 | 3 | B7+F1–F3 前端 | `feat(frontend): 设置页新增系统提示词管理` |
-| 4 | 文档 + 测试 | `docs: 系统提示词功能验收清单与进度更新` |
+| 4 | 文档更新 | `docs: 系统提示词功能验收清单与进度更新` |
 
 每步提交前：`py_compile`（后端）/ `tsc`（前端）；全程遵守 git 备份约定，出问题可 `git reset --hard <上一提交>` 回退。
 
@@ -87,7 +87,11 @@
 - [ ] `py_compile` 全部改动文件
 - [ ] 迁移链校验：`alembic upgrade head` 干跑逻辑审查（upgrade/downgrade 对称）
 - [ ] 前端 `tsc` + `vite build`
-- [ ] 后端单测（可选新增）：`resolve_system_prompt` 空/非空两分支
+- [ ] 后端测试（**必做**，项目规则：All API endpoints must have corresponding test cases）：
+  - `resolve_system_prompt` 空/非空两分支单测
+  - `GET /users/me/system-prompt` 端点测试（未设置 → `is_custom=False`，effective=默认）
+  - `PATCH /users/me/system-prompt` 端点测试（保存自定义 → `is_custom=True`；传空串 → 回落默认）
+  - Agent 注入测试：patch/查库确认消息列表最前为 SystemMessage
 
 **实机（用户 Windows 机器，启动 `scripts/start.cmd` 后）**：
 1. 未设置任何提示词 → 新会话问「你是什么模型」→ 应回答 IrsBot/模型源，不提底层供应商

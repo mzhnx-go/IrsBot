@@ -1,3 +1,5 @@
+> ⚠️ **本文件已弃用（2026-09-17）**：任务分解基于「IM 机器人框架」旧定位，勾选状态也早已失真。当前任务与阶段以 [istbot-implement-plan.md](./istbot-implement-plan.md)（第四节 SC 清单）和 [PROGRESS.md](./PROGRESS.md) 为准。仅作历史参考保留。
+
 # Tasks - IrsBot IM 机器人框架 Implementation
 
 > 技术栈: LangChain + LangGraph, uv, SQLAlchemy 2.0, Alembic, FastAPI, React 19

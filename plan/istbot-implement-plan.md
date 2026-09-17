@@ -2,7 +2,8 @@
 
 > 更新时间：2026-09-16 ｜ 分支：`feat/agent-platform`（未推送远端）
 > **本文档为 IrsBot 唯一权威实施计划**（原 `progress.md` 已并入本文件）
-> 对照文档：[astrbot-architecture.md](./astrbot-architecture.md) ｜ [spec.md](./spec.md) ｜ [tasks.md](./tasks.md) ｜ [checklist.md](./checklist.md)
+> 对照文档：[astrbot-architecture.md](./astrbot-architecture.md)（架构参考，仍有效）
+> ⚠️ 已弃用（2026-09-17 改名+加声明头，仅历史参考）：[DEPRECATED-spec.md](./DEPRECATED-spec.md) ｜ [DEPRECATED-tasks.md](./DEPRECATED-tasks.md) ｜ [DEPRECATED-checklist.md](./DEPRECATED-checklist.md) ｜ [DEPRECATED-implementation-plan.md](./DEPRECATED-implementation-plan.md) —— 均为「IM 机器人框架」旧定位产物，本文档（第十节）中涉及它们同步的待办视为**以弃用方式结案**
 
 ---
 

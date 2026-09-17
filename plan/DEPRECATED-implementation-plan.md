@@ -1,3 +1,5 @@
+> ⚠️ **本文件已弃用（2026-09-17）**：仅作历史参考保留。最新权威计划请看 [istbot-implement-plan.md](./istbot-implement-plan.md)，部署详案看 [local-deployment-plan.md](./local-deployment-plan.md)，当前进度看 [PROGRESS.md](./PROGRESS.md)。
+
 # IrsBot Agent Platform — 详细实施计划 (v2)
 
 > 基于现有 FastAPI + React 全栈脚手架，引入 **LangChain + LangGraph** 作为 Agent 编排框架，使用 **uv** 管理依赖，**SQLAlchemy** 做数据库层，构建一个集 RAG、MCP、Tool、Skill、多模型适配于一体的 Agent 平台，并提供 Web 聊天对话界面。

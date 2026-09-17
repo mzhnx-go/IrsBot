@@ -923,8 +923,8 @@ Would install 140 packages
 | `istbot-implement-plan.md` | 定位改为 Docker 化；L1/L2 作废；写入 18 项验证基线 | ✅ 本轮 |
 | `PROGRESS.md` | 当前阶段改为 D1–D7；M2/M3 完成；D5.1 盘点完成 | ✅ 本轮 |
 | `astrbot-architecture.md` | 数据库/向量库行回滚为 PostgreSQL/Milvus | ✅ 本轮 |
-| `spec.md` | 定位与部署方式同步 | ⬜ 待做 |
-| `tasks.md` / `checklist.md` | 标题与阶段同步 | ⬜ 待做 |
+| `spec.md` | ~~定位与部署方式同步~~ → **已弃用结案**（2026-09-17）：内容过时且不再维护，改名 `DEPRECATED-spec.md` 并加声明头 | ✅ 以弃用结案 |
+| `tasks.md` / `checklist.md` | ~~标题与阶段同步~~ → **已弃用结案**（2026-09-17）：同上，改名 `DEPRECATED-tasks.md` / `DEPRECATED-checklist.md` | ✅ 以弃用结案 |
 
 ---
 
