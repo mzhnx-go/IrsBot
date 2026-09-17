@@ -26,7 +26,7 @@
 | **当前阶段** | **🎉 Phase D1–D7 ✅ + D5.1b ✅ 全完成**；**已建 git 回退基线**（独立仓库 `d:/AIpy/full-stack/IrsBot/.git`，分支 `feat/agent-platform`，提交 `fe7c391`/`00a951d`/`74dd8d9`）；Phase 10.3/10.5 代码审查完毕（`bfe1c7d` 修复 embedding 解密 bug），实机验收待做（§10.6）；**📋 系统提示词功能已规划待确认**（`plan/system-prompt-plan.md`，确认后开工） |
 | **代码状态** | 🔶 **有代码改动**：`backend/Dockerfile`（修 Python 版本）/ `backend/app/main.py`（静态托管）/ `frontend/src/main.tsx` + `routes/_layout/chat.tsx` + `hooks/useAgentChat.ts`（相对路径）/ `frontend/vite.config.ts`（proxy）/ `frontend/.env` + 配置类改动（见第四点五节） |
 | **运行状态** | ✅ `irsbot-milvus-1`（healthy） + `irsbot-db-1`（healthy）已由 compose 接管；✅ **本机 uvicorn :8001 已跑通 D1.3a**；🔶 `backend` 镜像**构建中**（`buildx history` → Running，28+ 分钟；**根因已锁定为容器虚拟网络限吞吐**，见 §3.3.5） |
-| **文档状态** | ✅ **已一致**：`istbot-implement-plan.md` 第零至十节全部对齐「Docker 交付」；`local-deployment-plan.md` 已升 **v7.2**（新增容器网络限速实测 + 「坑 C：日志文件误判」） |
+| **文档状态** | ✅ **已一致**：`istbot-implement-plan.md` 第零至十节全部对齐「Docker 交付」；`local-deployment-plan.md` 已升 **v7.2**（新增容器网络限速实测 + 「坑 C：日志文件误判」）；**2026-09-17 17:xx 全量回查再同步**：第一节 Phase 表 D1–D7 ⬜→✅、SC D1–D9 达成情况实证改判（D7 改判不迁移、D1 服务数 6→3）、10.1/10.5 待办消解结案、`local-deployment-plan.md` 状态头改「已全部完成」+ D1 子阶段表 + 风险表 8 行结案 |
 | **当前分支** | `feat/agent-platform`（未推送远端） |
 | **测试基线** | ✅ **294 单测 + 18 集成测试全部实跑通过**（详见第四节）；前端 `tsc --noEmit` ✅ ExitCode 0；`app.main` 导入 ✅（本机 `.venv` Python 3.13.0）；**D1.3a 实机验收 6/6 通过 ✅** |
 | **阻塞项** | **无** —— **D1.3a 已实机验证通过**（见下方验收表）；镜像构建是 D1.3c 分发优化，非阻塞 |

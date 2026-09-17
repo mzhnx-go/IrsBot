@@ -4,8 +4,9 @@
 > 上游文档：[istbot-implement-plan.md](./istbot-implement-plan.md)（全局规划）｜ [PROGRESS.md](./PROGRESS.md)（运行态）
 > **本文档只覆盖一件事：让 IrsBot 能被「一条命令启动、并且分发给别人」。**
 >
-> ✅ **状态：施工中。D1.2 已完成并实机验证；D1.3a（后端静态托管）+ D1.3b（前端相对路径 + Vite proxy）已完成编码，待实机验证。**
-> 下一步：验证 8000 端口出界面 → D1.1 剥离 Traefik 依赖 → D1.4 清理 items。
+> ✅ **状态：✅ 已全部完成（2026-09-17）。D1（D1.1–D1.5）→ D2 → D3 → D4 → D5 → D6 → D7 全部实机验收/落地，记录见 [PROGRESS.md](./PROGRESS.md)。**
+> 本文档自此刻起转为**历史施工记录**（保留坑位与实测数据供回查），**运行态进度以 PROGRESS.md 为准**。
+> 仅存的非阻塞尾巴：D1.3c（dist 烤进镜像的分发优化）。
 >
 > 📌 **v6 补充定位**：本项目基于 **full-stack-fastapi-template** 修改而来。
 > **除 IrsBot 自身功能（Agent / RAG / 对话 / Provider / 知识库）外，模板残留均可清理。**
@@ -932,18 +933,18 @@ Would install 140 packages
 
 | 风险 | 概率 | 影响 | 应对 | 状态 |
 |---|---|---|---|---|
-| Traefik/域名依赖导致本地起不来 | **高** | 高 | D1 彻底剥离 | ⬜ |
-| 端口冲突（本机 PG **5432** / Milvus **19530-9091-2379**） | **🔴 已确认会发生** | 中 | 见 3.3.2 端口处置表；容器 `db` 不映射 5432 | ⬜ |
-| **两套 Milvus 方案并存导致选错** | **高** | 中 | Q1 决策；**采用现网 v2.6.14 内嵌方案** | 🔴 待确认 |
-| `compose.override.yml` 混装开发工具进交付包 | **高** | 中 | Q3 决策：拆分配置 | 🔴 待确认 |
+| Traefik/域名依赖导致本地起不来 | **高** | 高 | D1 彻底剥离 | ✅ D1.1 完成 |
+| 端口冲突（本机 PG **5432** / Milvus **19530-9091-2379**） | **🔴 已确认会发生** | 中 | 见 3.3.2 端口处置表；容器 `db` 不映射 5432 | ✅ 已处置落地（D1.2/D1.3 验证通过） |
+| **两套 Milvus 方案并存导致选错** | **高** | 中 | Q1 决策；**采用现网 v2.6.14 内嵌方案** | ✅ Q1 已确认 + D1.2 落地 |
+| `compose.override.yml` 混装开发工具进交付包 | **高** | 中 | Q3 决策：拆分配置 | ✅ Q3 已确认（adminer 保留 override） |
 | **数据迁移丢数据** | ~~中~~ → **低** | ~~极高~~ → **中** | 强制备份 + 逐条验证 + 保留回滚；**且真实资产仅 5 类** | ✅ 风险已下调 |
-| Milvus 向量数据不可迁移 | **中** | **低**（原为中） | M1；重新索引成本 = 上传 2 个 211 B 文件 | ⬜ 非阻塞 |
-| `SECRET_KEY` 不落盘 → 容器重启登录失效 | **已存在** | 中 | D3 强制落盘 | ⬜ |
-| `FIRST_SUPERUSER_PASSWORD=changethis` | **已确认存在** | 中 | D3.2 随机生成 + 打印 | ⬜ |
-| 前端 SPA 路由刷新 404 | 中 | 中 | 后端加 catch-all 回退 `index.html` | ⬜ |
-| Docker 镜像过大（含 langchain 全家桶） | 中 | 低 | 分层构建 + `.dockerignore`；不必强求小体积 | ⬜ |
+| Milvus 向量数据不可迁移 | **中** | **低**（原为中） | M1；重新索引成本 = 上传 2 个 211 B 文件 | ✅ 已消解 —— **D5 判定不迁移**（绑定挂载零迁移复用现网数据；M1 调研随之失去必要性） |
+| `SECRET_KEY` 不落盘 → 容器重启登录失效 | **已存在** | 中 | D3 强制落盘 | ✅ D3 完成 |
+| `FIRST_SUPERUSER_PASSWORD=changethis` | **已确认存在** | 中 | D3.2 随机生成 + 打印 | ✅ D3.2 完成 |
+| 前端 SPA 路由刷新 404 | 中 | 中 | 后端加 catch-all 回退 `index.html` | ✅ D1.3a 修复并实机验收 |
+| Docker 镜像过大（含 langchain 全家桶） | 中 | 低 | 分层构建 + `.dockerignore`；不必强求小体积 | 🔶 部分缓解（wheelhouse 离线分层构建已落地）；体积优化保留 |
 | Milvus 内存占用 | ~~2G+（3 容器）~~ → **单容器，更低** | 低 | 用户已接受 | ✅ 已接受 |
-| `psycopg` 连接泄漏（ResourceWarning） | 中 | 低 | 长期运行前修；D4 后可选 | ⬜ |
+| `psycopg` 连接泄漏（ResourceWarning） | 中 | 低 | 长期运行前修；D4 后可选 | ⬜ 保留（可选优化） |
 
 ---
 
@@ -994,15 +995,15 @@ Would install 140 packages
 
 | 子阶段 | 内容 | 状态 |
 |---|---|---|
-| **D1.1** | 剥离部署层残留：Traefik / `${DOMAIN}` / `${STACK_NAME}` / `external: true` / `compose.traefik.yml` / `proxy` / `mailcatcher` / `playwright` / nginx 配置；统一 `restart` 策略；`.env` 改 `PROJECT_NAME=IrsBot`、`FRONTEND_HOST=http://localhost:8000` | ⬜ **可立即开工** |
+| **D1.1** | 剥离部署层残留：Traefik / `${DOMAIN}` / `${STACK_NAME}` / `external: true` / `compose.traefik.yml` / `proxy` / `mailcatcher` / `playwright` / nginx 配置；统一 `restart` 策略；`.env` 改 `PROJECT_NAME=IrsBot`、`FRONTEND_HOST=http://localhost:8000` | ✅ 已完成（2026-09-17 02:27 实机验收，含 D1.3e 并入） |
 | **D1.2** | Milvus 改由 compose 管理（单容器内嵌 etcd + local 存储 + 绑定挂载复用数据） | ✅ 已完成并验证 |
-| **D1.3a** | `app/main.py` 加静态托管 + SPA fallback（排除 `/api` 前缀 + 判断 `accept` 头） | ✅ **已编码**，待实机验证 |
-| **D1.3b** | 前端 API 地址改**同源相对路径**（三处分别改）+ `vite.config.ts` 补 **proxy**（含 `ws: true`）+ 删 `.env` 的 `VITE_API_URL` | ✅ **已编码**，待实机验证 |
-| **D1.3c** | `backend/Dockerfile` 增加 `COPY ./frontend/dist /app/frontend-dist`（**分发优化，非阻塞**） | ⬜ |
+| **D1.3a** | `app/main.py` 加静态托管 + SPA fallback（排除 `/api` 前缀 + 判断 `accept` 头） | ✅ **实机验收 6/6 通过**（2026-09-17 00:23，uvicorn 8001） |
+| **D1.3b** | 前端 API 地址改**同源相对路径**（三处分别改）+ `vite.config.ts` 补 **proxy**（含 `ws: true`）+ 删 `.env` 的 `VITE_API_URL` | ✅ 已完成并验证（D1.3 全链路闭环 01:14） |
+| **D1.3c** | `backend/Dockerfile` 增加 `COPY ./frontend/dist /app/frontend-dist`（**分发优化，非阻塞**） | ⬜ 唯一存留尾巴（非阻塞） |
 | **D1.3d** | `compose.override.yml` backend 绑定挂载 `./frontend/dist:/app/frontend-dist` | ✅ 已完成 |
-| **D1.3e** | 移除 `frontend` 独立容器（nginx） | ⬜（并入 D1.1） |
-| **D1.4** | 删除 `items` 模板残留（前后端 + 新增 alembic 迁移删表 + 侧边栏入口） | ⬜ |
-| **D1.5** | `DOCKER_IMAGE_*` / `TAG` 清理（**须与 `image:` 字段同批删**） | ⬜ |
+| **D1.3e** | 移除 `frontend` 独立容器（nginx） | ✅ 已完成（并入 D1.1） |
+| **D1.4** | 删除 `items` 模板残留（前后端 + 新增 alembic 迁移删表 + 侧边栏入口） | ✅ 已完成（2026-09-17 01:29 实机验收） |
+| **D1.5** | `DOCKER_IMAGE_*` / `TAG` 清理（**须与 `image:` 字段同批删**） | ✅ 已完成（2026-09-17 02:27） |
 
 > 🔴 **D1.3b 的三处陷阱（务必按 §3.3.4 表格逐处改，不要统一替换）**：
 > 1. `main.tsx` → `OpenAPI.BASE = ""`（不是 `"/api"`）
