@@ -1,1 +1,0 @@
-﻿src/routes/recover-password.tsx(61,24): error TS2551: Property 'recoverPassword' does not exist on type 'typeof LoginService'. Did you mean 'resetPassword'?
