@@ -10,6 +10,7 @@ node_modules/
 # Python 生成物
 __pycache__/
 *.py[cod]
+*.log
 .venv/
 backend/uploads/
 .trae/
