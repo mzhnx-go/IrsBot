@@ -258,14 +258,17 @@ class ProviderManager:
             return self._embed_cache[cache_key]
 
         provider_type = pc.provider_type.lower()
+        # api_key 在库中加密存储，构建 Embeddings 时必须先解密，
+        # 否则会把密文当密钥发给服务商 → 鉴权失败（get_chat_model 已解密，这里漏了）。
+        api_key = decrypt_api_key(pc.api_key)
         if provider_type == "openai":
             embed = OpenAIEmbeddings(
                 model=pc.model_name,
-                api_key=pc.api_key,
+                api_key=api_key,
                 base_url=pc.base_url or None,
             )
         elif provider_type == "anthropic":
-            embed = AnthropicEmbeddings(api_key=pc.api_key)
+            embed = AnthropicEmbeddings(api_key=api_key)
         else:
             raise ValueError(f"Unsupported embedding provider: {provider_type}")
 
