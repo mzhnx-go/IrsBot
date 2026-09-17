@@ -1,0 +1,15 @@
+# Milvus 内嵌 etcd 配置
+#
+# 用途：Milvus standalone 单容器模式下，etcd 以内嵌方式运行在同一个容器内，
+#       通过本文件配置其监听地址与压缩策略。不需要独立的 etcd 容器。
+#
+# 挂载位置：见 compose.override.yml 的 milvus 服务
+#   ./milvus-config/embedEtcd.yaml -> /milvus/configs/embedEtcd.yaml (read-only)
+#
+# 与原 D:\Milvus\embedEtcd.yaml 保持一致。
+
+listen-client-urls: http://0.0.0.0:2379
+advertise-client-urls: http://0.0.0.0:2379
+quota-backend-bytes: 4294967296
+auto-compaction-mode: revision
+auto-compaction-retention: '1000'

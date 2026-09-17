@@ -1,0 +1,93 @@
+﻿docker : time="2026-09-17T01:00:54+08:00" level=warning msg="The \"CI\" variable is not set. Defaulting to a blank stri
+ng."
+所在位置 行:446 字符: 1
++ docker compose --progress=plain build backend 2>&1 | Out-File "d:\AIp ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (time="2026-09-1... blank string.":String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ Image backend:latest Building 
+ Image backend:latest Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 936B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 6.26kB 0.0s done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for ghcr.io/astral-sh/uv:0.9.26
+#3 DONE 0.0s
+
+#4 [internal] load metadata for docker.io/library/python:3.13-slim
+#4 DONE 0.1s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 FROM ghcr.io/astral-sh/uv:0.9.26@sha256:9a23023be68b2ed09750ae636228e903a54a05ea56ed03a934d00fe9fbeded4b
+#6 resolve ghcr.io/astral-sh/uv:0.9.26@sha256:9a23023be68b2ed09750ae636228e903a54a05ea56ed03a934d00fe9fbeded4b 0.0s done
+#6 DONE 0.0s
+
+#7 [stage-0 1/9] FROM docker.io/library/python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285
+#7 resolve docker.io/library/python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285 0.0s done
+#7 DONE 0.0s
+
+#8 [stage-0 2/9] COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /bin/
+#8 CACHED
+
+#9 [stage-0 3/9] WORKDIR /app/
+#9 CACHED
+
+#10 [internal] load build context
+#10 transferring context: 89.42MB 5.0s
+#10 transferring context: 158.32MB 9.4s done
+#10 DONE 9.4s
+
+#11 [stage-0 4/9] RUN --mount=type=bind,source=wheelhouse,target=/app/wheelhouse     --mount=type=cache,target=/root/.cache/uv     --mount=type=bind,source=uv.lock,target=uv.lock     --mount=type=bind,source=pyproject.toml,target=pyproject.toml     uv sync --frozen --no-install-workspace --all-extras --no-dev --package app       --find-links /app/wheelhouse --offline
+#11 0.757 Using CPython 3.13.15 interpreter at: /usr/local/bin/python
+#11 0.757 Creating virtual environment at: .venv
+#11 0.782   脳 Failed to download `regex==2026.5.9`
+#11 0.782   鈺扳攢鈻?Network connectivity is disabled, but the
+#11 0.782       requested data wasn't found in the cache for:
+#11 0.782       `https://files.pythonhosted.org/packages/30/e1/c93444052cf41581f3c884ab3fb5823daf0992f11cd4388d4275ca610558/regex-2026.5.9-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl`
+#11 0.782   help: `regex` (v2026.5.9) was included because `app[rag]` (v0.1.0) depends
+#11 0.782         on `tiktoken` (v0.13.0) which depends on `regex`
+#11 ERROR: process "/bin/sh -c uv sync --frozen --no-install-workspace --all-extras --no-dev --package app       --find-links /app/wheelhouse --offline" did not complete successfully: exit code: 1
+------
+ > [stage-0 4/9] RUN --mount=type=bind,source=wheelhouse,target=/app/wheelhouse     --mount=type=cache,target=/root/.cache/uv     --mount=type=bind,source=uv.lock,target=uv.lock     --mount=type=bind,source=pyproject.toml,target=pyproject.toml     uv sync --frozen --no-install-workspace --all-extras --no-dev --package app       --find-links /app/wheelhouse --offline:
+0.757 Using CPython 3.13.15 interpreter at: /usr/local/bin/python
+0.757 Creating virtual environment at: .venv
+0.782   脳 Failed to download `regex==2026.5.9`
+0.782   鈺扳攢鈻?Network connectivity is disabled, but the
+0.782       requested data wasn't found in the cache for:
+0.782       `https://files.pythonhosted.org/packages/30/e1/c93444052cf41581f3c884ab3fb5823daf0992f11cd4388d4275ca610558/regex-2026.5.9-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl`
+0.782   help: `regex` (v2026.5.9) was included because `app[rag]` (v0.1.0) depends
+0.782         on `tiktoken` (v0.13.0) which depends on `regex`
+------
+Dockerfile:88
+
+--------------------
+
+  87 |     #      pip download 浼氭姤 "editable requirement ... cannot be installed when requiring hashes"锛?
+
+  88 | >>> RUN --mount=type=bind,source=wheelhouse,target=/app/wheelhouse \
+
+  89 | >>>     --mount=type=cache,target=/root/.cache/uv \
+
+  90 | >>>     --mount=type=bind,source=uv.lock,target=uv.lock \
+
+  91 | >>>     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+
+  92 | >>>     uv sync --frozen --no-install-workspace --all-extras --no-dev --package app \
+
+  93 | >>>       --find-links /app/wheelhouse --offline
+
+  94 |     
+
+--------------------
+
+failed to solve: process "/bin/sh -c uv sync --frozen --no-install-workspace --all-extras --no-dev --package app       
+--find-links /app/wheelhouse --offline" did not complete successfully: exit code: 1
+

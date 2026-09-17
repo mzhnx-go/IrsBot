@@ -1,0 +1,46 @@
+# 裁剪 docker 构建上下文：build context 是仓库根（compose 里 context: .），
+# 没有 .dockerignore 时 node_modules / .venv / .git 会被全量传给 daemon，
+# 每次 build 都要多传几百 MB 甚至上 GB。
+
+# 依赖与虚拟环境
+**/node_modules/
+.venv/
+**/.venv/
+
+# 版本控制与编辑器
+.git/
+.github/
+.vscode/
+.trae/
+.claude/
+.copier/
+.workbuddy/
+
+# 缓存与测试产物
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.ruff_cache/
+backend/htmlcov/
+backend/.coverage
+frontend/test-results/
+frontend/blob-report/
+
+# 运行期数据（进镜像毫无意义）
+uploads/
+milvus-config/
+
+# 文档、脚本与构建日志
+docs/
+img/
+plan/
+skills/
+hooks/
+scripts/
+*.log
+
+# 🔴 以下四项**必须留在上下文里**，不要排除：
+#   backend/            → COPY 进镜像的应用代码
+#   frontend/dist/      → D1.3c 的 COPY ./frontend/dist /app/frontend-dist
+#   wheelhouse/         → RUN --mount=type=bind 的离线依赖源
+#   wheelhouse-req.txt  → 同上

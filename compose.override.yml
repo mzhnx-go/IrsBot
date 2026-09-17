@@ -1,0 +1,114 @@
+# 本地开发覆盖层：只保留「开发时需要的端口映射 / 绑定挂载 / 调试命令」。
+#
+# 🔧 Phase D1 已删除的服务（2026-09-17）：
+#   - proxy       （traefik 反向代理，D1.1）
+#   - adminer     （D1.1）
+#   - mailcatcher （D1.1，邮件能力已整体移除，SMTP_* 配置也不再使用）
+#   - playwright  （D1.1，E2E 容器；本机没装 bun，且它依赖已删除的前端容器）
+#   - frontend    （D1.3e，前端产物由 backend 静态托管，不再需要独立的 nginx 容器）
+#   - traefik-public 网络（D1.1，随 traefik 一起删）
+
+services:
+
+  # --- Milvus Standalone (RAG 向量数据库) ---
+  # 单容器内嵌 etcd + local 存储方案（与原 D:\Milvus\standalone.bat 一致）
+  #
+  # 为什么不用「独立 etcd + 独立 MinIO」的三容器方案：
+  #   1. 现在跑通的测试基线（18 项集成测试）是在这个单容器方案上验证的
+  #   2. 少两个容器 = 少两个故障点、少两个数据卷
+  #   3. 数据全在一个目录（/var/lib/milvus），备份/迁移都简单
+  #
+  # ⚠️ 端口冲突提醒：宿主机已有名为 milvus-standalone 的容器占用
+  #    19530 / 9091 / 2379。首次 compose up 前必须先停掉它：
+  #      docker stop milvus-standalone && docker rm milvus-standalone
+  #    （数据在 D:\Milvus\volumes\milvus，删容器不会丢数据）
+
+  milvus:
+    image: milvusdb/milvus:v2.6.14
+    restart: unless-stopped
+    # Milvus 需要这一项，否则部分系统上会因 seccomp 限制启动失败
+    security_opt:
+      - seccomp:unconfined
+    ports:
+      - "19530:19530"   # gRPC，backend 通过 MILVUS_URI 连这个
+      - "9091:9091"     # metrics / healthz
+    command: ["milvus", "run", "standalone"]
+    environment:
+      # 内嵌 etcd：不需要独立的 etcd 容器
+      - ETCD_USE_EMBED=true
+      - ETCD_DATA_DIR=/var/lib/milvus/etcd
+      - ETCD_CONFIG_PATH=/milvus/configs/embedEtcd.yaml
+      # local 存储：不需要 MinIO
+      - COMMON_STORAGETYPE=local
+      - DEPLOY_MODE=STANDALONE
+    volumes:
+      - ./milvus-config/embedEtcd.yaml:/milvus/configs/embedEtcd.yaml:ro
+      # 🔑 直接绑定到你现有 Milvus 的数据目录，而不是新建空卷。
+      #    这样 compose 接管后，原有的 collection / 向量数据仍然在。
+      - D:/Milvus/volumes/milvus:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
+  # --- End Milvus Standalone ---
+
+  db:
+    restart: "no"
+    # ⚠️ 故意不映射 5432 到宿主机。
+    #    原因：本机装了一个 PostgreSQL 18.3（D:\PostgreSQL），已占用 5432。
+    #    容器内的 db 只需要被同网络的 backend 访问（POSTGRES_SERVER=db）。
+    #    若确实要用 pgAdmin 直连，加一行：
+    #      - "5433:5432"
+
+  backend:
+    restart: "no"
+    ports:
+      - "8000:8000"
+    depends_on:
+      milvus:
+        condition: service_healthy
+    environment:
+      - MILVUS_URI=http://milvus:19530
+      # 前端构建产物目录（见 app/main.py 的 WEBUI_DIR）
+      - IrsBot_WEBUI_DIR=/app/frontend-dist
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command:
+      - fastapi
+      - run
+      - --reload
+      - "app/main.py"
+    develop:
+      watch:
+        - path: ./backend
+          action: sync
+          target: /app/backend
+          ignore:
+            - ./backend/.venv
+            - .venv
+        - path: ./backend/pyproject.toml
+          action: rebuild
+    volumes:
+      - ./backend/htmlcov:/app/backend/htmlcov
+      # 🔑 前端构建产物绑定挂载：让后端容器能"看到"宿主机上构建好的 dist。
+      #    好处：改完前端只需重新构建 dist，刷新浏览器即生效，**无需重建后端镜像**。
+      #
+      #    ⚠️ 宿主机没有 bun，用 node 直接调 vite：
+      #       cd frontend
+      #       node <仓库根>/node_modules/typescript/bin/tsc -p tsconfig.build.json
+      #       node <仓库根>/node_modules/vite/bin/vite.js build
+      #
+      #    注意：dist 不存在时 Docker 会自动创建空目录，此时 app/main.py 里
+      #    WEBUI_INDEX.exists() 为假 → 静态托管整段跳过 → 后端退化为纯 API 服务。
+      - ./frontend/dist:/app/frontend-dist
+
+volumes:
+  app-db-data:
+  # 注意：这里不再声明 milvus-data。
+  # 因为 milvus 服务已改为绑定挂载（D:/Milvus/volumes/milvus），
+  # 没有任何服务引用 milvus-data 时，`docker compose config` 会自动把它从
+  # 输出中移除（写了也等于没写）。若将来要改回命名卷，在这里加回来即可。

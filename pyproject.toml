@@ -1,0 +1,16 @@
+[tool.uv.workspace]
+members = ["backend"]
+
+[dependency-groups]
+dev = [
+    "zizmor>=1.25.2",
+]
+
+github-actions = [
+    "smokeshow >=0.5.0",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: 真实 API 集成测试（需要网络和 API Key）",
+]

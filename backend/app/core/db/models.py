@@ -1,0 +1,475 @@
+"""Agent 平台数据模型 —— SQLModel 风格。
+
+所有模型（含模板的 User/Item）统一注册在 SQLModel.metadata 下，
+由 Alembic 统一管理迁移（见 app/alembic/env.py）。
+
+每个模型对应一张表：
+1. ProviderConfig  —— LLM 供应商配置
+2. Conversation    —— 对话会话
+3. Message         —— 会话中的消息
+4. KnowledgeBase   —— RAG 知识库
+5. Document        —— 知识库文档
+6. MCPServer       —— MCP 服务器配置
+7. Skill           —— 已安装技能
+8. Persona         —— 智能体人设
+9. AgentRun        —— Agent 执行记录
+"""
+
+import uuid
+from datetime import datetime
+
+from sqlalchemy import JSON, Column, DateTime, String, Text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlmodel import Field, Relationship, SQLModel
+
+from app.core.db.sqlmodel_models import get_datetime_utc
+
+# ── 1. ProviderConfig ──────────────────────────────────────────
+
+
+class ProviderConfig(SQLModel, table=True):
+    """LLM 供应商配置表。
+
+    存储用户接入的模型服务商信息（密钥、模型名、自定义地址等），
+    供 ProviderManager 动态构建 LangChain 模型实例。
+
+    Attributes:
+        id: 主键，UUID 自动生成。
+        user_id: 所属用户，级联删除。
+        name: 配置显示名称。
+        provider_type: 供应商类型，"openai" | "anthropic" | "gemini"。
+        api_key: API 密钥。
+        base_url: 自定义 API 地址（兼容 OpenAI 协议的中转站等）。
+        model_name: 默认使用的模型名。
+        config: 额外扩展配置（JSON）。
+        is_active: 是否启用。
+        is_default: 是否为该用户的默认配置。
+        fallback_order: 回退优先级，数值越小越优先。
+        created_at / updated_at: 创建与更新时间（UTC）。
+    """
+
+    __tablename__ = "provider_configs"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=UUID(as_uuid=True),
+    )
+    user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE", index=True)
+    name: str = Field(sa_type=String(100), max_length=100)
+    provider_type: str = Field(
+        sa_type=String(50), max_length=50
+    )  # "openai" | "anthropic" | "gemini"
+    api_key: str = Field(sa_type=Text)  # 加密存储
+    base_url: str | None = Field(default=None, sa_type=String(500), max_length=500)
+    model_name: str = Field(sa_type=String(100), max_length=100)
+    config: dict = Field(default_factory=dict, sa_type=JSON)
+    is_active: bool = True
+    is_default: bool = False
+    fallback_order: int = 999
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True), default=get_datetime_utc, nullable=False
+        ),
+    )
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True),
+            default=get_datetime_utc,
+            onupdate=get_datetime_utc,
+            nullable=False,
+        ),
+    )
+
+
+# ── 2. Conversation ────────────────────────────────────────────
+
+
+class Conversation(SQLModel, table=True):
+    """对话会话表。
+
+    一次会话包含多条消息和多次 Agent 执行记录；删除会话时
+    级联删除其下所有消息与执行记录。
+
+    Attributes:
+        id: 主键，UUID 自动生成。
+        session_id: 前端会话标识，建索引用于查询。
+        user_id: 所属用户，级联删除。
+        title: 会话标题，默认"新对话"。
+        persona_id: 关联的智能体人设 id（可为空）。
+        created_at / updated_at: 创建与更新时间（UTC）。
+        messages: 该会话下的消息列表（一对多）。
+        runs: 该会话下的 Agent 执行记录列表（一对多）。
+    """
+
+    __tablename__ = "conversations"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=UUID(as_uuid=True),
+    )
+    session_id: str = Field(sa_type=String(255), max_length=255, index=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE", index=True)
+    title: str = Field(default="新对话", sa_type=String(255), max_length=255)
+    persona_id: uuid.UUID | None = Field(default=None, sa_type=UUID(as_uuid=True))
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True), default=get_datetime_utc, nullable=False
+        ),
+    )
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True),
+            default=get_datetime_utc,
+            onupdate=get_datetime_utc,
+            nullable=False,
+        ),
+    )
+
+    messages: list["Message"] = Relationship(
+        back_populates="conversation", cascade_delete=True
+    )
+    runs: list["AgentRun"] = Relationship(
+        back_populates="conversation", cascade_delete=True
+    )
+
+
+# ── 3. Message ─────────────────────────────────────────────────
+
+
+class Message(SQLModel, table=True):
+    """会话消息表。
+
+    存储对话中的一条消息，role 区分消息来源；content 统一序列化为
+    JSON 以支持多态的内容分片（文本/图片等）。
+
+    Attributes:
+        id: 主键，UUID 自动生成。
+        conversation_id: 所属会话，级联删除。
+        role: 消息角色，"system" | "user" | "assistant" | "tool"。
+        content: 消息内容（多态 ContentPart 序列化为 JSON）。
+        tool_calls: 助手发起的工具调用列表（仅 assistant 消息）。
+        tool_call_id: 工具结果的调用 id（仅 tool 消息，与请求侧配对）。
+        created_at: 创建时间（UTC）。
+        conversation: 反向关联的会话对象。
+    """
+
+    __tablename__ = "messages"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=UUID(as_uuid=True),
+    )
+    conversation_id: uuid.UUID = Field(
+        foreign_key="conversations.id", ondelete="CASCADE", index=True
+    )
+    role: str = Field(sa_type=String(20), max_length=20)  # system/user/assistant/tool
+    content: dict = Field(sa_type=JSON)  # 多态 ContentPart，序列化为 JSON
+    tool_calls: list[dict] | None = Field(default=None, sa_type=JSON)
+    tool_call_id: str | None = Field(default=None, sa_type=String(255), max_length=255)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True), default=get_datetime_utc, nullable=False
+        ),
+    )
+
+    conversation: Conversation | None = Relationship(back_populates="messages")
+
+
+# ── 4. KnowledgeBase ───────────────────────────────────────────
+
+
+class KnowledgeBase(SQLModel, table=True):
+    """RAG 知识库表。
+
+    一个知识库包含若干文档，并定义分块与检索策略。
+
+    Attributes:
+        id: 主键，UUID 自动生成。
+        user_id: 所属用户，级联删除。
+        name: 知识库名称。
+        description: 描述（可为空）。
+        embedding_provider_id: 指定的向量模型 Provider id（为空时用默认）。
+        chunk_size: 分块大小（字符数），默认 500。
+        chunk_overlap: 分块重叠长度，默认 50。
+        retrieval_mode: 检索注入方式，"inject"（注入提示词）| "tool"（作为工具调用）。
+        created_at: 创建时间（UTC）。
+        documents: 该知识库下的文档列表（一对多）。
+    """
+
+    __tablename__ = "knowledge_bases"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=UUID(as_uuid=True),
+    )
+    user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE", index=True)
+    name: str = Field(sa_type=String(255), max_length=255)
+    description: str | None = Field(default=None, sa_type=Text)
+    embedding_provider_id: uuid.UUID | None = Field(
+        default=None, sa_type=UUID(as_uuid=True)
+    )
+    chunk_size: int = 500
+    chunk_overlap: int = 50
+    retrieval_mode: str = Field(
+        default="inject", sa_type=String(20), max_length=20
+    )  # "inject" | "tool"
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True), default=get_datetime_utc, nullable=False
+        ),
+    )
+
+    documents: list["Document"] = Relationship(
+        back_populates="kb", cascade_delete=True
+    )
+
+
+# ── 5. Document ────────────────────────────────────────────────
+
+
+class Document(SQLModel, table=True):
+    """知识库文档表。
+
+    记录上传到知识库的文件及其解析/向量化状态。
+
+    Attributes:
+        id: 主键，UUID 自动生成。
+        kb_id: 所属知识库，级联删除。
+        user_id: 上传用户，级联删除。
+        filename: 原始文件名。
+        file_path: 落盘存储路径。
+        status: 处理状态，pending / processing / done / error。
+        chunks_count: 切分出的文本块数量。
+        file_size: 文件大小（字节）。
+        file_type: 文件类型（如 md、pdf，可为空）。
+        created_at: 创建时间（UTC）。
+        kb: 反向关联的知识库对象。
+    """
+
+    __tablename__ = "documents"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=UUID(as_uuid=True),
+    )
+    kb_id: uuid.UUID = Field(
+        foreign_key="knowledge_bases.id", ondelete="CASCADE", index=True
+    )
+    user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE", index=True)
+    filename: str = Field(sa_type=String(500), max_length=500)
+    file_path: str = Field(sa_type=String(1000), max_length=1000)
+    status: str = Field(
+        default="pending", sa_type=String(20), max_length=20
+    )  # pending / processing / done / error
+    chunks_count: int = 0
+    file_size: int = 0
+    file_type: str | None = Field(default=None, sa_type=String(20), max_length=20)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True), default=get_datetime_utc, nullable=False
+        ),
+    )
+
+    kb: KnowledgeBase | None = Relationship(back_populates="documents")
+
+
+# ── 6. MCPServer ───────────────────────────────────────────────
+
+
+class MCPServer(SQLModel, table=True):
+    """MCP 服务器配置表。
+
+    存储外部 MCP (Model Context Protocol) 服务器的连接方式与可用工具列表。
+
+    Attributes:
+        id: 主键，UUID 自动生成。
+        user_id: 所属用户，级联删除。
+        name: 服务器显示名称。
+        transport_type: 传输方式，"sse" | "streamable_http" | "stdio"。
+        url: 远程服务器地址（sse / streamable_http 时必填）。
+        command: 启动命令（stdio 时使用）。
+        args: 启动命令参数列表。
+        env_vars: 环境变量字典。
+        is_active: 是否启用。
+        tools: 该服务器提供的工具列表（JSON）。
+        created_at: 创建时间（UTC）。
+    """
+
+    __tablename__ = "mcp_servers"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=UUID(as_uuid=True),
+    )
+    user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE", index=True)
+    name: str = Field(sa_type=String(100), max_length=100)
+    transport_type: str = Field(
+        sa_type=String(20), max_length=20
+    )  # "sse" | "streamable_http" | "stdio"
+    url: str | None = Field(default=None, sa_type=String(1000), max_length=1000)
+    command: str | None = Field(default=None, sa_type=String(500), max_length=500)
+    args: list[str] = Field(default_factory=list, sa_type=JSON)
+    env_vars: dict = Field(default_factory=dict, sa_type=JSON)
+    is_active: bool = True
+    tools: list[dict] = Field(default_factory=list, sa_type=JSON)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True), default=get_datetime_utc, nullable=False
+        ),
+    )
+
+
+# ── 7. Skill ───────────────────────────────────────────────────
+
+
+class Skill(SQLModel, table=True):
+    """已安装技能表。
+
+    每条记录对应一个已安装到本地的技能目录（含 SKILL.md）。
+
+    Attributes:
+        id: 主键，UUID 自动生成。
+        name: 技能名，全局唯一。
+        description: 技能描述。
+        path: 技能目录的磁盘路径。
+        source_type: 安装来源，local / plugin / sandbox。
+        is_active: 是否启用（停用后不注入提示词）。
+        config: 额外配置（JSON）。
+        created_at: 创建时间（UTC）。
+    """
+
+    __tablename__ = "skills"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=UUID(as_uuid=True),
+    )
+    name: str = Field(sa_type=String(100), max_length=100, unique=True)
+    description: str = Field(sa_type=Text)
+    path: str = Field(sa_type=String(1000), max_length=1000)
+    source_type: str = Field(
+        default="local", sa_type=String(20), max_length=20
+    )  # local / plugin / sandbox
+    is_active: bool = True
+    config: dict = Field(default_factory=dict, sa_type=JSON)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True), default=get_datetime_utc, nullable=False
+        ),
+    )
+
+
+# ── 8. Persona ─────────────────────────────────────────────────
+
+
+class Persona(SQLModel, table=True):
+    """智能体人设表。
+
+    定义一个 Agent 人设：系统提示词、头像、默认模型与绑定的工具集。
+
+    Attributes:
+        id: 主键，UUID 自动生成。
+        user_id: 所属用户，级联删除。
+        name: 人设名称。
+        prompt: 系统提示词。
+        avatar: 头像 URL 或路径（可为空）。
+        default_provider_id: 默认使用的 Provider id（为空时用用户默认）。
+        tools: 绑定的工具名列表（JSON）。
+        is_active: 是否启用。
+        created_at: 创建时间（UTC）。
+    """
+
+    __tablename__ = "personas"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=UUID(as_uuid=True),
+    )
+    user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE", index=True)
+    name: str = Field(sa_type=String(100), max_length=100)
+    prompt: str = Field(sa_type=Text)  # 系统提示词
+    avatar: str | None = Field(default=None, sa_type=String(500), max_length=500)
+    default_provider_id: uuid.UUID | None = Field(
+        default=None, sa_type=UUID(as_uuid=True)
+    )
+    tools: list[str] = Field(default_factory=list, sa_type=JSON)
+    is_active: bool = True
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True), default=get_datetime_utc, nullable=False
+        ),
+    )
+
+
+# ── 9. AgentRun（执行记录）────────────────────────────────────
+
+
+class AgentRun(SQLModel, table=True):
+    """Agent 执行记录表。
+
+    每次用户触发 Agent 执行都会写入一条记录，用于追踪状态、
+    token 消耗、耗时与错误信息。
+
+    Attributes:
+        id: 主键，UUID 自动生成。
+        conversation_id: 所属会话；会话删除时置 NULL（SET NULL）。
+        user_id: 所属用户，级联删除。
+        provider_id: 本次使用的 Provider id（可为空）。
+        persona_id: 本次使用的人设 id（可为空）。
+        status: 执行状态，running / completed / failed / interrupted。
+        input_text: 用户输入文本。
+        output_text: Agent 最终输出（可为空）。
+        tool_calls_made: 本次执行的工具调用次数。
+        tokens_used: 消耗的 token 数。
+        duration_ms: 执行耗时（毫秒，可为空）。
+        error_message: 失败时的错误信息（可为空）。
+        created_at: 创建时间（UTC）。
+        conversation: 反向关联的会话对象。
+    """
+
+    __tablename__ = "agent_runs"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=UUID(as_uuid=True),
+    )
+    conversation_id: uuid.UUID | None = Field(
+        default=None, foreign_key="conversations.id", ondelete="SET NULL", index=True
+    )
+    user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE", index=True)
+    provider_id: uuid.UUID | None = Field(default=None, sa_type=UUID(as_uuid=True))
+    persona_id: uuid.UUID | None = Field(default=None, sa_type=UUID(as_uuid=True))
+    status: str = Field(sa_type=String(20), max_length=20)  # running/completed/...
+    input_text: str = Field(sa_type=Text)
+    output_text: str | None = Field(default=None, sa_type=Text)
+    tool_calls_made: int = 0
+    tokens_used: int = 0
+    duration_ms: int | None = None
+    error_message: str | None = Field(default=None, sa_type=Text)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True), default=get_datetime_utc, nullable=False
+        ),
+    )
+
+    conversation: Conversation | None = Relationship(back_populates="runs")

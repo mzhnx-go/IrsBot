@@ -1,0 +1,92 @@
+# 🔧 本文件已在 Phase D1 精简（2026-09-17）：
+#   D1.1  剥离部署层残留：删除 traefik 全套 labels、`proxy` 服务、`adminer`、
+#         以及 ${DOMAIN} / ${STACK_NAME} 变量和 traefik-public 网络。
+#         → 现在只有 db / prestart / backend 三个服务，没有反向代理，
+#           对外端口由 compose.override.yml 的 backend.ports 直接暴露（8000）。
+#   D1.3e 删除独立的 `frontend` 服务：前端产物由 backend 容器静态托管
+#         （dist 绑定挂载 + SPA fallback），不再需要 nginx 容器。
+#   D1.5  删除 `image:` 字段与 .env 的 DOCKER_IMAGE_BACKEND / DOCKER_IMAGE_FRONTEND / TAG。
+#         本地开发只要有 `build:` 就够了，镜像名由 compose 自动生成为
+#         <项目名>-<服务名>（本项目即 irsbot-backend）。
+#
+# ⚠️ 变量约束：下面所有 `?Variable not set` 的变量都必须在 .env 里存在，否则 compose 直接报错。
+
+services:
+
+  db:
+    image: postgres:18
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    volumes:
+      - app-db-data:/var/lib/postgresql/data/pgdata
+    env_file:
+      - .env
+    environment:
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
+      - POSTGRES_USER=${POSTGRES_USER?Variable not set}
+      - POSTGRES_DB=${POSTGRES_DB?Variable not set}
+
+  prestart:
+    # 一次性任务：等 db 可连 → alembic upgrade head → 播种初始数据（superuser + 默认模型源）
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+    command: bash scripts/prestart.sh
+    env_file:
+      - .env
+    environment:
+      # 🔴 必须在这里显式覆盖 POSTGRES_SERVER。
+      #    本服务同时有 env_file: .env，而 .env 里可能是 localhost（宿主机裸跑 backend 时用）；
+      #    env_file 的值优先级高于 compose 的 environment，除非在 environment 里再声明一次。
+      #    ${POSTGRES_SERVER:-db} = 「.env 没设就用 db」，保留指向宿主机 PG 的后门。
+      - POSTGRES_SERVER=${POSTGRES_SERVER:-db}
+      - SECRET_KEY=${SECRET_KEY?Variable not set}
+      - FIRST_SUPERUSER=${FIRST_SUPERUSER?Variable not set}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD?Variable not set}
+
+  backend:
+    restart: always
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      prestart:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_SERVER=${POSTGRES_SERVER:-db}
+      - SECRET_KEY=${SECRET_KEY?Variable not set}
+      - FIRST_SUPERUSER=${FIRST_SUPERUSER?Variable not set}
+      - FIRST_SUPERUSER_PASSWORD=${FIRST_SUPERUSER_PASSWORD?Variable not set}
+    healthcheck:
+      # ⚠️ 基础镜像是 python:3.13-slim，**没有 curl** —— 原来的
+      #   test: ["CMD", "curl", "-f", ...] 每次都 OCI runtime exec failed，容器永远 unhealthy。
+      #   改用镜像自带的 python（Dockerfile 已把 /app/.venv/bin 加入 PATH）。
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/utils/health-check/').status == 200 else 1)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  app-db-data:

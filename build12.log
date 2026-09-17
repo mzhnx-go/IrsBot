@@ -1,0 +1,76 @@
+﻿docker :  Image irsbot-backend Building 
+所在位置 行:453 字符: 1
++ docker compose --progress=plain build backend 2>&1 | Out-File "d:\AIp ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( Image irsbot-backend Building :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ Image irsbot-prestart Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 937B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 6.76kB 0.0s done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for ghcr.io/astral-sh/uv:0.9.26
+#3 DONE 0.0s
+
+#4 [internal] load metadata for docker.io/library/python:3.13-slim
+#4 DONE 0.1s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 1.03kB done
+#5 DONE 0.0s
+
+#6 [stage-0 1/9] FROM docker.io/library/python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285
+#6 resolve docker.io/library/python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285 0.0s done
+#6 DONE 0.0s
+
+#7 FROM ghcr.io/astral-sh/uv:0.9.26@sha256:9a23023be68b2ed09750ae636228e903a54a05ea56ed03a934d00fe9fbeded4b
+#7 resolve ghcr.io/astral-sh/uv:0.9.26@sha256:9a23023be68b2ed09750ae636228e903a54a05ea56ed03a934d00fe9fbeded4b 0.0s done
+#7 DONE 0.0s
+
+#8 [internal] load build context
+#8 transferring context: 956.50kB 0.1s done
+#8 DONE 0.1s
+
+#9 [stage-0 2/9] COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /bin/
+#9 CACHED
+
+#10 [stage-0 4/9] RUN --mount=type=bind,source=wheelhouse,target=/app/wheelhouse     --mount=type=bind,source=wheelhouse-req.txt,target=/app/wheelhouse-req.txt     uv venv /app/.venv &&     uv pip install --python /app/.venv/bin/python       -r /app/wheelhouse-req.txt       --find-links /app/wheelhouse       --offline       --no-cache       --compile-bytecode
+#10 CACHED
+
+#11 [stage-0 5/9] COPY ./backend/scripts /app/backend/scripts
+#11 CACHED
+
+#12 [stage-0 3/9] WORKDIR /app/
+#12 CACHED
+
+#13 [stage-0 6/9] COPY ./backend/pyproject.toml ./backend/alembic.ini /app/backend/
+#13 CACHED
+
+#14 [stage-0 7/9] COPY ./backend/app /app/backend/app
+#14 DONE 0.1s
+
+#15 [stage-0 8/9] COPY ./frontend/dist /app/frontend-dist
+#15 DONE 0.1s
+
+#16 [stage-0 9/9] WORKDIR /app/backend/
+#16 DONE 0.0s
+
+#17 exporting to image
+#17 exporting layers 0.1s done
+#17 exporting manifest sha256:c748825edf1e61b6e2444b04567e8fd63176a53740bf5e775104d63677214976 0.0s done
+#17 exporting config sha256:ce0be37cbf031d0540600bb28cd6916d38f5f1c0d791249c60bc3754e250cc2f 0.0s done
+#17 exporting attestation manifest sha256:d697ed65925b7362da2bbd082f66edb0e6365eb383d8c71efcc58d4cef92ed8b 0.0s done
+#17 exporting manifest list sha256:c5ff0e7fd63cdefe20a0b570c0f7c8b5af0cc5740bb663acd1bbaba06323c90c 0.0s done
+#17 naming to docker.io/library/irsbot-backend:latest
+#17 naming to docker.io/library/irsbot-backend:latest done
+#17 unpacking to docker.io/library/irsbot-backend:latest 0.1s done
+#17 DONE 0.4s
+
+#18 resolving provenance for metadata file
+#18 DONE 0.0s
+ Image irsbot-backend Built 

@@ -1,0 +1,25 @@
+.vscode/*
+!.vscode/extensions.json
+.env
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Python 生成物
+__pycache__/
+*.py[cod]
+.venv/
+backend/uploads/
+.trae/
+skills-lock.json
+
+# backup dumps (may contain secrets)
+backups/
+
+# WorkBuddy 工具元数据（非项目代码；memory 可能含本地密钥明文）
+.workbuddy/
+
+# 离线 wheelhouse（构建缓存，可由 Dockerfile 流程重新生成）
+wheelhouse/

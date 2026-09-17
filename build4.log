@@ -1,0 +1,103 @@
+﻿docker : time="2026-09-17T01:04:06+08:00" level=warning msg="The \"CI\" variable is not set. Defaulting to a blank stri
+ng."
+所在位置 行:446 字符: 1
++ docker compose --progress=plain build backend 2>&1 | Out-File "d:\AIp ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (time="2026-09-1... blank string.":String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ Image backend:latest Building 
+ Image backend:latest Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 936B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 5.67kB 0.0s done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for ghcr.io/astral-sh/uv:0.9.26
+#3 DONE 0.0s
+
+#4 [internal] load metadata for docker.io/library/python:3.13-slim
+#4 DONE 0.1s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [stage-0 1/8] FROM docker.io/library/python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285
+#6 resolve docker.io/library/python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285 0.0s done
+#6 DONE 0.0s
+
+#7 FROM ghcr.io/astral-sh/uv:0.9.26@sha256:9a23023be68b2ed09750ae636228e903a54a05ea56ed03a934d00fe9fbeded4b
+#7 resolve ghcr.io/astral-sh/uv:0.9.26@sha256:9a23023be68b2ed09750ae636228e903a54a05ea56ed03a934d00fe9fbeded4b 0.0s done
+#7 DONE 0.0s
+
+#8 [stage-0 2/8] COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /bin/
+#8 CACHED
+
+#9 [stage-0 3/8] WORKDIR /app/
+#9 CACHED
+
+#10 [internal] load build context
+#10 transferring context: 219.04kB 0.0s done
+#10 DONE 0.0s
+
+#11 [stage-0 4/8] RUN --mount=type=bind,source=wheelhouse,target=/app/wheelhouse     --mount=type=bind,source=wheelhouse-req.txt,target=/app/wheelhouse-req.txt     --mount=type=cache,target=/root/.cache/uv     uv venv /app/.venv &&     uv pip install --python /app/.venv/bin/python       -r /app/wheelhouse-req.txt       --find-links /app/wheelhouse       --offline       --compile-bytecode
+#11 0.252 Using CPython 3.13.15 interpreter at: /usr/local/bin/python
+#11 0.252 Creating virtual environment at: .venv
+#11 0.557   脳 No solution found when resolving dependencies:
+#11 0.557   鈺扳攢鈻?Because packaging==25.0 needs to be downloaded from a registry and you
+#11 0.557       require packaging==25.0, we can conclude that your requirements are
+#11 0.557       unsatisfiable.
+#11 0.557 
+#11 0.557       hint: Packages were unavailable because the network was disabled. When
+#11 0.557       the network is disabled, registry packages may only be read from the
+#11 0.557       cache.
+#11 ERROR: process "/bin/sh -c uv venv /app/.venv &&     uv pip install --python /app/.venv/bin/python       -r /app/wheelhouse-req.txt       --find-links /app/wheelhouse       --offline       --compile-bytecode" did not complete successfully: exit code: 1
+------
+ > [stage-0 4/8] RUN --mount=type=bind,source=wheelhouse,target=/app/wheelhouse     --mount=type=bind,source=wheelhouse-req.txt,target=/app/wheelhouse-req.txt     --mount=type=cache,target=/root/.cache/uv     uv venv /app/.venv &&     uv pip install --python /app/.venv/bin/python       -r /app/wheelhouse-req.txt       --find-links /app/wheelhouse       --offline       --compile-bytecode:
+0.252 Using CPython 3.13.15 interpreter at: /usr/local/bin/python
+0.252 Creating virtual environment at: .venv
+0.557   脳 No solution found when resolving dependencies:
+0.557   鈺扳攢鈻?Because packaging==25.0 needs to be downloaded from a registry and you
+0.557       require packaging==25.0, we can conclude that your requirements are
+0.557       unsatisfiable.
+0.557 
+0.557       hint: Packages were unavailable because the network was disabled. When
+0.557       the network is disabled, registry packages may only be read from the
+0.557       cache.
+------
+Dockerfile:87
+
+--------------------
+
+  86 |     #         瀹炴祴锛?36 涓?wheel 鍏?150MB锛屾竻鍗庢簮 1m15s 涓嬪畬锛堝鍣ㄥ唴鍚岄噺瑕?30-60 鍒嗛挓锛夈€?
+
+  87 | >>> RUN --mount=type=bind,source=wheelhouse,target=/app/wheelhouse \
+
+  88 | >>>     --mount=type=bind,source=wheelhouse-req.txt,target=/app/wheelhouse-req.txt \
+
+  89 | >>>     --mount=type=cache,target=/root/.cache/uv \
+
+  90 | >>>     uv venv /app/.venv && \
+
+  91 | >>>     uv pip install --python /app/.venv/bin/python \
+
+  92 | >>>       -r /app/wheelhouse-req.txt \
+
+  93 | >>>       --find-links /app/wheelhouse \
+
+  94 | >>>       --offline \
+
+  95 | >>>       --compile-bytecode
+
+  96 |     
+
+--------------------
+
+failed to solve: process "/bin/sh -c uv venv /app/.venv &&     uv pip install --python /app/.venv/bin/python       -r /
+app/wheelhouse-req.txt       --find-links /app/wheelhouse       --offline       --compile-bytecode" did not complete su
+ccessfully: exit code: 1
+

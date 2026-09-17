@@ -1,0 +1,218 @@
+﻿docker : time="2026-09-17T01:13:31+08:00" level=warning msg="The \"CI\" variable is not set. Defaulting to a blank stri
+ng."
+所在位置 行:446 字符: 1
++ docker compose --progress=plain build backend 2>&1 | Out-File "d:\AIp ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (time="2026-09-1... blank string.":String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ Image backend:latest Building 
+ Image backend:latest Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 936B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 5.97kB 0.0s done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for ghcr.io/astral-sh/uv:0.9.26
+#3 DONE 0.0s
+
+#4 [internal] load metadata for docker.io/library/python:3.13-slim
+#4 DONE 0.1s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [stage-0 1/8] FROM docker.io/library/python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285
+#6 resolve docker.io/library/python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285 0.0s done
+#6 DONE 0.0s
+
+#7 FROM ghcr.io/astral-sh/uv:0.9.26@sha256:9a23023be68b2ed09750ae636228e903a54a05ea56ed03a934d00fe9fbeded4b
+#7 resolve ghcr.io/astral-sh/uv:0.9.26@sha256:9a23023be68b2ed09750ae636228e903a54a05ea56ed03a934d00fe9fbeded4b 0.0s done
+#7 DONE 0.0s
+
+#8 [stage-0 2/8] COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /bin/
+#8 CACHED
+
+#9 [stage-0 3/8] WORKDIR /app/
+#9 CACHED
+
+#10 [internal] load build context
+#10 transferring context: 25.50kB 0.0s done
+#10 DONE 0.0s
+
+#11 [stage-0 4/8] RUN --mount=type=bind,source=wheelhouse,target=/app/wheelhouse     --mount=type=bind,source=wheelhouse-req.txt,target=/app/wheelhouse-req.txt     uv venv /app/.venv &&     uv pip install --python /app/.venv/bin/python       -r /app/wheelhouse-req.txt       --find-links /app/wheelhouse       --offline       --no-cache       --compile-bytecode
+#11 0.357 Using CPython 3.13.15 interpreter at: /usr/local/bin/python
+#11 0.357 Creating virtual environment at: .venv
+#11 0.591 Resolved 136 packages in 74ms
+#11 2.883 Prepared 136 packages in 2.29s
+#11 3.303 Installed 136 packages in 419ms
+#11 6.425 Bytecode compiled 10859 files in 3.12s
+#11 6.425  + aiohappyeyeballs==2.6.2
+#11 6.425  + aiohttp==3.14.1
+#11 6.425  + aiosignal==1.4.0
+#11 6.425  + alembic==1.18.4
+#11 6.425  + annotated-doc==0.0.4
+#11 6.425  + annotated-types==0.7.0
+#11 6.425  + anthropic==0.111.0
+#11 6.425  + anyio==4.12.1
+#11 6.425  + argon2-cffi==25.1.0
+#11 6.425  + argon2-cffi-bindings==25.1.0
+#11 6.425  + attrs==26.1.0
+#11 6.425  + bcrypt==4.3.0
+#11 6.425  + beautifulsoup4==4.15.0
+#11 6.425  + certifi==2026.1.4
+#11 6.425  + cffi==2.0.0
+#11 6.425  + charset-normalizer==3.4.7
+#11 6.425  + click==8.3.1
+#11 6.425  + cryptography==49.0.0
+#11 6.425  + dataclasses-json==0.6.7
+#11 6.425  + defusedxml==0.7.1
+#11 6.425  + distro==1.9.0
+#11 6.425  + dnspython==2.8.0
+#11 6.425  + docstring-parser==0.18.0
+#11 6.425  + email-validator==2.3.0
+#11 6.425  + faiss-cpu==1.15.0
+#11 6.425  + fastapi==0.136.3
+#11 6.425  + fastapi-cli==0.0.21
+#11 6.425  + fastapi-cloud-cli==0.11.0
+#11 6.425  + fastar==0.11.0
+#11 6.425  + filetype==1.2.0
+#11 6.425  + frozenlist==1.8.0
+#11 6.425  + google-ai-generativelanguage==0.12.0
+#11 6.425  + google-api-core==2.31.0
+#11 6.425  + google-auth==2.55.0
+#11 6.425  + googleapis-common-protos==1.75.0
+#11 6.425  + greenlet==3.3.0
+#11 6.425  + grpcio==1.81.1
+#11 6.425  + grpcio-status==1.81.1
+#11 6.425  + h11==0.16.0
+#11 6.425  + httpcore==1.0.9
+#11 6.425  + httptools==0.7.1
+#11 6.425  + httpx==0.28.1
+#11 6.425  + httpx-sse==0.4.3
+#11 6.425  + idna==3.15
+#11 6.425  + jinja2==3.1.6
+#11 6.425  + jiter==0.15.0
+#11 6.425  + jsonpatch==1.33
+#11 6.425  + jsonpointer==3.1.1
+#11 6.425  + jsonschema==4.26.0
+#11 6.425  + jsonschema-specifications==2025.9.1
+#11 6.425  + langchain==0.3.30
+#11 6.425  + langchain-anthropic==0.2.4
+#11 6.425  + langchain-community==0.3.31
+#11 6.425  + langchain-core==0.3.86
+#11 6.425  + langchain-google-genai==2.1.12
+#11 6.425  + langchain-milvus==0.2.1
+#11 6.425  + langchain-openai==0.2.14
+#11 6.425  + langchain-text-splitters==0.3.11
+#11 6.425  + langgraph==0.2.76
+#11 6.425  + langgraph-checkpoint==2.1.2
+#11 6.425  + langgraph-sdk==0.1.74
+#11 6.425  + langsmith==0.8.18
+#11 6.425  + mako==1.3.12
+#11 6.425  + markdown-it-py==4.0.0
+#11 6.425  + markupsafe==3.0.3
+#11 6.425  + marshmallow==3.26.2
+#11 6.425  + mcp==1.28.0
+#11 6.425  + mdurl==0.1.2
+#11 6.426  + milvus-lite==3.2.1
+#11 6.426  + multidict==6.7.1
+#11 6.426  + mypy-extensions==1.1.0
+#11 6.426  + numpy==2.4.6
+#11 6.426  + openai==1.109.1
+#11 6.426  + orjson==3.11.9
+#11 6.426  + ormsgpack==1.12.2
+#11 6.426  + packaging==25.0
+#11 6.426  + pandas==3.0.3
+#11 6.426  + propcache==0.5.2
+#11 6.426  + proto-plus==1.28.0
+#11 6.426  + protobuf==7.35.1
+#11 6.426  + psycopg==3.3.4
+#11 6.426  + psycopg-binary==3.3.4
+#11 6.426  + pwdlib==0.3.0
+#11 6.426  + pyarrow==25.0.1
+#11 6.426  + pyasn1==0.6.3
+#11 6.426  + pyasn1-modules==0.4.2
+#11 6.426  + pycparser==3.0
+#11 6.426  + pydantic==2.13.4
+#11 6.426  + pydantic-core==2.46.4
+#11 6.426  + pydantic-extra-types==2.11.0
+#11 6.426  + pydantic-settings==2.14.1
+#11 6.426  + pygments==2.20.0
+#11 6.426  + pyjwt==2.13.0
+#11 6.426  + pymilvus==2.5.18
+#11 6.426  + pypdf==6.13.3
+#11 6.426  + python-dateutil==2.9.0.post0
+#11 6.426  + python-dotenv==1.2.2
+#11 6.426  + python-magic==0.4.27
+#11 6.426  + python-multipart==0.0.32
+#11 6.426  + pyyaml==6.0.3
+#11 6.426  + rank-bm25==0.2.2
+#11 6.426  + referencing==0.37.0
+#11 6.426  + regex==2026.5.9
+#11 6.426  + requests==2.34.2
+#11 6.426  + requests-toolbelt==1.0.0
+#11 6.426  + rich==14.2.0
+#11 6.426  + rich-toolkit==0.17.1
+#11 6.426  + rignore==0.7.6
+#11 6.426  + rpds-py==2026.5.1
+#11 6.426  + sentry-sdk==2.62.0
+#11 6.426  + setuptools==84.0.0
+#11 6.426  + shellingham==1.5.4
+#11 6.426  + six==1.17.0
+#11 6.426  + sniffio==1.3.1
+#11 6.426  + soupsieve==2.8.4
+#11 6.426  + sqlalchemy==2.0.45
+#11 6.426  + sqlmodel==0.0.38
+#11 6.426  + sse-starlette==3.4.4
+#11 6.426  + starlette==1.3.1
+#11 6.426  + tenacity==9.1.4
+#11 6.427  + tiktoken==0.13.0
+#11 6.427  + tqdm==4.68.3
+#11 6.427  + typer==0.21.1
+#11 6.427  + typing-extensions==4.15.0
+#11 6.427  + typing-inspect==0.9.0
+#11 6.427  + typing-inspection==0.4.2
+#11 6.427  + ujson==6.0.0
+#11 6.427  + urllib3==2.7.0
+#11 6.427  + uuid-utils==0.16.2
+#11 6.427  + uvicorn==0.40.0
+#11 6.427  + uvloop==0.22.1
+#11 6.427  + watchfiles==1.1.1
+#11 6.427  + websockets==16.0
+#11 6.427  + xxhash==3.7.0
+#11 6.427  + yarl==1.24.2
+#11 6.427  + zstandard==0.25.0
+#11 DONE 7.0s
+
+#12 [stage-0 5/8] COPY ./backend/scripts /app/backend/scripts
+#12 DONE 0.2s
+
+#13 [stage-0 6/8] COPY ./backend/pyproject.toml ./backend/alembic.ini /app/backend/
+#13 DONE 0.0s
+
+#14 [stage-0 7/8] COPY ./backend/app /app/backend/app
+#14 DONE 0.1s
+
+#15 [stage-0 8/8] WORKDIR /app/backend/
+#15 DONE 0.0s
+
+#16 exporting to image
+#16 exporting layers
+#16 exporting layers 18.9s done
+#16 exporting manifest sha256:942b27a90f693943d17f35567d06ad87ea3e76b57c48864d791f4c12da1c6583 0.0s done
+#16 exporting config sha256:263fca1007687b6656958b6c07448295b361479b410ab47e1aeb3fd7da1e25ec 0.0s done
+#16 exporting attestation manifest sha256:fc960e32018fd1f3a1a11463a06de7b6b3dec54ae545899c770d7dd433f55db0 0.0s done
+#16 exporting manifest list sha256:e3c5b130f5b5387790731c0937d2a0fdd9b210569bea3d09eef93d1155b1accf 0.0s done
+#16 naming to docker.io/library/backend:latest done
+#16 unpacking to docker.io/library/backend:latest
+#16 unpacking to docker.io/library/backend:latest 5.5s done
+#16 DONE 24.5s
+
+#17 resolving provenance for metadata file
+#17 DONE 0.0s
+ Image backend:latest Built 

@@ -1,0 +1,26 @@
+﻿Looking in indexes: https://pypi.tuna.tsinghua.edu.cn/simple
+Collecting faiss-cpu==1.15.0 (from -r wheelhouse-extra.txt (line 1))
+  Downloading faiss_cpu-1.15.0-cp310-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (18.8 MB)
+     ---------------------------------------- 18.8/18.8 MB 10.6 MB/s  0:00:01
+Collecting milvus-lite==3.2.1 (from -r wheelhouse-extra.txt (line 2))
+  Downloading milvus_lite-3.2.1-py3-none-any.whl (269 kB)
+Collecting pyarrow==25.0.1 (from -r wheelhouse-extra.txt (line 3))
+  Downloading pyarrow-25.0.1-cp313-cp313-manylinux_2_28_x86_64.whl (50.1 MB)
+     ---------------------------------------- 50.1/50.1 MB 15.0 MB/s  0:00:03
+Collecting uvloop==0.22.1 (from -r wheelhouse-extra.txt (line 4))
+  Downloading uvloop-0.22.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (4.4 MB)
+     ---------------------------------------- 4.4/4.4 MB 15.8 MB/s  0:00:00
+Saved .\wheelhouse\faiss_cpu-1.15.0-cp310-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+Saved .\wheelhouse\milvus_lite-3.2.1-py3-none-any.whl
+Saved .\wheelhouse\pyarrow-25.0.1-cp313-cp313-manylinux_2_28_x86_64.whl
+Saved .\wheelhouse\uvloop-0.22.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+Successfully downloaded faiss-cpu milvus-lite pyarrow uvloop
+D:\python\python.exe : 
+所在位置 行:446 字符: 1
++ D:\python\python.exe -m pip download -r wheelhouse-extra.txt -d wheel ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[notice] A new release of pip is available: 26.1.1 -> 26.2.1
+[notice] To update, run: python.exe -m pip install --upgrade pip

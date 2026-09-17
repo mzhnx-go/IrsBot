@@ -1,0 +1,24 @@
+﻿docker : time="2026-09-17T01:28:43+08:00" level=warning msg="The \"CI\" variable is not set. Defaulting to a blank stri
+ng."
+所在位置 行:446 字符: 1
++ docker compose up -d backend 2>&1 | Out-File "d:\AIpy\full-stack\IrsB ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (time="2026-09-1... blank string.":String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ Container irsbot-milvus-1 Running 
+ Container irsbot-db-1 Running 
+ Container irsbot-backend-1 Recreate 
+ Container irsbot-backend-1 Recreated 
+ Container irsbot-db-1 Waiting 
+ Container irsbot-db-1 Healthy 
+ Container irsbot-prestart-1 Starting 
+ Container irsbot-prestart-1 Started 
+ Container irsbot-prestart-1 Waiting 
+ Container irsbot-milvus-1 Waiting 
+ Container irsbot-db-1 Waiting 
+ Container irsbot-db-1 Healthy 
+ Container irsbot-milvus-1 Healthy 
+ Container irsbot-prestart-1 Exited 
+ Container irsbot-backend-1 Starting 
+ Container irsbot-backend-1 Started 
