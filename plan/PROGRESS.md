@@ -525,7 +525,7 @@ bun run --filter frontend build     # 构建 → frontend/dist/
 | 10.2 | 前端聊天页 | ✅ |
 | 10.3 | 前端管理页（Provider 外） | 🔶 **代码审查完成**：`admin.tsx` 用户管理页 + `settings.tsx` 设置页（含「模型源」tab）均已存在，侧边栏 `/settings`、`/admin`（superuser）导航已通；**缺口：知识库（KB）管理 UI 尚未建**，待确认是否补 |
 | 10.4 | 上下文记忆 | ✅ |
-| 10.5a–e | Provider 管理 UI 实测 5 项 | 🔶 **代码审查完成 + 修复 1 个阻断 bug**；5 项功能逻辑齐备，实测清单见 §10.6 |
+| 10.5a–e | Provider 管理 UI 实测 5 项 | 🔶 **已实测（API 层）**：a/b/c/e ✅ 通过；**d ⚠️ 发现缺陷**（删默认源后无默认）→ 待修；连带项 **f RAG 向量化 ✅ 通过**（`bfe1c7d` 修复已生效）。明细与证据见 §10.6 实测结果 |
 
 > 🔴 **代码审查发现并修复的阻断 bug（2026-09-17，Phase 10.5）**：
 > `backend/app/core/agent/provider.py::get_embedding_model` 把库中**加密存储**的 `pc.api_key`
@@ -551,6 +551,34 @@ bun run --filter frontend build     # 构建 → frontend/dist/
 
 **连带验证（修 bug 后必做）**：建一个知识库 → 上传文档 → 触发向量化，确认不再 `401`
 （embedding 现走解密后的真实 key）。
+
+### ✅ §10.6 实测结果（2026-09-17 21:xx，实栈 http://localhost:8000，API 层直测）
+
+> 说明：原计划在浏览器里点测，但**本环境无法启动浏览器**（`agent-browser` 已装好、Chrome 196MB 已下载，一旦拉起 Chromium 进程即被沙箱杀掉；`--help` 这类不启浏览器的命令正常）。改为**直连真实后端**逐项验证——数据层与互斥逻辑完全等价，只有「徽标是否渲染」属纯视觉项未覆盖。
+
+| 项 | 结果 | 实测证据 |
+|---|---|---|
+| **a 列表** | ✅ 通过 | `GET /providers` → 200，返回 `default`：`type=openai`、`model=qwen3.8-flash`、`base_url=https://dashscope.aliyuncs.com/compatible-mode/v1`、`is_default=True`、`is_active=True` |
+| **b 新增** | ✅ 通过 | `POST /providers` → 200，新行 `verify-test-106`（openai / gpt-4o-mini）落库；复测 `GET` 由 1 行变 2 行 |
+| **c 设为默认** | ✅ 通过（互斥生效） | `PATCH /providers/{新}` `{is_default:true}` → 200；复测 `default.is_default` 自动变 `False`，全库 `is_default=True` 行**数量 = 1** ✅ |
+| **d 删除** | ⚠️ **发现缺陷（未通过）** | `DELETE /providers/{新}` → 200 `{"ok":true}`，该行消失；**但原 `default` 行仍为 `is_default=False` → 全库没有任何默认模型源**，与预期「徽标回到 default」不符。**根因**：`ProviderManager.delete_provider()`（`provider.py:455–470`）只做 `session.delete(obj)`，**没有在删除的恰好是默认行时提升另一条为默认**（`clear_other_defaults(user_id, keep_id)` 具备能力但只在 create/update 路径被调用）。**影响**：用户删掉当前默认源后，界面无「默认」徽标，后端也失去默认源（聊天/RAG 取默认 Provider 的路径会拿不到） |
+| **e 加密** | ✅ 通过 | 全部行的响应体**均无 `api_key` 字段**（`has_api_key=False`）；仅 name/type/model/base_url/is_default/is_active |
+| **f RAG 向量化** | ✅ **通过（bfe1c7d 修复已生效）** | 建库 `verify-106-rag`（201）→ 上传 213 B txt → `status=done`、`chunks_count=1`（**embedding 写入成功，无 401**）→ `POST /kb/{id}/query` → 200，命中 1 条且**内容正是写入时的独有事实 `Iris-2026`** → 测试库已清理（DELETE 200） |
+
+> ⚠️ **实测过程污染与恢复**：d 项执行后环境一度处于「无默认模型源」状态，**已立即用 `PATCH /providers/{default.id}` `{is_default:true}` 恢复**（复测 `default.is_default=True` ✅）。测试用的 `verify-test-106` 模型源与 `verify-106-rag` 知识库均已删除，环境已还原。
+
+**结论**：5 项中 a/b/c/e 全通过，**f（最关键的一项）通过**；**d 暴露 1 个真实缺陷**（删默认后不自动提升新默认），建议修复。修复方案见下。
+
+### 🔧 待修：d 项缺陷（删默认源后无默认）
+
+**位置**：`backend/app/core/agent/provider.py::delete_provider`（455–470 行）
+
+**改法（两选一）**：
+- 方案 1（推荐，改动最小）：`delete_provider` 里先判断被删行 `is_default`；若为 True，删除后从该用户剩余 `is_active=True` 的行里挑一条（按 `fallback_order` 升序 / 创建时间最早）置为 `is_default=True`，并 `commit`。
+- 方案 2：删除后若该用户已无任何 `is_default=True` 的行，则不自动提升，改为**前端/接口显式提示「请重新指定默认模型源」**（更保守，但用户体验差一步）。
+
+**配套**：补一条回归测试（删默认行 → 断言仍有且仅有 1 条 `is_default=True`），符合项目「所有 API 端点都要有测试」的既定规则。
+
 
 **契约校验（已在沙箱静态确认）**：
 - `frontend/src/client/sdk.gen.ts` 的 `ProvidersService` 四个方法名/路径与 `useProviders.ts` 调用、**及后端 `providers.py` 路由**完全一致（`listProviders` GET、`createProvider` POST `{requestBody}`、`updateProvider` PATCH `{providerId,requestBody}`、`deleteProvider` DELETE `{providerId}`）。
