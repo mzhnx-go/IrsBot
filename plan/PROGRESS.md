@@ -23,13 +23,13 @@
 
 | 项 | 值 |
 |---|---|
-| **当前阶段** | **🎉 Phase D1–D7 ✅ + D5.1b ✅ 全完成**；**已建 git 回退基线**（独立仓库 `d:/AIpy/full-stack/IrsBot/.git`，分支 `feat/agent-platform`）；**✅ §10.6 Provider 实测 a–f 全部通过（2026-09-18）**：a 列表/b 新增/c 设默认/e 加密/f RAG 向量化 ✅；**d 项缺陷（删默认源后无默认）已修复**（`a746d10`：`delete_provider` 自动补位 + 7 条回归测试 + 实机 A/B 验证），详见第八节；**✅ 系统提示词功能已实施并实机验收（2026-09-17）**：User.system_prompt 列+迁移 `a1b2c3d4e5f6`、`prompts.py`、Agent 注入 SystemMessage、GET/PATCH `/users/me/system-prompt`、设置页「系统提示词」tab、client 已重新生成；**✅ 注册闸门已收口（2026-09-18）**：新增 `USERS_OPEN_REGISTRATION` 开关（安全默认 `false`，沿用 D6 工具开关范式）、`/users/signup` 加守卫（**置于查重之前**，防账号枚举）、前端登录页移除「注册」入口，+3 条测试并双层证伪 —— ⚠️ **前端 `frontend/dist` 需重新构建后 UI 才生效**（构建产物仍是旧版）→ **已重建**：用**仓库根** `node_modules` 跑 `vite build`（12.90s），新产物 `login-CP8ls77z.js`，旧产物与「还没有账号」字符串均已消失；dist 为绑定挂载 → 刷新浏览器即生效。**唯一未完成**：backend 容器内代码仍是旧版（沙箱 `docker` CLI 不可用），需用户 `docker compose up -d --build backend` 后复测应得 403 |
+| **当前阶段** | **🎉 Phase D1–D7 ✅ + D5.1b ✅ 全完成**；**已建 git 回退基线**（独立仓库 `d:/AIpy/full-stack/IrsBot/.git`，分支 `feat/agent-platform`）；**✅ §10.6 Provider 实测 a–f 全部通过（2026-09-18）**：a 列表/b 新增/c 设默认/e 加密/f RAG 向量化 ✅；**d 项缺陷（删默认源后无默认）已修复**（`a746d10`：`delete_provider` 自动补位 + 7 条回归测试 + 实机 A/B 验证），详见第八节；**✅ 系统提示词功能已实施并实机验收（2026-09-17）**：User.system_prompt 列+迁移 `a1b2c3d4e5f6`、`prompts.py`、Agent 注入 SystemMessage、GET/PATCH `/users/me/system-prompt`、设置页「系统提示词」tab、client 已重新生成；**✅ 注册闸门已收口（2026-09-18）**：新增 `USERS_OPEN_REGISTRATION` 开关（安全默认 `false`，沿用 D6 工具开关范式）、`/users/signup` 加守卫（**置于查重之前**，防账号枚举）、前端登录页移除「注册」入口，+3 条测试并双层证伪 —— ⚠️ **前端 `frontend/dist` 需重新构建后 UI 才生效**（构建产物仍是旧版）→ **已重建**：用**仓库根** `node_modules` 跑 `vite build`（12.90s），新产物 `login-CP8ls77z.js`，旧产物与「还没有账号」字符串均已消失；dist 为绑定挂载 → 刷新浏览器即生效。**✅ 容器同步已完成（2026-09-18）**：`docker compose up -d --build backend` 重建镜像成功（db / milvus / prestart / backend 全部 Recreate，**命名卷 `app-db-data` 数据保留**），容器内 `config.py`（`USERS_OPEN_REGISTRATION`）与 `users.py`（403 守卫）已确认为新版；**实机复测 `POST /users/signup` → 403 + 约定话术、防枚举响应逐字节一致、无账号落库**，详见第八节末「容器同步 + 注册闸门实机验证」 |
 | **代码状态** | 🔶 **有代码改动**：`backend/Dockerfile`（修 Python 版本）/ `backend/app/main.py`（静态托管）/ `frontend/src/main.tsx` + `routes/_layout/chat.tsx` + `hooks/useAgentChat.ts`（相对路径）/ `frontend/vite.config.ts`（proxy）/ `frontend/.env` + 配置类改动（见第四点五节） |
-| **运行状态** | ✅ `irsbot-milvus-1`（healthy） + `irsbot-db-1`（healthy）已由 compose 接管；✅ **本机 uvicorn :8001 已跑通 D1.3a**；🔶 `backend` 镜像**构建中**（`buildx history` → Running，28+ 分钟；**根因已锁定为容器虚拟网络限吞吐**，见 §3.3.5） |
-| **文档状态** | ✅ **已一致**：`istbot-implement-plan.md` 第零至十节全部对齐「Docker 交付」；`local-deployment-plan.md` 已升 **v7.2**（新增容器网络限速实测 + 「坑 C：日志文件误判」）；**2026-09-17 17:xx 全量回查再同步**：第一节 Phase 表 D1–D7 ⬜→✅、SC D1–D9 达成情况实证改判（D7 改判不迁移、D1 服务数 6→3）、10.1/10.5 待办消解结案、`local-deployment-plan.md` 状态头改「已全部完成」+ D1 子阶段表 + 风险表 8 行结案 |
+| **运行状态** | ✅ **全栈运行中（2026-09-18 重建后）**：`irsbot-backend-1` / `irsbot-db-1` / `irsbot-milvus-1` 全部 healthy，**backend 容器内代码 = 最新提交**（不再是「构建中」）；前端 `dist` 经绑定挂载 `/app/frontend-dist` 生效 |
+| **文档状态** | ✅ **已一致**（含 2026-09-18 **D2 语义拆分回查**）：`istbot-implement-plan.md` **第六轮同步**——把「Phase 11 因单用户整体降级」拆为 **(A) 多用户运营化**（降级不做）与 **(B) 归属隔离**（已实现为硬约束），共修 **15 处活引用**（0.0 决策表 / 0.2 / 0.4 / 0.5 / 一节阶段表 / Phase 3 / Phase 3.5 / SC11 / SC D10 / 6.1 能力矩阵 / 8.0 / 8.1 / 8.4 / 5.x 已移出表 / 第九节变更说明），`~~划掉~~` 与历轮留痕按「追溯性引用」**一律保留**；`local-deployment-plan.md` 已升 **v7.2**；详见第八节末「文档同步：D2 语义拆分」 |
 | **当前分支** | `feat/agent-platform`（未推送远端） |
 | **测试基线** | ✅ **全量最新实跑：`pytest ../tests -q` → 321 passed, 0 failed（123.29s，2026-09-18）**（上次 311；新增 = §10.6 修复 7 条 + 注册闸门 3 条；工作区另有未提交的 Provider 多租户加固测试，一并跑通）；后端 `py_compile` ✅；**前端 `tsc -p tsconfig.build.json --noEmit` → ExitCode 0 ✅**（`frontend/node_modules` 内无依赖、仅 vite 缓存 → 改用**仓库根** `node_modules/typescript/bin/tsc`）；**`vite build` ✅ 12.90s** 重建 dist |
-| **阻塞项** | **无** —— **D1.3a 已实机验证通过**（见下方验收表）；镜像构建是 D1.3c 分发优化，非阻塞 |
+| **阻塞项** | **无** —— 容器同步已闭环（2026-09-18）；**D1.3a 已实机验证通过**（见下方验收表）；镜像构建是 D1.3c 分发优化，非阻塞 |
 | **施工前必做** | **M1 待做（非阻塞）**；**M2 / M3 ✅ 已完成**；**Q1–Q3 ✅ 已确认**；Q4–Q10 待确认（见第九点五节） |
 
 > ✅ **D1.3a 实机验收（2026-09-17 00:23，本机 uvicorn 8001 端口，`IrsBot_WEBUI_DIR` 指向 `frontend/dist`）**：
@@ -135,7 +135,8 @@
 | # | 决策 | 影响 |
 |---|---|---|
 | D1 | 网页部署独立成另一个项目 | 本项目**单形态**；Phase 16 移出 |
-| D2 | 本地版单用户 | **Phase 11 降级**（仅保留 cache 淘汰 + `is_default` 约束） |
+| D2 | 本地版单用户 | **拆分**（2026-09-18）：**多用户运营化降级**（不做自助注册/配额/计费）；**归属隔离已实现为硬约束**（`user_id` 必填 + fail closed，`ef08cc1`）。另保留 cache 淘汰 + `is_default` 约束 |
+| **D2.1** | **注册入口默认关闭** | `USERS_OPEN_REGISTRATION=false` → `/users/signup` 直接 403；守卫置于查重之前防账号枚举（`41cccfd`） |
 | ~~D3~~ | ~~Docker 与裸机脚本都做~~ | ➖ **已变更** —— 见 D5 |
 | **D4** | **保持 PostgreSQL + Milvus**（不换 SQLite / FAISS） | **L1 / L2 阶段全部作废**；`local-deployment-plan.md` 整份重写 |
 | **D5** | **部署形态 = Docker 一键启动**（唯一前置：装 Docker） | 放弃裸机脚本路线；采用容器内全栈方案 |
@@ -620,7 +621,107 @@ $env:POSTGRES_SERVER="localhost"; $env:POSTGRES_DB="test_app"   # 覆盖 .env �
 - `providers.router` 已 `include_router` 进 `api/main.py`（第 22 行），端点真实存在。
 - `frontend/src/components/Providers/ProviderSettings.tsx` 表单 zod 校验、`AddProviderDialog`、`ProviderRow`（设为默认/删除确认）齐全；`is_default` 互斥由后端保证。
 
-> 代码层已具备实跑条件；**沙箱无法跑 Docker+前端+PG 全链路**，故 a–e 的点击实测与「embedding 不再 401」需你在 Windows 机器执行 `start.cmd` 后按上表走一遍。
+> ✅ **2026-09-18 更新**：上述「需你在 Windows 机器按表走一遍」**已全部完成**——a/b/c/e/f 于 2026-09-17 经实栈 API 直测通过，d 项缺陷已修复并 A/B 验证；容器代码同步见下一节。
+
+### ✅ 容器同步 + 注册闸门实机验证（2026-09-18）
+
+**背景**：上一轮结束时容器内仍是旧代码（`config.py` 无 `USERS_OPEN_REGISTRATION`、`users.py` 无 403 守卫），沙箱 `docker` CLI 不可用，只能留给用户在宿主机执行 `docker compose up -d --build backend`。本轮该步骤已执行并验证闭环。
+
+**关键认知**：`compose.override.yml` 里 backend 用的是 **`develop.watch`（`action: sync`）**，而 `docker compose up -d` **不会**启动 watch 守护进程 —— 所以「改了源码但容器里是旧的」是**预期行为**，不是 bug。同步方式二选一：
+
+| 方式 | 命令 | 说明 |
+|---|---|---|
+| **重建镜像（本次采用）** | `docker compose up -d --build backend` | 源码烘进镜像；**一次到位、可复现** |
+| 持续同步（开发时） | `docker compose watch` | 需另开一个常驻终端；改了即同步 |
+
+> ⚠️ 另有一条已知坑（本轮未踩）：容器内 `backend/` 非绑定挂载，若手动 `docker cp` 灌回**较旧**版本，mtime 变小 → uvicorn `--reload`（StatReload）**只在 mtime 变大时重载** → 造成「代码换了、行为却是旧的」假象。解法见 §10.6 d 节末的 `os.utime` 备注。
+
+**重建结果**：
+
+```
+Image irsbot-backend Built
+Container irsbot-db-1 Recreated / Started / Healthy
+Container irsbot-prestart-1 Exited          ← 迁移 + 播种跑完
+Container irsbot-backend-1 Started
+```
+
+- ✅ 4 个容器全部 Recreate（`db` / `prestart` / `backend` / `milvus` 保持 Running）
+- ✅ **数据未丢**：`db` 用命名卷 `app-db-data`，重建后 `user=1`、`provider_configs=1`（`default`，`is_default=True`）—— 与重建前基线一致
+
+**容器内代码校验（`docker compose exec backend grep`）**：
+
+| 目标 | 结果 |
+|---|---|
+| `app/core/config.py` | ✅ `167: USERS_OPEN_REGISTRATION: bool = False` |
+| `app/api/routes/users.py` | ✅ 403 守卫存在（`194: detail="Open user registration is forbidden on this server"`） |
+| `app/core/agent/provider.py` | ✅ `ProviderConfig.user_id == user_id` 出现 **7 处**（与仓库源码一致） |
+| `app/core/agent/provider.py` | ✅ 删默认源补位逻辑存在（`505:` 注释行） |
+| `app/core/agent/prompts.py` | ✅ `DEFAULT_SYSTEM_PROMPT` 存在（系统提示词功能已进容器） |
+| `/app/frontend-dist/assets` | ✅ 与宿主机 `frontend/dist` 一致（`login-CP8ls77z.js`，无旧产物） |
+
+**运行时验证（真实栈 `http://localhost:8000/api/v1`，7 项全过）**：
+
+| # | 断言 | 结果 |
+|---|---|---|
+| 1 | 后端存活 | ✅ `GET /utils/health-check/` → 200 |
+| 2 | **注册闸门生效** | ✅ `POST /users/signup` → **403** `{"detail":"Open user registration is forbidden on this server"}` |
+| 3 | **防账号枚举** | ✅ 已存在邮箱（`admin@example.com`）与不存在邮箱的响应**逐字节一致**（`403` + 同一 JSON）→ 证明守卫确实在「查重」**之前** |
+| 4 | 超管登录 | ✅ `POST /login/access-token`（**表单编码**，`OAuth2PasswordRequestForm` 不吃 JSON） → 200 |
+| 5 | **闸门关闭时无账号落库** | ✅ `GET /users/` → `users=['admin@example.com']`（无 `sync-probe` 账号），符合「单用户」定位 |
+| 6 | Provider 能力不回归 | ✅ `GET /providers` → `count=1`，`defaults=['default']`（恰好 1 条默认，重建后未失默认） |
+| 7 | 系统提示词不回归 | ✅ `GET /users/me/system-prompt` → 200 |
+
+> 🎯 **结论**：**容器同步闭环，D10（无自助注册入口）实机达成，既有能力无回归。**
+>
+> 📌 **复现命令**（宿主机 PowerShell，注意 `PowerShell` 的 stdout 常不回显 → 用 `Out-File` 落盘再读）：
+> ```powershell
+> cd d:\AIpy\full-stack\IrsBot
+> docker compose up -d --build backend
+> docker compose exec -T backend grep -n "USERS_OPEN_REGISTRATION" app/core/config.py
+> ```
+> 验「防枚举」时**两个请求的原始字节都要比对**，只看状态码无法区分「守卫在前」还是「守卫在后」。
+
+### ✅ 文档同步：D2 语义拆分（2026-09-18，第六轮）
+
+**漂移是什么**：`istbot-implement-plan.md` 写「因 D2（本地单用户），Phase 11 **整体降级** —— 串 Key 在单用户下不存在」，并把它落成一条**义务**：「Provider 读取函数保留可选归属参数位（`user_id: UUID | None = None`），单用户下忽略 —— **留接口不留逻辑**」。
+
+**而代码（`ef08cc1`）恰恰相反**：`user_id` 已是**必填位置参数**（无默认值），两条查找分支都过滤，缓存键含 `user_id`，`None` 时 **fail closed**。
+
+> 🔴 **这是最危险的一类漂移**：不是「忘了更新」，而是**文档与已发布代码方向相反**。照文档办事的人会以为「隔离不用做」，进而把 `user_id` 过滤**删掉**。
+
+**错在哪（根因）**：把**两件性质不同的事**当成一件处理了——
+
+| 拆分项 | 内容 | 正确处置 |
+|---|---|---|
+| **(A) 多用户「运营化」** | 自助注册、配额、计费、多账号自助闭环 | ➖ 降级不做（D2 + D1） |
+| **(B) 「归属隔离」** | 每条数据 / 每个 Provider 只能被归属者取到 | ✅ 已实现为硬约束 |
+
+原判「单用户下不存在串 Key」**只对 (A) 成立**。 (B) 有独立价值：① `get_chat_model(provider_id=None)` 若不过滤就是**全库**默认源 → 静默用错 Key（**无报错的越权**）② 代码库要被另一个多用户项目复用，留「忽略 user_id」的签名等于**预埋缺陷** ③ 安全默认优于留白。
+
+**一句话**：砍掉的是**运营功能**，不是**安全边界**。
+
+**本轮同步范围（只改活引用，保留追溯性引用）**：
+
+| 位置 | 改法 |
+|---|---|
+| 0.0 决策表 D2 行 | 拆为 (A)/(B) 两句；**新增 D2.1 行**（注册入口默认关闭） |
+| 0.2 定位决策表 | 「多租户要不要做」→ 明确指「多用户运营化」；「Provider 归属」→ 删掉「无需多租户隔离」 |
+| 0.4 现状表 | 「注册 关闭（单账号）」→ 写明开关名与 403 行为 |
+| 0.4 复用义务 | 「留接口不留逻辑」→ 改为「**归属隔离已实现**」 |
+| 0.5 追溯表 | 三行改判；**明确指出当年「把两句当一件事否掉」是过度归并** |
+| 一节阶段表 · Phase 3 | 补「归属隔离已实现」 |
+| Phase 3.5 | 删掉「单用户下忽略 user_id」，改为「已实现」 |
+| SC 表 · SC11 | `~~取消~~` → **✅ 达成**（并加一句说明「取消的应是运营化」） |
+| SC 表 · **新增 D10** | 无自助注册入口（含防枚举断言） |
+| 6.1 能力矩阵 | 删「**读取函数缺归属参数位**（留接口即可）」→ 「归属隔离已实现」 |
+| 8.0 引言 / 总览表 / 8.1 索引 | 「降级」→ 「运营化降级；归属隔离已实现」 |
+| **8.4 全节重写** | 原「为什么全部不再适用」→ 拆 (A)/(B) + 「已实现内容」表 + 逐项裁定 11.1–11.5 + 注册闸门小节 |
+| 五节「已移出本表」注 | 补 2026-09-18 更正 |
+| 第九节变更说明 | **追加第六轮 7 行**（不覆盖历史） |
+
+> ✅ **刻意保留（追溯性引用）**：0.5 表里 `~~划掉~~` 的历轮判断、第九节第五轮的历史记录、8.4 引言中**引用的原错误表述**（作为对照留痕）。**删除它们 = 下次还会被同一个错误意见说服。**
+
+**踩到的工具坑（值得记住）**：同一轮里**并行发多个文件编辑**时，出现过**部分编辑未落盘**（表现为「返回成功但内容还是旧的」）。→ **改完必须重新 grep 回查**，不能以「编辑返回成功」为准。本轮为此做了两轮 grep 复核，补回了 4 处漏改（0.4 注册行 / Phase 3 行 / 8.0 引言 / 8.1 索引）。
 
 ---
 
@@ -666,42 +767,46 @@ $env:POSTGRES_SERVER="localhost"; $env:POSTGRES_DB="test_app"   # 覆盖 .env �
 
 ## 十、下一步（明确动作）
 
-**第 0 步：~~审阅 + 回答 Q1–Q6~~** → ✅ **Q1–Q3 已确认，D1.2 已完成**；Q4–Q10 可在施工中陆续回答。
+> ⚠️ **本节已于 2026-09-18 重写**：原文是第五轮（D1 时代）的施工步骤，D1–D7 已完成，那些命令**不再需要执行**。以下为当前真实待办。
 
-**第 1 步：开工 D1.1**（剥离部署层残留 —— **不依赖任何调研结论，可立即动手**）
+**✅ 已闭环（无需再做）**：D1–D7 全部完成 ｜ D5 判定不迁移 ｜ §10.6 Provider a–f 实测 ｜ d 项缺陷修复 ｜ 系统提示词 ｜ 注册闸门（方案 a）｜ **容器同步（2026-09-18）**。
+
+**待办按优先级**：
+
+| # | 待办 | 依据 | 状态 |
+|---|---|---|---|
+| 1 | **D8「可分发」验证**：把仓库拷到干净机器/他人环境，装 Docker 后一条命令跑通（验证无本机隐式依赖） | SC **D8** ⬜ | 唯一未达成的 SC；需**另一台机器**，本机做不了 |
+| 2 | **D9 补验**：在**容器环境内**复跑 294 单测 + 18 集成测试（当前 321 passed 是宿主机跑的结果） | SC **D9** 🔶 | 容器内跑：`docker compose exec backend pytest ../tests -q` |
+| 3 | **Phase 15.1 历史对话侧边栏**：数据层（conversations/messages）已完备，缺侧边栏 UI —— 用户已确认「历史对话要能保存下来继续聊」 | 8.5 / 15.1 | 未开工；**用户可决定是否提前到本轮** |
+| 4 | **随手修（同属 `provider.py` / `models.py`）**：① `_chat_cache`/`_embed_cache` 加 LRU 或 TTL ② `is_default` 加 DB 级部分唯一索引 | 8.4 保留两项 | 与用户数无关，遇到就改 |
+| 5 | **Phase D1.3c 分发优化**（镜像体积/wheelhouse） | PROGRESS §5.3 | 非阻塞，可延后 |
+
+**验证命令速查**（宿主机 PowerShell；⚠️ PowerShell stdout 常不回显 → 一律 `Out-File` 落盘再 `Read`）：
 
 ```powershell
 cd d:\AIpy\full-stack\IrsBot
-# D1.1 改 compose.yml + compose.override.yml：
-#   删 traefik 全层 labels / traefik-public external 网络 / ${DOMAIN} / ${STACK_NAME}
-#   删 compose.traefik.yml、proxy、mailcatcher、playwright、nginx.conf
-#   .env 改 PROJECT_NAME=IrsBot、FRONTEND_HOST=http://localhost:8000
-# 改完立刻验证：
-docker compose config           # 目标：无任何 ?Variable not set 报错
-docker compose up -d db         # 只起 db，验证最小面
+
+# 容器健康与代码版本
+docker compose ps
+docker compose exec -T backend grep -n "USERS_OPEN_REGISTRATION" app/core/config.py
+
+# 注册闸门（期望 403）
+#   ⚠️ 必须比对"已存在邮箱"与"不存在邮箱"两个响应的原始字节，只看状态码无法验证防枚举
+curl.exe -s -o - -w "`n%{http_code}`n" -X POST http://localhost:8000/api/v1/users/signup `
+  -H "Content-Type: application/json" `
+  -d '{\"email\":\"admin@example.com\",\"password\":\"xxxxxxxx123\",\"full_name\":\"X\"}'
+
+# 容器内跑测试（D9）
+docker compose exec -T backend pytest ../tests -q
 ```
 
-**第 2 步：~~D1.2（Milvus）~~** → ✅ **已完成**（单容器内嵌 etcd，绑定挂载零迁移复用数据）
-
-**第 3 步：D1.3 → D1.4 → D1.5（前端托管 + 模板残留清理）**
+**改完源码后如何让容器生效**（二选一，别忘）：
 
 ```powershell
-# D1.3a: backend/app/main.py 加静态托管 + SPA fallback（排除 /api 前缀）
-# D1.3b: VITE_API_URL 改相对路径 /api
-# D1.3c: backend/Dockerfile 加 COPY ./frontend/dist /app/frontend-dist
-# D1.4 : 删 items（前后端 + 新增 alembic 迁移删表 + 侧边栏）
-# D1.5 : 清 DOCKER_IMAGE_*/TAG（与 image: 字段同批）
-# 💡 D1.3–D1.4 同批改前端、只构建一次
+docker compose up -d --build backend   # 重建镜像（一次到位、可复现）
+docker compose watch                   # 或：另开常驻终端持续同步
 ```
-
-**第 4 步：D2 + D3（启动脚本 + 首次引导）** → **第 5 步：D4 端到端验证** → **第 6 步：D5 数据迁移**
-
-```powershell
-# D4：重跑测试基线（务必带上 integration 标记，否则会被静默跳过）
-cd d:\AIpy\full-stack\IrsBot\backend
-uv run pytest -m integration -q     # 期望 18 passed
-uv run pytest -q                    # 期望 294 passed
-```
+> ⚠️ `docker compose up -d` **不会**启动 `develop.watch` → 「改了源码容器里还是旧的」是预期行为，不是 bug。
 
 ---
 
@@ -757,4 +862,6 @@ uv run pytest -q                    # 期望 294 passed
 | 2026-09-17 12:49 | **📋 系统提示词功能计划已写（未施工，待用户确认）**：新建 `plan/system-prompt-plan.md`，含现状结论（personas 表预留但全链路未打通）、方案（`user.system_prompt` 列 + alembic 迁移 + `prompts.py` 默认提示词 + Agent 消息最前注入 SystemMessage + `GET/PUT /users/me/system-prompt` + 设置页新 tab）、生效范围=**全局按用户、保存即生效**（不落消息表、动态注入）、默认提示词文案草案、4 步 4 提交执行序、实机验收 6 项。**待确认 3 项**：默认文案 / 全局范围 / 设置页入口。确认后开工 |
 | 2026-09-18 01:17 | **✅ 修复 Provider 解析的多租户越权缺口**：`ProviderManager.get_chat_model` / `get_embedding_model` 在 `provider_id=None` 时**只查 `is_default` + `is_active`，没有 `user_id` 过滤** → 多用户下 A 用户没有默认源时会**静默取到 B 用户的默认源**，越权使用他人密钥与模型（`chat_with_fallback` 的候选源查询同样缺过滤）。修复：① 两个方法增加**必填** `user_id` 形参，`provider_id` 分支与默认分支**都**加 `user_id` 过滤；② `chat_with_fallback` 增加 `user_id` 并在候选查询中过滤；③ **chat 缓存 key 补 `user_id`**（原 key 不含 user_id，不同用户用 `provider_id=None` 会命中同一条目拿到别人的模型实例——这是同一缺陷的隐蔽副本）；④ `Agent.__init__` 统一解析 `user_uuid` 并透传；⑤ `user_id` 为 `None` 时 **fail closed**（查不到任何源），绝不回落成「取全库任意默认源」。**顺带修掉一个预先存在的阻断 bug**：`get_embedding_model` 函数**首行**即 `from langchain_anthropic import AnthropicEmbeddings`，而该版本 `langchain_anthropic` **没有这个类** → 该函数对**任何** provider 都会在查库前 `ImportError`（无调用方故一直未被发现）；已改为**惰性导入**（仅在对应类型分支内导入）。**新增 7 条回归测试**（缓存 key 归属 1 条 + 多租户隔离 6 条：默认源不跨用户、优先取本人源、显式 provider_id 不可跨用户、无 user_id fail closed、embedding 不跨用户、回退候选按人过滤）。**证伪**：临时短路默认分支的 `user_id` 过滤 → 恰好 3 条相关测试失败（`DID NOT RAISE` / `MultipleResultsFound`），恢复后全绿 → 证明测试真覆盖缺陷。**全量回归 318 passed / 0 failed**（311 基线 + 7 新增）。⚠️ **踩坑留档**：新增测试里用 `asyncio.run()` 会**清空默认事件循环**，导致后续 16 条异步测试报 `no current event loop in thread 'MainThread'`；已改用 `pytest-asyncio` 的 `@pytest.mark.asyncio` + `await`。**当前仍是单用户，此缺口不可从 HTTP 触发**（chat 路由不暴露 `provider_id`），属多用户上线前必修项，现已前置修掉 |
 | 2026-09-18 01:xx | **✅ 修复 §10.6 d 项缺陷（提交 `a746d10`）**：`ProviderManager.delete_provider` 原只 `session.delete(obj)`，删掉当前默认源后**该用户再无任何 `is_default=True`**（徽标消失、取默认源直接 RuntimeError）。改为**删除前先选接替者**：若被删行 `is_default`，则在同用户**其余启用中**（`is_active=True`）配置里按 `fallback_order` 升序取一条置为默认，再删除并一次 `commit`。**三处关键约束**：① 只取启用中候选（`get_chat_model` 要求 `is_default` **与** `is_active` 同时成立，否则是"有徽标取不到模型"的假象）；② 严格按 `user_id` 过滤（否则会提升**他人**源 → 越权使用他人密钥）；③ 无接替者时保持无默认、不报错。**新增 7 条回归测试**（manager 6 + API 1）。**双层证伪**：测试层短路提升逻辑 → 恰好 4 条补位测试失败；实机层把 `cd1f17b` 旧版 `docker cp` 进容器跑同一动作序列 → `default` 掉成 `False`、**0 条默认**（缺陷如实复现）；换回修复版 → 恰好 1 条默认且自动补位 ✅。**全量回归 311 passed**。⚠️ **重要坑**：uvicorn `--reload`（StatReload）**只在 mtime 变大时重载**，用 `docker cp` 灌回较旧版本不会触发重载 → 需 `os.utime` 把 mtime 顶到未来。环境已还原（仅剩 `default` 且为默认） |
-| 2026-09-18 01:3x | **✅ 注册闸门收口（用户批准「方案 a」）**：起因 = 用户问「为什么有多用户」，调研发现 `/users/signup` **完全无守卫**（探针实测：匿名 `POST /users/signup` → **HTTP 200 建号成功**，新号可立即登录拿 token；根因 = 模板原版的 `if not settings.USERS_OPEN_REGISTRATION` 守卫**被删掉**且 `config.py` 根本没有该字段），而前端 `routes/signup.tsx` 是完整注册页、`login.tsx:126` 还有「注册」链接 → **「单用户」从事实降级成了假设**。**实施（沿用 D6 工具开关范式：安全默认 + `.env` 显式开启）**：① `config.py` 新增 `USERS_OPEN_REGISTRATION: bool = False`；② `users.py::register_user` 加守卫，**严格要求置于查重之前**（否则未开放时「400 邮箱已存在」与「403」的差异会变成**账号枚举探测面**），并清掉排障残留（`import traceback` + `print("=== SIGNUP ERROR ===")`）；③ `.env` 补显式声明与注释（与 `ENABLE_SHELL` 等排在一起）；④ 前端 `login.tsx` 删「注册」链接及随之无用的 `Link as RouterLink` import（`createFileRoute`/`redirect` 仍在用）。**测试 +3**：`forbidden_when_disabled`（403 且不落库）、`signup_disabled_does_not_leak_email_existence`（已存在 vs 全新邮箱响应**逐字节一致**）、`users_open_registration_default_is_false`（锁字段默认值不受 `.env` 影响）；原 2 条注册测试改为 `monkeypatch` 打开开关后运行。**双层证伪**：短路守卫 → 恰好 2 条失败；把守卫**挪到查重之后** → 恰好 1 条（防枚举那条）失败 → 两条约束均被真实锁住。**全量回归 321 passed / 0 failed**（318 + 3）。**前端已收尾**：`tsc -p tsconfig.build.json --noEmit` → ExitCode 0（**必须用仓库根 `node_modules`** —— `frontend/node_modules` 里其实没有依赖，只有 vite 缓存）；`vite build` 12.90s 重建 `frontend/dist`（新产物 `login-CP8ls77z.js`，旧产物连同「还没有账号」字符串一并清除）→ dist 为**绑定挂载**，刷新浏览器即生效。⚠️ **唯一未完成项**：backend 容器内代码仍是旧版（沙箱 `docker` CLI 本次完全不可用，连 `docker --version` 都报 `/usr/bin/env: 'sh'`），实测打真实接口 `POST /users/signup` **仍返回 200** → 需用户 `docker compose up -d --build backend`（或 `docker compose watch`）后复测应得 403。三层多用户残留溯源已留档 memory 日志 |
+| 2026-09-18 01:33 | **✅ 容器同步闭环 + 注册闸门实机验证（用户指令「同步」）**：沙箱此前 `docker` CLI 完全不可用，本轮恢复可执行。**① 容器同步**：`docker compose up -d --build backend` → 镜像构建成功、4 容器 Recreate（`db`/`prestart`/`backend`/`milvus`）、`prestart` 迁移+播种跑完、backend Started；**命名卷 `app-db-data` 数据保留**（重建后 `user=1`、`provider_configs=1` 且 `is_default=True`）。**② 容器内代码校验**：`config.py:167 USERS_OPEN_REGISTRATION` ✅ / `users.py:194` 403 守卫 ✅ / `provider.py` 的 `ProviderConfig.user_id == user_id` 出现 7 处（与源码一致）✅ / `prompts.py` 的 `DEFAULT_SYSTEM_PROMPT` ✅ / `/app/frontend-dist/assets` 与宿主机 `dist` 一致（`login-CP8ls77z.js`，无旧产物）✅。**③ 运行时 7 项验证全过**：后端存活 200 / **`POST /users/signup` → 403 + 约定话术** / **防枚举：已存在与不存在邮箱响应逐字节一致** / 超管登录 200（注意 `/login/access-token` 吃**表单编码**，不吃 JSON，否则 422） / `GET /users/` 仅 `admin@example.com`（无探针账号落库） / `GET /providers` 恰 1 条默认（无回归） / `GET /users/me/system-prompt` 200。**④ 文档同步（D2 语义拆分，第六轮）**：修复「文档与已发布代码方向相反」的漂移——`istbot-implement-plan.md` 原写「Phase 11 因单用户**整体降级**…留接口不留逻辑、单用户下忽略 `user_id`」，而代码（`ef08cc1`）恰恰是「`user_id` **必填** + 双分支过滤 + 缓存键含 user_id + fail closed」。现拆为 **(A) 多用户运营化**（降级不做）与 **(B) 归属隔离**（已实现为硬约束），共改 **15 处活引用**（0.0 决策表 + 新增 D2.1 / 0.2 / 0.4 两处 / 0.5 三行 / 一节 Phase 3 / Phase 3.5 / SC11 恢复为 ✅ / **新增 SC D10** / 6.1 能力矩阵 / 8.0 引言+总览表 / 8.1 索引 / **8.4 全节重写** / 五节已移出注 / 第九节追加第六轮 7 行），`~~划掉~~` 与历轮留痕作为**追溯性引用一律保留**（删了下次还会被同一个错误意见说服）。**⑤ 工具坑留档**：同一轮**并行发多个文件编辑**时出现**部分编辑未落盘**（返回成功但内容仍旧）→ 必须 grep 回查，本轮补回 4 处漏改（0.4 注册行 / Phase 3 行 / 8.0 引言 / 8.1 索引）。**另一认知**：`compose.override.yml` 用 `develop.watch`，而 `docker compose up -d` **不启动 watch** → 「改源码但容器是旧的」是预期行为；同步用 `up -d --build` 或另开 `docker compose watch` |
+| 2026-09-18 01:43 | **🔍 文档漂移根因复盘（写给自己）**：本次漂移不是「忘了更新」，而是**把两件性质不同的事当成一件**——「多用户**运营化**（注册/配额/计费）」与「数据**归属隔离**（user_id 过滤）」。前者该砍，后者是安全边界。原判「单用户下不存在串 Key」只对前者成立；`get_chat_model(provider_id=None)` 若不过滤取的是**全库**默认源 → 用户配了 A 家 Key 却静默跑 B 家，**无报错的越权**。教训：**「不做 X」这种否定式结论，必须写清否定的到底是 X 的哪一层**，否则半年后照文档办事的人会把安全边界也一起删掉 |
+| 2026-09-18 01:3x（⚠️ 本行补记于此，**实际发生时间早于上方 01:33 行**） | **✅ 注册闸门收口（用户批准「方案 a」）**：起因 = 用户问「为什么有多用户」，调研发现 `/users/signup` **完全无守卫**（探针实测：匿名 `POST /users/signup` → **HTTP 200 建号成功**，新号可立即登录拿 token；根因 = 模板原版的 `if not settings.USERS_OPEN_REGISTRATION` 守卫**被删掉**且 `config.py` 根本没有该字段），而前端 `routes/signup.tsx` 是完整注册页、`login.tsx:126` 还有「注册」链接 → **「单用户」从事实降级成了假设**。**实施（沿用 D6 工具开关范式：安全默认 + `.env` 显式开启）**：① `config.py` 新增 `USERS_OPEN_REGISTRATION: bool = False`；② `users.py::register_user` 加守卫，**严格要求置于查重之前**（否则未开放时「400 邮箱已存在」与「403」的差异会变成**账号枚举探测面**），并清掉排障残留（`import traceback` + `print("=== SIGNUP ERROR ===")`）；③ `.env` 补显式声明与注释（与 `ENABLE_SHELL` 等排在一起）；④ 前端 `login.tsx` 删「注册」链接及随之无用的 `Link as RouterLink` import（`createFileRoute`/`redirect` 仍在用）。**测试 +3**：`forbidden_when_disabled`（403 且不落库）、`signup_disabled_does_not_leak_email_existence`（已存在 vs 全新邮箱响应**逐字节一致**）、`users_open_registration_default_is_false`（锁字段默认值不受 `.env` 影响）；原 2 条注册测试改为 `monkeypatch` 打开开关后运行。**双层证伪**：短路守卫 → 恰好 2 条失败；把守卫**挪到查重之后** → 恰好 1 条（防枚举那条）失败 → 两条约束均被真实锁住。**全量回归 321 passed / 0 failed**（318 + 3）。**前端已收尾**：`tsc -p tsconfig.build.json --noEmit` → ExitCode 0（**必须用仓库根 `node_modules`** —— `frontend/node_modules` 里其实没有依赖，只有 vite 缓存）；`vite build` 12.90s 重建 `frontend/dist`（新产物 `login-CP8ls77z.js`，旧产物连同「还没有账号」字符串一并清除）→ dist 为**绑定挂载**，刷新浏览器即生效。⚠️ **唯一未完成项**：backend 容器内代码仍是旧版（沙箱 `docker` CLI 本次完全不可用，连 `docker --version` 都报 `/usr/bin/env: 'sh'`），实测打真实接口 `POST /users/signup` **仍返回 200** → 需用户 `docker compose up -d --build backend`（或 `docker compose watch`）后复测应得 403。三层多用户残留溯源已留档 memory 日志 |
