@@ -9,6 +9,7 @@ from app.core.auth.security import verify_password
 from app.models import User, UserCreate
 from tests.utils.user import create_random_user
 from tests.utils.utils import random_email, random_lower_string
+from app.core.agent.prompts import DEFAULT_SYSTEM_PROMPT, resolve_system_prompt
 
 
 def test_get_users_superuser_me(
@@ -513,3 +514,83 @@ def test_delete_user_without_privileges(
     )
     assert r.status_code == 403
     assert r.json()["detail"] == "The user doesn't have enough privileges"
+
+
+# -- 系统提示词测试 ------
+def test_get_my_system_prompt_default(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """未设置过 → is_custom=False，effective_prompt=默认提示词"""
+    r = client.get(
+        f"{settings.API_V1_STR}/users/me/system-prompt",
+        headers=superuser_token_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["system_prompt"] is None
+    assert data["is_custom"] is False
+    assert data["effective_prompt"] == DEFAULT_SYSTEM_PROMPT
+
+
+def test_update_my_system_prompt_roundtrip(
+    client: TestClient,
+    superuser_token_headers: dict[str, str],
+    db: Session,
+) -> None:
+    """保存自定义 → 生效并落库；传空串 → 清空回落默认"""
+    # ① 保存自定义
+    r = client.patch(
+        f"{settings.API_V1_STR}/users/me/system-prompt",
+        headers=superuser_token_headers,
+        json={"system_prompt": "你是测试提示词"},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["system_prompt"] == "你是测试提示词"
+    assert data["is_custom"] is True
+    assert data["effective_prompt"] == "你是测试提示词"
+
+    # ② GET 读回（验证响应组装层）
+    r = client.get(
+        f"{settings.API_V1_STR}/users/me/system-prompt",
+        headers=superuser_token_headers,
+    )
+    assert r.status_code == 200
+    assert r.json()["system_prompt"] == "你是测试提示词"
+
+    # ③ 直接查库（验证存储层）
+    user_query = select(User).where(User.email == settings.FIRST_SUPERUSER)
+    user_db = db.exec(user_query).one()
+    assert user_db.system_prompt == "你是测试提示词"
+
+    # ④ 传空串 → 清空回落默认
+    r = client.patch(
+        f"{settings.API_V1_STR}/users/me/system-prompt",
+        headers=superuser_token_headers,
+        json={"system_prompt": ""},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["system_prompt"] is None
+    assert data["is_custom"] is False
+    assert data["effective_prompt"] == DEFAULT_SYSTEM_PROMPT
+
+
+def test_update_my_system_prompt_too_long(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """超过10000字符 -> 400"""
+    r = client.patch(
+        f"{settings.API_V1_STR}/users/me/system-prompt",
+        headers=superuser_token_headers,
+        json={"system_prompt": "a" * 10001},
+    )
+    assert r.status_code == 400
+
+
+def test_resolve_system_prompt_branches() -> None:
+    """解析函数两分支：自定义优先，空值回落默认"""
+    assert resolve_system_prompt("自定义内容") == "自定义内容"
+    assert resolve_system_prompt(None) == DEFAULT_SYSTEM_PROMPT
+    assert resolve_system_prompt("") == DEFAULT_SYSTEM_PROMPT
+    assert resolve_system_prompt("     ") == DEFAULT_SYSTEM_PROMPT

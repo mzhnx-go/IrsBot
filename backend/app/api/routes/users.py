@@ -10,10 +10,13 @@ from app.api.deps import (
     get_current_active_superuser,
 )
 from app.core import crud
+from app.core.agent.prompts import resolve_system_prompt
 from app.core.auth.security import get_password_hash, verify_password
 from app.core.config import settings
 from app.core.db.sqlmodel_models import (
     Message,
+    SystemPromptPublic,
+    SystemPromptUpdate,
     UpdatePassword,
     User,
     UserCreate,
@@ -130,6 +133,49 @@ def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     session.delete(current_user)
     session.commit()
     return Message(message="User deleted successfully")
+
+
+# ── 系统提示词 ──────────────────────────────────────────
+
+
+def _system_prompt_response(user: User) -> SystemPromptPublic:
+    """由 User 组装提示词响应（GET 和 PATCH 共用，避免重复）"""
+    return SystemPromptPublic(
+        system_prompt=user.system_prompt,
+        is_custom=bool(user.system_prompt and user.system_prompt.strip()),
+        effective_prompt=resolve_system_prompt(user.system_prompt),
+    )
+
+
+@router.get("/me/system-prompt", response_model=SystemPromptPublic)
+def read_my_system_prompt(current_user: CurrentUser) -> Any:
+    """
+    Get current user's system prompt status.
+    """
+    return _system_prompt_response(current_user)
+
+
+@router.patch("/me/system-prompt", response_model=SystemPromptPublic)
+def update_my_system_prompt(
+    *, session: SessionDep, body: SystemPromptUpdate, current_user: CurrentUser
+) -> Any:
+    """
+    Update current user's system prompt; empty string / null falls back to default.
+    """
+    # 长度校验：超长提示词拒收
+    if body.system_prompt and len(body.system_prompt) > 10000:
+        raise HTTPException(
+            status_code=400,
+            detail="System prompt too long (max 10000 characters)",
+        )
+
+    # strip 后为空 → 存 None（清空 = 回落默认提示词）
+    cleaned = body.system_prompt.strip() if body.system_prompt else None
+    current_user.system_prompt = cleaned or None
+
+    session.add(current_user)
+    session.commit()
+    return _system_prompt_response(current_user)
 
 
 @router.post("/signup", response_model=UserPublic)

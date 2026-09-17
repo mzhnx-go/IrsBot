@@ -8,14 +8,17 @@ import uuid
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.agent.graph import create_compiled_agent_graph
+from app.core.agent.prompts import resolve_system_prompt
 from app.core.agent.provider import ProviderManager
 from app.core.agent.state import AgentState
 from app.core.agent.tools import ToolRegistry
 from app.core.config import settings
+from app.core.db.sqlmodel_models import User
 
 # 触发 builtin 工具的注册（注册是导入 app.core.agent.builtins 的副作用，
 # 其是否注册 shell/file_write 由 config 的 ENABLE_SHELL / ENABLE_FILE_WRITE 决定）。
@@ -63,6 +66,18 @@ class Agent:
         self.conversation_id = conversation_id or str(uuid.uuid4())
         self.user_id = user_id or ""
 
+        # 读取当前用户的自定义系统提示词（未设置/为空时 resolve 回落默认）。
+        # 用已有 session + user_id 查库，WS 路由与 Pipeline 两条链路都无需改动。
+        self.system_prompt: str | None = None
+        if self.user_id:
+            try:
+                user = session.get(User, uuid.UUID(self.user_id))
+                if user is not None:
+                    self.system_prompt = user.system_prompt
+            except (ValueError, SQLAlchemyError):
+                # user_id 不是合法 UUID 或查询失败：退回默认提示词，不阻断会话
+                self.system_prompt = None
+
         # 创建 LLM 模型实例
         provider_mgr = ProviderManager(session)
         self.llm = provider_mgr.get_chat_model(
@@ -109,8 +124,9 @@ class Agent:
         Returns:
             最终的 AgentState 字典
         """
-        # 组装消息列表：历史消息 + 新用户消息
-        messages = list(history or [])
+        # 组装消息列表：系统提示词（最前）+ 历史消息 + 新用户消息
+        messages: list = [SystemMessage(content=resolve_system_prompt(self.system_prompt))]
+        messages.extend(history or [])
         messages.append(HumanMessage(content=user_message))
 
         # 组装初始状态
@@ -133,7 +149,9 @@ class Agent:
         Yields:
             LangGraph 的 astream_events 事件字典
         """
-        messages = list(history or [])
+        # 组装消息列表：系统提示词（最前）+ 历史消息 + 新用户消息
+        messages: list = [SystemMessage(content=resolve_system_prompt(self.system_prompt))]
+        messages.extend(history or [])
         messages.append(HumanMessage(content=user_message))
 
         initial_state = self._build_initial_state(messages)
