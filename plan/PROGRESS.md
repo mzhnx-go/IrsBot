@@ -517,17 +517,47 @@ bun run --filter frontend build     # 构建 → frontend/dist/
 
 ---
 
-## 八、Phase 10 收尾清单（旧，未关单）
+## 八、Phase 10 收尾清单（2026-09-17 代码审查 + 验收清单）
 
 | # | 任务 | 状态 |
 |---|---|---|
 | 10.1 | WS API | ✅ |
 | 10.2 | 前端聊天页 | ✅ |
-| 10.3 | 前端管理页（Provider 外） | 🔶 未做 |
+| 10.3 | 前端管理页（Provider 外） | 🔶 **代码审查完成**：`admin.tsx` 用户管理页 + `settings.tsx` 设置页（含「模型源」tab）均已存在，侧边栏 `/settings`、`/admin`（superuser）导航已通；**缺口：知识库（KB）管理 UI 尚未建**，待确认是否补 |
 | 10.4 | 上下文记忆 | ✅ |
-| 10.5a–e | Provider 管理 UI 实测 5 项 | ⬜ |
+| 10.5a–e | Provider 管理 UI 实测 5 项 | 🔶 **代码审查完成 + 修复 1 个阻断 bug**；5 项功能逻辑齐备，实测清单见 §10.6 |
 
-> 建议：**先推 D1**（交付主线），10.5 的 UI 实测可在 D4 阶段一并补。
+> 🔴 **代码审查发现并修复的阻断 bug（2026-09-17，Phase 10.5）**：
+> `backend/app/core/agent/provider.py::get_embedding_model` 把库中**加密存储**的 `pc.api_key`
+> **原样**（密文）传给 `OpenAIEmbeddings` / `AnthropicEmbeddings`，
+> 而同文件 `get_chat_model` 已正确 `decrypt_api_key`。
+> 因为 `init_db` 播种默认模型源时也用 `encrypt_api_key`，**所有** DB 落库的 key 都是密文
+> → 任何走 DB Provider 的 RAG 向量化 / 检索都会鉴权失败（`401`）。
+> ✅ 修复：embedding 分支同样先 `decrypt_api_key(pc.api_key)`。两文件 `py_compile` 通过。
+> ⚠️ 该 bug 不影响 10.5a–e 的「增/改/删/列/加密存储」5 项 UI 本身，但会在「实测后用 KB 验证 embedding」时暴露，
+> 故提前修掉，避免你实机点到 RAG 才报错。
+
+### §10.6 Phase 10.5 实测验收清单（需在用户 Windows 机器跑，沙箱无 Docker/前端/PG）
+
+**前置**：`scripts/start.cmd` 一条命令起栈（db/milvus/backend healthy）→ 浏览器开 `http://localhost:8000`。
+
+| 项 | 操作 | 预期 | 后端链路 |
+|---|---|---|---|
+| a 列表 | 登录 admin → 侧边栏「设置」→「模型源」 | 显示已播种的 `default` 模型源，带「默认」徽标 | `GET /api/v1/providers` → `ProviderManager.list_providers` |
+| b 新增 | 点「新增模型源」→ 填 名称/类型(openai)/API Key/模型名 → 保存 | 列表新增一行；`GET` 复测出现该条；Key 不再出现 | `POST /api/v1/providers` → `create_provider`（encrypt） |
+| c 设为默认 | 对新行点「设为默认」 | 旧默认徽标消失、新行出现「默认」 | `PATCH /providers/{id}` `{is_default:true}` → `clear_other_defaults` |
+| d 删除 | 点「删除」→ 确认 | 该行消失；`GET` 复测已无 | `DELETE /providers/{id}` → `delete_provider` |
+| e 加密 | 浏览器 Network 看 `GET /api/v1/providers` 响应 | **响应体无 `api_key` 字段**（仅 name/type/model/base_url/is_default/is_active） | `ProviderOut` 不含 api_key |
+
+**连带验证（修 bug 后必做）**：建一个知识库 → 上传文档 → 触发向量化，确认不再 `401`
+（embedding 现走解密后的真实 key）。
+
+**契约校验（已在沙箱静态确认）**：
+- `frontend/src/client/sdk.gen.ts` 的 `ProvidersService` 四个方法名/路径与 `useProviders.ts` 调用、**及后端 `providers.py` 路由**完全一致（`listProviders` GET、`createProvider` POST `{requestBody}`、`updateProvider` PATCH `{providerId,requestBody}`、`deleteProvider` DELETE `{providerId}`）。
+- `providers.router` 已 `include_router` 进 `api/main.py`（第 22 行），端点真实存在。
+- `frontend/src/components/Providers/ProviderSettings.tsx` 表单 zod 校验、`AddProviderDialog`、`ProviderRow`（设为默认/删除确认）齐全；`is_default` 互斥由后端保证。
+
+> 代码层已具备实跑条件；**沙箱无法跑 Docker+前端+PG 全链路**，故 a–e 的点击实测与「embedding 不再 401」需你在 Windows 机器执行 `start.cmd` 后按上表走一遍。
 
 ---
 
