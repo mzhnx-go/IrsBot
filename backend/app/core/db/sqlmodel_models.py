@@ -3,9 +3,8 @@ from datetime import datetime, timezone
 from typing import Optional, Literal
 
 from pydantic import EmailStr
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, Text
 from sqlmodel import Field, Relationship, SQLModel
-
 
 def get_datetime_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -56,8 +55,10 @@ class User(UserBase, table=True):
         default_factory=get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore
     )
-    # ⚠️ items 关系已随 D1.4 删除（模板残留的示例待办表）。
-    #    原为：Relationship(back_populates="owner", cascade_delete=True)
+    system_prompt: str | None = Field(
+        default=None,
+        sa_type=Text,
+    )
 
 
 # Properties to return via API, id is always required
@@ -165,4 +166,15 @@ class MCPServerConnectResponse(SQLModel):
     success: bool
     message: str 
     tools: list[dict] = Field(default_factory=list)
-    
+
+
+#--系统提示词相关模型
+class SystemPromptUpdate(SQLModel):
+    """更新系统提示词请求（传空串/null 即清空回落默认）"""
+    system_prompt: str | None = None
+
+class SystemPromptPublic(SQLModel):
+    """系统提示词状态（GET/PATCH 共用响应）"""
+    system_prompt: str | None
+    is_custom: bool
+    effective_prompt: str
