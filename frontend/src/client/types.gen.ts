@@ -209,6 +209,22 @@ export type ProviderUpdate = {
     is_default?: (boolean | null);
 };
 
+/**
+ * 系统提示词状态（GET/PATCH 共用响应）
+ */
+export type SystemPromptPublic = {
+    system_prompt: (string | null);
+    is_custom: boolean;
+    effective_prompt: string;
+};
+
+/**
+ * 更新系统提示词请求（传空串/null 即清空回落默认）
+ */
+export type SystemPromptUpdate = {
+    system_prompt?: (string | null);
+};
+
 export type Token = {
     access_token: string;
     token_type?: string;
@@ -472,6 +488,14 @@ export type UsersUpdatePasswordMeData = {
 };
 
 export type UsersUpdatePasswordMeResponse = (Message);
+
+export type UsersReadMySystemPromptResponse = (SystemPromptPublic);
+
+export type UsersUpdateMySystemPromptData = {
+    requestBody: SystemPromptUpdate;
+};
+
+export type UsersUpdateMySystemPromptResponse = (SystemPromptPublic);
 
 export type UsersRegisterUserData = {
     requestBody: UserRegister;

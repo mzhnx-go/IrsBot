@@ -778,6 +778,53 @@ export const ProviderUpdateSchema = {
     description: '更新请求体：所有字段可选'
 } as const;
 
+export const SystemPromptPublicSchema = {
+    properties: {
+        system_prompt: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'System Prompt'
+        },
+        is_custom: {
+            type: 'boolean',
+            title: 'Is Custom'
+        },
+        effective_prompt: {
+            type: 'string',
+            title: 'Effective Prompt'
+        }
+    },
+    type: 'object',
+    required: ['system_prompt', 'is_custom', 'effective_prompt'],
+    title: 'SystemPromptPublic',
+    description: '系统提示词状态（GET/PATCH 共用响应）'
+} as const;
+
+export const SystemPromptUpdateSchema = {
+    properties: {
+        system_prompt: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'System Prompt'
+        }
+    },
+    type: 'object',
+    title: 'SystemPromptUpdate',
+    description: '更新系统提示词请求（传空串/null 即清空回落默认）'
+} as const;
+
 export const TokenSchema = {
     properties: {
         access_token: {

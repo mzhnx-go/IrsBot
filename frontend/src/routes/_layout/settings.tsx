@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import ProviderSettings from "@/components/Providers/ProviderSettings"
 import ChangePassword from "@/components/UserSettings/ChangePassword"
 import DeleteAccount from "@/components/UserSettings/DeleteAccount"
+import SystemPromptSettings from "@/components/UserSettings/SystemPromptSettings"
 import UserInformation from "@/components/UserSettings/UserInformation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import useAuth from "@/hooks/useAuth"
@@ -10,6 +11,11 @@ import useAuth from "@/hooks/useAuth"
 const tabsConfig = [
   { value: "my-profile", title: "我的资料", component: UserInformation },
   { value: "password", title: "密码", component: ChangePassword },
+  {
+    value: "system-prompt",
+    title: "系统提示词",
+    component: SystemPromptSettings,
+  },
   { value: "providers", title: "模型源", component: ProviderSettings },
   { value: "danger-zone", title: "危险操作", component: DeleteAccount },
 ]
@@ -27,9 +33,6 @@ export const Route = createFileRoute("/_layout/settings")({
 
 function UserSettings() {
   const { user: currentUser } = useAuth()
-  const finalTabs = currentUser?.is_superuser
-    ? tabsConfig.slice(0, 4)
-    : tabsConfig
 
   if (!currentUser) {
     return null
@@ -44,13 +47,13 @@ function UserSettings() {
 
       <Tabs defaultValue="my-profile">
         <TabsList>
-          {finalTabs.map((tab) => (
+          {tabsConfig.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.title}
             </TabsTrigger>
           ))}
         </TabsList>
-        {finalTabs.map((tab) => (
+        {tabsConfig.map((tab) => (
           <TabsContent key={tab.value} value={tab.value}>
             <tab.component />
           </TabsContent>
