@@ -1,5 +1,6 @@
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -311,7 +312,11 @@ def test_update_password_me_same_password_error(
     )
 
 
-def test_register_user(client: TestClient, db: Session) -> None:
+def test_register_user(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """开关打开时注册端点正常工作（多用户场景 / 复用到另一个项目）。"""
+    monkeypatch.setattr(settings, "USERS_OPEN_REGISTRATION", True)
     username = random_email()
     password = random_lower_string()
     full_name = random_lower_string()
@@ -334,7 +339,11 @@ def test_register_user(client: TestClient, db: Session) -> None:
     assert verified
 
 
-def test_register_user_already_exists_error(client: TestClient) -> None:
+def test_register_user_already_exists_error(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """开关打开时，注册已存在的邮箱返回 400。"""
+    monkeypatch.setattr(settings, "USERS_OPEN_REGISTRATION", True)
     password = random_lower_string()
     full_name = random_lower_string()
     data = {
@@ -348,6 +357,64 @@ def test_register_user_already_exists_error(client: TestClient) -> None:
     )
     assert r.status_code == 400
     assert r.json()["detail"] == "The user with this email already exists in the system"
+
+
+def test_register_user_forbidden_when_disabled(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """安全默认：注册开关关闭时，匿名注册一律 403 且不落库。"""
+    monkeypatch.setattr(settings, "USERS_OPEN_REGISTRATION", False)
+    username = random_email()
+    data = {
+        "email": username,
+        "password": random_lower_string(),
+        "full_name": random_lower_string(),
+    }
+    r = client.post(
+        f"{settings.API_V1_STR}/users/signup",
+        json=data,
+    )
+    assert r.status_code == 403
+    assert r.json()["detail"] == "Open user registration is forbidden on this server"
+
+    user_query = select(User).where(User.email == username)
+    assert db.exec(user_query).first() is None
+
+
+def test_signup_disabled_does_not_leak_email_existence(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """关闭时，已存在邮箱与全新邮箱的响应必须完全一致。
+
+    这条锁住「守卫必须在查重之前」：若把守卫挪到查重之后，已存在邮箱会
+    变成 400 而新邮箱是 403，差异即可被用来枚举系统内有哪些账号。
+    """
+    monkeypatch.setattr(settings, "USERS_OPEN_REGISTRATION", False)
+    existing = client.post(
+        f"{settings.API_V1_STR}/users/signup",
+        json={
+            "email": settings.FIRST_SUPERUSER,
+            "password": random_lower_string(),
+            "full_name": random_lower_string(),
+        },
+    )
+    fresh = client.post(
+        f"{settings.API_V1_STR}/users/signup",
+        json={
+            "email": random_email(),
+            "password": random_lower_string(),
+            "full_name": random_lower_string(),
+        },
+    )
+    assert existing.status_code == fresh.status_code == 403
+    assert existing.json() == fresh.json()
+
+
+def test_users_open_registration_default_is_false() -> None:
+    """锁住安全默认：字段默认值必须是 False（与 .env 是否写无关）。"""
+    from app.core.config import Settings
+
+    assert Settings.model_fields["USERS_OPEN_REGISTRATION"].default is False
 
 
 def test_update_user(

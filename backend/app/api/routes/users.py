@@ -182,25 +182,27 @@ def update_my_system_prompt(
 def register_user(session: SessionDep, user_in: UserRegister) -> Any:
     """
     Create new user without the need to be logged in.
+
+    受 USERS_OPEN_REGISTRATION 开关约束：本地单用户部署默认关闭，
+    关闭时该端点直接 403，账号只能由管理员创建。
     """
-    import traceback
-    try:
-        user = crud.get_user_by_email(session=session, email=user_in.email)
-        if user:
-            raise HTTPException(
-                status_code=400,
-                detail="The user with this email already exists in the system",
-            )
-        user_create = UserCreate.model_validate(user_in)
-        user = crud.create_user(session=session, user_create=user_create)
-        return user
-    except HTTPException:
-        raise
-    except Exception:
-        print("=== SIGNUP ERROR ===")
-        traceback.print_exc()
-        print("=====================")
-        raise
+    # 守卫必须在查重之前：否则未开放时也能从「该邮箱已存在」的报错里
+    # 反推出系统内已有哪些账号（把注册闸门变成账号枚举探测面）。
+    if not settings.USERS_OPEN_REGISTRATION:
+        raise HTTPException(
+            status_code=403,
+            detail="Open user registration is forbidden on this server",
+        )
+
+    user = crud.get_user_by_email(session=session, email=user_in.email)
+    if user:
+        raise HTTPException(
+            status_code=400,
+            detail="The user with this email already exists in the system",
+        )
+    user_create = UserCreate.model_validate(user_in)
+    user = crud.create_user(session=session, user_create=user_create)
+    return user
 
 
 @router.get("/{user_id}", response_model=UserPublic)

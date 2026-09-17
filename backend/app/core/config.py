@@ -160,6 +160,12 @@ class Settings(BaseSettings):
     ENABLE_FILE_WRITE: bool = False
     FILE_WRITE_ROOTS: Annotated[list[str], BeforeValidator(parse_path_list)] = []
 
+    # ── 注册开关（安全默认：不开放自助注册）───────────────────
+    # 本地单用户部署下，账号只应由管理员创建（/admin 页或 superuser 的
+    # POST /users/）。如需恢复模板的多用户自助注册（例如复用到另一个
+    # 多用户项目），在 .env 设 true。
+    USERS_OPEN_REGISTRATION: bool = False
+
     # ── 内容安全 ───────────────────────────────────────────────
     ENABLE_CONTENT_SAFETY: bool = False
     SAFETY_KEYWORDS_FILE: str = "./config/safety_keywords.txt"
