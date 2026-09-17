@@ -204,3 +204,29 @@ def test_delete_other_users_provider_404(
         headers=normal_user_token_headers,
     )
     assert res.status_code == 404
+
+
+def test_delete_default_promotes_successor(
+    client: TestClient, superuser_token_headers: dict, db: Session
+) -> None:
+    """§10.6 d 回归：删除当前默认源后，该用户仍「有且仅有」1 条默认（自动补位）。
+
+    修复前：行被删掉后没有任何接替者，列表里「默认」徽标凭空消失，
+    且取默认源的链路会 RuntimeError。
+    """
+    a = _create_provider(client, superuser_token_headers, is_default=True)
+    _create_provider(client, superuser_token_headers)
+
+    res = client.delete(
+        f"{settings.API_V1_STR}/providers/{a['id']}",
+        headers=superuser_token_headers,
+    )
+    assert res.status_code == 200
+
+    items = client.get(
+        f"{settings.API_V1_STR}/providers", headers=superuser_token_headers
+    ).json()
+    defaults = [item for item in items if item["is_default"]]
+    assert len(defaults) == 1, f"删默认后应恰好剩 1 条默认，实际 {len(defaults)} 条"
+    assert defaults[0]["id"] != a["id"]
+    assert defaults[0]["is_active"] is True, "接替者必须启用中，否则取默认仍会失败"

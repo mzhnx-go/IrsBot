@@ -453,7 +453,14 @@ class ProviderManager:
         return obj
 
     def delete_provider(self, provider_id: uuid.UUID) -> bool:
-        """删除一个 Provider 配置。
+        """删除一个 Provider 配置；若删的是默认源，则自动提升同用户下一条为默认。
+
+        不补位会留下「无默认源」空窗：列表里没有任何「默认」徽标，且
+        get_chat_model() / get_embedding_model() 取默认的路径会直接失败
+        （RuntimeError: No active provider configured）。
+
+        接替者只在该用户的**其余启用中**（is_active=True）配置里按 fallback_order
+        升序挑第一条；若没有可接替的，则保持无默认（此时也确实没有可用源）。
 
         Args:
             provider_id: 目标 ProviderConfig 的 id。
@@ -463,10 +470,27 @@ class ProviderManager:
         """
         stmt = select(ProviderConfig).where(ProviderConfig.id == provider_id)
         obj = self.session.exec(stmt).one_or_none()
-        if obj:
-            self.session.delete(obj)
-            self.session.commit()
-            return True
-        return False
+        if obj is None:
+            return False
+
+        # 先选好接替者再删：删掉的恰好是默认源时，避免出现无默认源的空窗
+        if obj.is_default:
+            successor_stmt = (
+                select(ProviderConfig)
+                .where(
+                    ProviderConfig.user_id == obj.user_id,
+                    ProviderConfig.id != obj.id,
+                    ProviderConfig.is_active.is_(True),
+                )
+                .order_by(ProviderConfig.fallback_order)
+                .limit(1)
+            )
+            successor = self.session.exec(successor_stmt).first()
+            if successor is not None:
+                successor.is_default = True
+
+        self.session.delete(obj)
+        self.session.commit()
+        return True
 
 

@@ -525,7 +525,7 @@ bun run --filter frontend build     # 构建 → frontend/dist/
 | 10.2 | 前端聊天页 | ✅ |
 | 10.3 | 前端管理页（Provider 外） | 🔶 **代码审查完成**：`admin.tsx` 用户管理页 + `settings.tsx` 设置页（含「模型源」tab）均已存在，侧边栏 `/settings`、`/admin`（superuser）导航已通；**缺口：知识库（KB）管理 UI 尚未建**，待确认是否补 |
 | 10.4 | 上下文记忆 | ✅ |
-| 10.5a–e | Provider 管理 UI 实测 5 项 | 🔶 **已实测（API 层）**：a/b/c/e ✅ 通过；**d ⚠️ 发现缺陷**（删默认源后无默认）→ 待修；连带项 **f RAG 向量化 ✅ 通过**（`bfe1c7d` 修复已生效）。明细与证据见 §10.6 实测结果 |
+| 10.5a–e | Provider 管理 UI 实测 5 项 | ✅ **已完成（API 层实测）**：a/b/c/e ✅ 通过；d ⚠️ 曾发现缺陷（删默认源后无默认）→ **已修复**（`delete_provider` 自动补位 + 6 条回归测试，2026-09-18）；连带项 **f RAG 向量化 ✅ 通过**（`bfe1c7d` 修复已生效）。明细与证据见 §10.6 实测结果 |
 
 > 🔴 **代码审查发现并修复的阻断 bug（2026-09-17，Phase 10.5）**：
 > `backend/app/core/agent/provider.py::get_embedding_model` 把库中**加密存储**的 `pc.api_key`
@@ -567,17 +567,41 @@ bun run --filter frontend build     # 构建 → frontend/dist/
 
 > ⚠️ **实测过程污染与恢复**：d 项执行后环境一度处于「无默认模型源」状态，**已立即用 `PATCH /providers/{default.id}` `{is_default:true}` 恢复**（复测 `default.is_default=True` ✅）。测试用的 `verify-test-106` 模型源与 `verify-106-rag` 知识库均已删除，环境已还原。
 
-**结论**：5 项中 a/b/c/e 全通过，**f（最关键的一项）通过**；**d 暴露 1 个真实缺陷**（删默认后不自动提升新默认），建议修复。修复方案见下。
+**结论**：5 项中 a/b/c/e 全通过，**f（最关键的一项）通过**；**d 暴露 1 个真实缺陷**（删默认后不自动提升新默认）→ **已修复并补齐回归测试**（见下节）。
 
-### 🔧 待修：d 项缺陷（删默认源后无默认）
+### ✅ 已修：d 项缺陷（删默认源后无默认）—— 2026-09-18
 
-**位置**：`backend/app/core/agent/provider.py::delete_provider`（455–470 行）
+**位置**：`backend/app/core/agent/provider.py::delete_provider`
 
-**改法（两选一）**：
-- 方案 1（推荐，改动最小）：`delete_provider` 里先判断被删行 `is_default`；若为 True，删除后从该用户剩余 `is_active=True` 的行里挑一条（按 `fallback_order` 升序 / 创建时间最早）置为 `is_default=True`，并 `commit`。
-- 方案 2：删除后若该用户已无任何 `is_default=True` 的行，则不自动提升，改为**前端/接口显式提示「请重新指定默认模型源」**（更保守，但用户体验差一步）。
+**改法（采用方案 1）**：删除前先判断被删行是否 `is_default`；若是，则在该用户**其余启用中**（`is_active=True`、`id != 被删行`）的配置里按 `fallback_order` 升序取一条置为 `is_default=True`，再执行删除并一次 `commit`。
+- 只查 `is_active=True` 是关键：`get_chat_model()`/`get_embedding_model()` 要求 `is_default` **与** `is_active` 同时成立，若把停用中的源提上来，会变成「有默认徽标但取不到模型」的假象。
+- 严格按 `user_id` 过滤：避免删自己的默认源时把**别人的**源提上来（越权使用他人密钥）。
+- 无接替者时保持无默认（此时确实也没有可用源），不报错。
 
-**配套**：补一条回归测试（删默认行 → 断言仍有且仅有 1 条 `is_default=True`），符合项目「所有 API 端点都要有测试」的既定规则。
+**配套回归测试（新增 6 条，命名前缀不变）**：
+
+| 文件 | 测试 | 断言 |
+|---|---|---|
+| `tests/provider/test_manager.py` | `test_delete_default_promotes_successor` | 删默认 → 接替者就位、恰好 1 条默认 |
+| 同上 | `test_delete_default_picks_lowest_fallback_order` | 多候选时挑 `fallback_order` 最小的一条 |
+| 同上 | `test_delete_default_skips_inactive_candidates` | 停用中的候选不被提升 |
+| 同上 | `test_delete_last_default_leaves_no_default` | 删唯一默认 → 干净地无默认，不报错 |
+| 同上 | `test_delete_default_does_not_touch_other_users` | 多租户隔离：不提升他人源 |
+| 同上 | `test_delete_non_default_keeps_existing_default` | 删非默认源不动现有默认 |
+| `tests/api/routes/test_providers.py` | `test_delete_default_promotes_successor` | API 层：删默认后列表仍有且仅有 1 条 `is_default` 且 `is_active` |
+
+**验证结果**：
+- **证伪验证**：临时把提升逻辑短路（`if obj.is_default and False`）后重跑 → **恰好这 4 条依赖补位的新测试失败**（`4 failed, 20 passed`），证明测试真实覆盖该缺陷，不是空转。
+- **修复后**：`tests/provider/test_manager.py` + `tests/api/routes/test_providers.py` → **24 passed**。
+- **全量回归**：见本节末「测试基线」记录。
+
+**实跑命令（宿主机，注意 `env_file="../.env"` 是相对 cwd 的，必须在 `backend/` 下运行）**：
+
+```powershell
+cd d:\AIpy\full-stack\IrsBot\backend
+$env:POSTGRES_SERVER="localhost"; $env:POSTGRES_DB="test_app"   # 覆盖 .env 的 db / app
+..\.venv\Scripts\python.exe -m pytest ..\tests\provider\test_manager.py ..\tests\api\routes\test_providers.py -q
+```
 
 
 **契约校验（已在沙箱静态确认）**：
