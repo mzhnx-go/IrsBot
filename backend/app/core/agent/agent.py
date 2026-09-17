@@ -66,21 +66,32 @@ class Agent:
         self.conversation_id = conversation_id or str(uuid.uuid4())
         self.user_id = user_id or ""
 
+        # 解析 user_id（str → UUID），供系统提示词查询与 Provider 归属过滤共用。
+        # 非法/缺失 UUID 视为「无身份」：提示词退回默认，Provider 解析 fail closed。
+        user_uuid: uuid.UUID | None = None
+        if self.user_id:
+            try:
+                user_uuid = uuid.UUID(self.user_id)
+            except ValueError:
+                user_uuid = None
+
         # 读取当前用户的自定义系统提示词（未设置/为空时 resolve 回落默认）。
         # 用已有 session + user_id 查库，WS 路由与 Pipeline 两条链路都无需改动。
         self.system_prompt: str | None = None
-        if self.user_id:
+        if user_uuid is not None:
             try:
-                user = session.get(User, uuid.UUID(self.user_id))
+                user = session.get(User, user_uuid)
                 if user is not None:
                     self.system_prompt = user.system_prompt
-            except (ValueError, SQLAlchemyError):
-                # user_id 不是合法 UUID 或查询失败：退回默认提示词，不阻断会话
+            except SQLAlchemyError:
+                # 查询失败：退回默认提示词，不阻断会话
                 self.system_prompt = None
 
-        # 创建 LLM 模型实例
+        # 创建 LLM 模型实例。
+        # ⚠️ 必须传 user_id：Provider 解析按归属过滤，否则会取到别人的默认源。
         provider_mgr = ProviderManager(session)
         self.llm = provider_mgr.get_chat_model(
+            user_id=user_uuid,
             provider_id=provider_id,
             model_name=model_name,
             temperature=temperature,

@@ -199,7 +199,7 @@ class TestGetChatModel:
     def test_raises_without_provider(self, db: Session):
         mgr = ProviderManager(db)
         with pytest.raises(RuntimeError, match="No active provider"):
-            mgr.get_chat_model()
+            mgr.get_chat_model(user_id=_uid())
 
     def test_raises_unsupported_type(self, db: Session):
         mgr = ProviderManager(db)
@@ -207,7 +207,7 @@ class TestGetChatModel:
         mgr.create_provider(user_id=uid, name="bad", provider_type="unknown",
                             api_key="k", model_name="x")
         with pytest.raises(ValueError, match="Unsupported provider type"):
-            mgr.get_chat_model(provider_id=mgr.list_providers()[0].id)
+            mgr.get_chat_model(user_id=uid, provider_id=mgr.list_providers(uid)[0].id)
 
     def test_caches_model(self, db: Session):
         mgr = ProviderManager(db)
@@ -218,11 +218,99 @@ class TestGetChatModel:
         # (actual model creation requires valid API key, but init_chat_model
         #  with a fake key still creates the object — it fails at call time)
         try:
-            model = mgr.get_chat_model(provider_id=obj.id)
+            model = mgr.get_chat_model(user_id=uid, provider_id=obj.id)
             assert model is not None
         except Exception:
             # API key invalid is expected in tests — object was created
             pass
+
+    def test_cache_key_is_user_scoped(self, db: Session):
+        """缓存 key 必须含 user_id，否则不同用户会命中同一条目拿到别人的实例。"""
+        mgr = ProviderManager(db)
+        uid = _uid()
+        mgr.create_provider(user_id=uid, name="a", provider_type="openai",
+                            api_key="sk-test-key-for-testing", model_name="gpt-4o-mini",
+                            is_default=True)
+        try:
+            mgr.get_chat_model(user_id=uid)
+        except Exception:
+            pytest.skip("init_chat_model 未能构建实例，跳过缓存 key 断言")
+        assert mgr._chat_cache, "应已写入缓存"
+        assert all(str(uid) in key for key in mgr._chat_cache)
+
+
+class TestMultiTenantIsolation:
+    """Provider 解析的多租户隔离（防 A 用户静默用上 B 用户的密钥/模型）。"""
+
+    def test_default_lookup_does_not_cross_users(self, db: Session):
+        """A 无默认源、B 有默认源 → A 取默认必须失败，绝不能取到 B 的。"""
+        mgr = ProviderManager(db)
+        a, b = _uid(), _uid()
+        mgr.create_provider(user_id=b, name="b-default", provider_type="openai",
+                            api_key="sk-b-secret", model_name="gpt-4o-mini",
+                            is_default=True)
+
+        with pytest.raises(RuntimeError, match="No active provider"):
+            mgr.get_chat_model(user_id=a)
+
+    def test_default_lookup_prefers_own_provider(self, db: Session):
+        """A、B 各有默认源 → A 解析到的必须是 A 自己那条（用不支持的类型做判别）。"""
+        mgr = ProviderManager(db)
+        a, b = _uid(), _uid()
+        # B 的默认源类型合法
+        mgr.create_provider(user_id=b, name="b-ok", provider_type="openai",
+                            api_key="sk-b-secret", model_name="gpt-4o-mini",
+                            is_default=True)
+        # A 的默认源类型非法 → 若 A 取到自己的就会抛 ValueError
+        mgr.create_provider(user_id=a, name="a-bad", provider_type="unknown",
+                            api_key="sk-a-secret", model_name="x",
+                            is_default=True)
+
+        with pytest.raises(ValueError, match="Unsupported provider type"):
+            mgr.get_chat_model(user_id=a)
+
+    def test_explicit_provider_id_cannot_cross_users(self, db: Session):
+        """A 显式传 B 的 provider_id → 必须取不到（provider_id 分支同样按归属过滤）。"""
+        mgr = ProviderManager(db)
+        a, b = _uid(), _uid()
+        b_obj = mgr.create_provider(user_id=b, name="b-obj", provider_type="openai",
+                                    api_key="sk-b-secret", model_name="gpt-4o-mini",
+                                    is_default=True)
+
+        with pytest.raises(RuntimeError, match="No active provider"):
+            mgr.get_chat_model(user_id=a, provider_id=b_obj.id)
+
+    def test_no_user_id_fails_closed(self, db: Session):
+        """user_id 为 None → 查不到任何源（fail closed），不回落成「取全库默认源」。"""
+        mgr = ProviderManager(db)
+        mgr.create_provider(user_id=_uid(), name="someone", provider_type="openai",
+                            api_key="sk-x", model_name="gpt-4o-mini", is_default=True)
+
+        with pytest.raises(RuntimeError, match="No active provider"):
+            mgr.get_chat_model(user_id=None)
+
+    def test_embedding_lookup_does_not_cross_users(self, db: Session):
+        """embedding 取默认同样按归属过滤。"""
+        mgr = ProviderManager(db)
+        a, b = _uid(), _uid()
+        mgr.create_provider(user_id=b, name="b-embed", provider_type="openai",
+                            api_key="sk-b-secret", model_name="BAAI/bge-m3",
+                            is_default=True)
+
+        with pytest.raises(RuntimeError, match="No active embedding provider"):
+            mgr.get_embedding_model(user_id=a)
+
+    @pytest.mark.asyncio
+    async def test_fallback_candidates_are_user_scoped(self, db: Session):
+        """回退链的候选源只在本人范围内挑选。"""
+        mgr = ProviderManager(db)
+        a, b = _uid(), _uid()
+        mgr.create_provider(user_id=b, name="b-only", provider_type="openai",
+                            api_key="sk-b-secret", model_name="gpt-4o-mini",
+                            is_default=True)
+
+        with pytest.raises(RuntimeError, match="No active providers"):
+            await mgr.chat_with_fallback(user_id=a, messages=[])
 
 
 class TestReloadConfig:

@@ -146,6 +146,7 @@ class ProviderManager:
 
     def get_chat_model(
         self,
+        user_id: uuid.UUID | None,
         provider_id: uuid.UUID | None = None,
         model_name: str | None = None,
         temperature: float = 0.0,
@@ -155,8 +156,14 @@ class ProviderManager:
         优先按 provider_id 查找启用中的配置；未指定时回退到默认且启用中的
         配置。实例按 key 缓存，命中缓存不重复创建。
 
+        ⚠️ 多租户硬约束：两条查找分支都必须带 user_id 过滤。
+        否则（provider_id 为 None 时）会取到**别人**的默认源，导致越权使用
+        他人密钥与模型。user_id 为 None 时查不到任何源（fail closed），
+        绝不回落成「取全库任意默认源」。
+
         Args:
-            provider_id: ProviderConfig 的 id；为 None 时取默认配置。
+            user_id: 归属用户 id，限定只能取该用户自己的 ProviderConfig。
+            provider_id: ProviderConfig 的 id；为 None 时取该用户的默认配置。
             model_name: 覆盖配置中的模型名；为 None 时用配置默认模型。
             temperature: 采样温度，默认 0.0。
 
@@ -164,23 +171,27 @@ class ProviderManager:
             一个 LangChain ChatModel 实例。
 
         Raises:
-            RuntimeError: 没有可用的（激活或默认）Provider 配置时。
+            RuntimeError: 该用户没有可用的（激活或默认）Provider 配置时。
             ValueError: Provider 类型不支持（非 openai/anthropic/gemini）时。
         """
         from langchain.chat_models import init_chat_model
 
-        cache_key = f"{provider_id}:{model_name}:{temperature}"
+        # ⚠️ cache key 必须含 user_id：否则不同用户用同一 provider_id=None 时
+        #    会命中同一缓存条目，拿到别人的模型实例。
+        cache_key = f"{user_id}:{provider_id}:{model_name}:{temperature}"
         if cache_key in self._chat_cache:
             return self._chat_cache[cache_key]
 
         if provider_id:
             stmt = select(ProviderConfig).where(
                 ProviderConfig.id == provider_id,
+                ProviderConfig.user_id == user_id,
                 ProviderConfig.is_active.is_(True),
             )
             pc = self.session.exec(stmt).one_or_none()
         else:
             stmt = select(ProviderConfig).where(
+                ProviderConfig.user_id == user_id,
                 ProviderConfig.is_default.is_(True),
                 ProviderConfig.is_active.is_(True),
             )
@@ -221,30 +232,39 @@ class ProviderManager:
 
     # -- 向量模型 Embeddings --------------------------------------
 
-    def get_embedding_model(self, provider_id: uuid.UUID | None = None) -> Any:
+    def get_embedding_model(
+        self, user_id: uuid.UUID | None, provider_id: uuid.UUID | None = None
+    ) -> Any:
         """获取一个 LangChain Embeddings 实例（带缓存）。
 
+        ⚠️ 依赖惰性导入：langchain_anthropic 当前版本没有 AnthropicEmbeddings，
+        若写成函数顶部导入会让**任何** provider 都在查库前就 ImportError（原缺陷）。
+
+        ⚠️ 多租户硬约束：两条查找分支都必须带 user_id 过滤，理由同
+        get_chat_model（否则会越权使用他人的密钥）；user_id 为 None 时
+        fail closed（查不到任何源）。
+
         Args:
-            provider_id: ProviderConfig 的 id；为 None 时取默认且启用中的配置。
+            user_id: 归属用户 id，限定只能取该用户自己的 ProviderConfig。
+            provider_id: ProviderConfig 的 id；为 None 时取该用户的默认且启用中的配置。
 
         Returns:
             一个 LangChain Embeddings 实例。
 
         Raises:
-            RuntimeError: 没有可用的 embedding Provider 配置时。
+            RuntimeError: 该用户没有可用的 embedding Provider 配置时。
             ValueError: Provider 类型不支持 embedding（仅 openai/anthropic）时。
         """
-        from langchain_anthropic import AnthropicEmbeddings
-        from langchain_openai import OpenAIEmbeddings
-
         if provider_id:
             stmt = select(ProviderConfig).where(
                 ProviderConfig.id == provider_id,
+                ProviderConfig.user_id == user_id,
                 ProviderConfig.is_active.is_(True),
             )
             pc = self.session.exec(stmt).one_or_none()
         else:
             stmt = select(ProviderConfig).where(
+                ProviderConfig.user_id == user_id,
                 ProviderConfig.is_default.is_(True),
                 ProviderConfig.is_active.is_(True),
             )
@@ -262,12 +282,16 @@ class ProviderManager:
         # 否则会把密文当密钥发给服务商 → 鉴权失败（get_chat_model 已解密，这里漏了）。
         api_key = decrypt_api_key(pc.api_key)
         if provider_type == "openai":
+            from langchain_openai import OpenAIEmbeddings
+
             embed = OpenAIEmbeddings(
                 model=pc.model_name,
                 api_key=api_key,
                 base_url=pc.base_url or None,
             )
         elif provider_type == "anthropic":
+            from langchain_anthropic import AnthropicEmbeddings
+
             embed = AnthropicEmbeddings(api_key=api_key)
         else:
             raise ValueError(f"Unsupported embedding provider: {provider_type}")
@@ -283,16 +307,18 @@ class ProviderManager:
 
     async def chat_with_fallback(
         self,
+        user_id: uuid.UUID | None,
         messages: list[Any],
         provider_id: uuid.UUID | None = None,
         max_retries: int = 2,
     ) -> Any:
         """调用 LLM，并在主 Provider 失败时自动回退到其他启用中的 Provider。
 
-        按 fallback_order 升序依次尝试所有启用中的 Provider，直到成功或超过
-        最大重试次数。
+        按 fallback_order 升序依次尝试**该用户**所有启用中的 Provider，直到成功
+        或超过最大重试次数。
 
         Args:
+            user_id: 归属用户 id；候选源只在该用户的 ProviderConfig 中挑选。
             messages: 待发送给 LLM 的消息列表。
             provider_id: 可选，指定起始 Provider；为 None 时按回退顺序从头尝试。
             max_retries: 最多尝试的 Provider 个数（额外上限），默认 2。
@@ -301,11 +327,14 @@ class ProviderManager:
             LLM 的响应对象。
 
         Raises:
-            RuntimeError: 没有启用中的 Provider，或所有 Provider 均失败时。
+            RuntimeError: 该用户没有启用中的 Provider，或所有 Provider 均失败时。
         """
         stmt = (
             select(ProviderConfig)
-            .where(ProviderConfig.is_active.is_(True))
+            .where(
+                ProviderConfig.user_id == user_id,
+                ProviderConfig.is_active.is_(True),
+            )
             .order_by(ProviderConfig.fallback_order)
         )
         providers = list(self.session.exec(stmt).all())
@@ -318,7 +347,7 @@ class ProviderManager:
             if i > max_retries:
                 break
             try:
-                model = self.get_chat_model(provider_id=pc.id)
+                model = self.get_chat_model(user_id=user_id, provider_id=pc.id)
                 response = await model.ainvoke(messages)
                 return response
             except Exception as exc:
