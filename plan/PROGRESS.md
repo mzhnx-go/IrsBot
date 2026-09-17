@@ -23,12 +23,12 @@
 
 | 项 | 值 |
 |---|---|
-| **当前阶段** | **🎉 Phase D1–D7 ✅ + D5.1b ✅ 全完成**；**已建 git 回退基线**（独立仓库 `d:/AIpy/full-stack/IrsBot/.git`，分支 `feat/agent-platform`，提交 `fe7c391`/`00a951d`/`74dd8d9`）；Phase 10.3/10.5 代码审查完毕（`bfe1c7d` 修复 embedding 解密 bug），实机验收待做（§10.6）；**✅ 系统提示词功能已实施（2026-09-17）**：User.system_prompt 列+迁移 `a1b2c3d4e5f6`、`prompts.py`（DEFAULT_SYSTEM_PROMPT/resolve_system_prompt）、Agent 注入 SystemMessage、GET/PATCH `/users/me/system-prompt`（+4 条测试）、设置页「系统提示词」tab（顺带修掉 settings.tsx `slice(0,4)` 残留 bug）、client 已重新生成；**✅ 实机验收已通过（2026-09-17）**：默认话术 / 保存即生效 / 清空回落默认 / 全局注入 4 项全过（历史会话项因库中无历史数据跳过，机制上动态注入天然全局生效） |
+| **当前阶段** | **🎉 Phase D1–D7 ✅ + D5.1b ✅ 全完成**；**已建 git 回退基线**（独立仓库 `d:/AIpy/full-stack/IrsBot/.git`，分支 `feat/agent-platform`）；**✅ §10.6 Provider 实测 a–f 全部通过（2026-09-18）**：a 列表/b 新增/c 设默认/e 加密/f RAG 向量化 ✅；**d 项缺陷（删默认源后无默认）已修复**（`a746d10`：`delete_provider` 自动补位 + 7 条回归测试 + 实机 A/B 验证），详见第八节；**✅ 系统提示词功能已实施并实机验收（2026-09-17）**：User.system_prompt 列+迁移 `a1b2c3d4e5f6`、`prompts.py`、Agent 注入 SystemMessage、GET/PATCH `/users/me/system-prompt`、设置页「系统提示词」tab、client 已重新生成 |
 | **代码状态** | 🔶 **有代码改动**：`backend/Dockerfile`（修 Python 版本）/ `backend/app/main.py`（静态托管）/ `frontend/src/main.tsx` + `routes/_layout/chat.tsx` + `hooks/useAgentChat.ts`（相对路径）/ `frontend/vite.config.ts`（proxy）/ `frontend/.env` + 配置类改动（见第四点五节） |
 | **运行状态** | ✅ `irsbot-milvus-1`（healthy） + `irsbot-db-1`（healthy）已由 compose 接管；✅ **本机 uvicorn :8001 已跑通 D1.3a**；🔶 `backend` 镜像**构建中**（`buildx history` → Running，28+ 分钟；**根因已锁定为容器虚拟网络限吞吐**，见 §3.3.5） |
 | **文档状态** | ✅ **已一致**：`istbot-implement-plan.md` 第零至十节全部对齐「Docker 交付」；`local-deployment-plan.md` 已升 **v7.2**（新增容器网络限速实测 + 「坑 C：日志文件误判」）；**2026-09-17 17:xx 全量回查再同步**：第一节 Phase 表 D1–D7 ⬜→✅、SC D1–D9 达成情况实证改判（D7 改判不迁移、D1 服务数 6→3）、10.1/10.5 待办消解结案、`local-deployment-plan.md` 状态头改「已全部完成」+ D1 子阶段表 + 风险表 8 行结案 |
 | **当前分支** | `feat/agent-platform`（未推送远端） |
-| **测试基线** | ✅ **294 单测 + 18 集成测试全部实跑通过**（详见第四节）；前端 `tsc --noEmit` ✅ ExitCode 0；`app.main` 导入 ✅（本机 `.venv` Python 3.13.0）；**D1.3a 实机验收 6/6 通过 ✅** |
+| **测试基线** | ✅ **全量最新实跑：`pytest ../tests -q` → 311 passed, 0 failed（100.93s）**（2026-09-18，含本次新增 7 条 provider 回归测试）；前端 `tsc --noEmit` ✅ ExitCode 0；`app.main` 导入 ✅；**D1.3a 实机验收 6/6 通过 ✅**；**§10.6 a–f 全部通过（d 项缺陷已修复并实机 A/B 验证）** |
 | **阻塞项** | **无** —— **D1.3a 已实机验证通过**（见下方验收表）；镜像构建是 D1.3c 分发优化，非阻塞 |
 | **施工前必做** | **M1 待做（非阻塞）**；**M2 / M3 ✅ 已完成**；**Q1–Q3 ✅ 已确认**；Q4–Q10 待确认（见第九点五节） |
 
@@ -591,9 +591,20 @@ bun run --filter frontend build     # 构建 → frontend/dist/
 | `tests/api/routes/test_providers.py` | `test_delete_default_promotes_successor` | API 层：删默认后列表仍有且仅有 1 条 `is_default` 且 `is_active` |
 
 **验证结果**：
-- **证伪验证**：临时把提升逻辑短路（`if obj.is_default and False`）后重跑 → **恰好这 4 条依赖补位的新测试失败**（`4 failed, 20 passed`），证明测试真实覆盖该缺陷，不是空转。
-- **修复后**：`tests/provider/test_manager.py` + `tests/api/routes/test_providers.py` → **24 passed**。
-- **全量回归**：见本节末「测试基线」记录。
+- **证伪验证（测试层）**：临时把提升逻辑短路（`if obj.is_default and False`）后重跑 → **恰好这 4 条依赖补位的新测试失败**（`4 failed, 20 passed`），证明测试真实覆盖该缺陷，不是空转。
+- **修复后（测试层）**：`tests/provider/test_manager.py` + `tests/api/routes/test_providers.py` → **24 passed**。
+- **全量回归**：`pytest ../tests -q` → **311 passed, 0 failed**（100.93s）。详见文末「测试基线」。
+- **实机验证（真实栈 http://localhost:8000，admin 登录）** —— A/B 对照：
+
+| 轮次 | 容器内 `provider.py` | 删默认源后的结果 |
+|---|---|---|
+| A（修复前，`cd1f17b` 版本） | 无补位逻辑 | 列表只剩 `default default=False` → **0 条默认**（缺陷如实复现，徽标消失） |
+| B（修复后，`a746d10` 版本） | 含补位逻辑 | 列表 `default default=True` → **恰好 1 条默认，且自动补位、处于启用中** ✅ |
+
+> 实机动作序列与 §10.6 d 完全一致：新增一条并设默认（互斥生效，旧默认自动降级）→ 删除它 → 断言仍有且仅有 1 条默认且非被删行。
+> **环境已还原**：验证后仅剩 1 条 `default`（`is_default=True`），与验证前基线一致；测试用的 `verify-106d-fix` 行已在流程内删除。
+
+> ⚠️ **一个坑（供下次实机验证参考）**：容器内 `backend/` 不是绑定挂载，只有 `develop.watch` 同步，所以改了代码要手动 `docker cp` 进容器；而 uvicorn 的 `--reload`（StatReload）**只在 mtime 变大时才重载**——用 `docker cp` 灌回**较旧**的版本时 mtime 反而变小，**不会触发重载**，会造成"代码明明换了、行为却是旧的"假象。解法：`docker exec … python -c "import os,time; os.utime(p,(t,t))"` 把 mtime 顶到未来，再等重载日志出现 `Started server process`。
 
 **实跑命令（宿主机，注意 `env_file="../.env"` 是相对 cwd 的，必须在 `backend/` 下运行）**：
 
@@ -744,3 +755,4 @@ uv run pytest -q                    # 期望 294 passed
 | 2026-09-17 11:xx | **✅ 建 git 回退基线（用户要求「git 备份代码，方便回退」）**：IrsBot 此前非独立仓库（是上层 `d:/AIpy` 混合仓库子目录，含 doc_gen_agent 等无关项目改动）。**在 `d:/AIpy/full-stack/IrsBot/.git` 新建独立仓库**（`init`→`add -A`→`commit`；父仓库不跟踪 IrsBot 故无 gitlink 冲突）。`check-ignore` 确认 `.env`/`backups/`/`.venv`/`node_modules`/`backend/uploads`/`frontend/dist` 均排除；额外把 `.workbuddy/`（含记忆日志、有 DB 密码明文）、`wheelhouse/`（可重生成构建缓存）、`*.log`（构建/测试日志）加入 `.gitignore`，并删临时 `_t.ps1`。**踩坑**：沙箱 `git init -b feat/agent-platform` 后首提交报 `could not parse HEAD`（分支名含斜杠时 unborn 分支引用创建异常）；**解决：删 `.git` 重 `init` 默认分支提交成功，再 `git branch -m feat/agent-platform` 改名**。基线 = `fe7c391`（353 文件）+ `00a951d`（去日志）+ `74dd8d9`（补 `*.log` 规则）；`git status` 干净。**回退方式**：`git log` 看基线 / `git reset --hard fe7c391` 回退 / `git stash` 暂存 |
 | 2026-09-17 12:xx | **✅ Phase 10.3/10.5 代码审查 + 修复 embedding 阻断 bug（提交 `bfe1c7d`/`499a2fd`）**：Provider 管理 UI / 用户管理页 / 设置页代码确认已存在且前后端契约一致；唯一逻辑改动 = `get_embedding_model` 补 `decrypt_api_key`（原样传加密 key 会导致 RAG 向量化 401）。§10.6 实机验收清单已入本文档第八节 |
 | 2026-09-17 12:49 | **📋 系统提示词功能计划已写（未施工，待用户确认）**：新建 `plan/system-prompt-plan.md`，含现状结论（personas 表预留但全链路未打通）、方案（`user.system_prompt` 列 + alembic 迁移 + `prompts.py` 默认提示词 + Agent 消息最前注入 SystemMessage + `GET/PUT /users/me/system-prompt` + 设置页新 tab）、生效范围=**全局按用户、保存即生效**（不落消息表、动态注入）、默认提示词文案草案、4 步 4 提交执行序、实机验收 6 项。**待确认 3 项**：默认文案 / 全局范围 / 设置页入口。确认后开工 |
+| 2026-09-18 01:xx | **✅ 修复 §10.6 d 项缺陷（提交 `a746d10`）**：`ProviderManager.delete_provider` 原只 `session.delete(obj)`，删掉当前默认源后**该用户再无任何 `is_default=True`**（徽标消失、取默认源直接 RuntimeError）。改为**删除前先选接替者**：若被删行 `is_default`，则在同用户**其余启用中**（`is_active=True`）配置里按 `fallback_order` 升序取一条置为默认，再删除并一次 `commit`。**三处关键约束**：① 只取启用中候选（`get_chat_model` 要求 `is_default` **与** `is_active` 同时成立，否则是"有徽标取不到模型"的假象）；② 严格按 `user_id` 过滤（否则会提升**他人**源 → 越权使用他人密钥）；③ 无接替者时保持无默认、不报错。**新增 7 条回归测试**（manager 6 + API 1）。**双层证伪**：测试层短路提升逻辑 → 恰好 4 条补位测试失败；实机层把 `cd1f17b` 旧版 `docker cp` 进容器跑同一动作序列 → `default` 掉成 `False`、**0 条默认**（缺陷如实复现）；换回修复版 → 恰好 1 条默认且自动补位 ✅。**全量回归 311 passed**。⚠️ **重要坑**：uvicorn `--reload`（StatReload）**只在 mtime 变大时重载**，用 `docker cp` 灌回较旧版本不会触发重载 → 需 `os.utime` 把 mtime 顶到未来。环境已还原（仅剩 `default` 且为默认） |
