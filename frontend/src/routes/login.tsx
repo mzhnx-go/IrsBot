@@ -1,7 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
   createFileRoute,
-  Link as RouterLink,
   redirect,
 } from "@tanstack/react-router"
 import { useForm } from "react-hook-form"
@@ -119,13 +118,6 @@ function Login() {
             <LoadingButton type="submit" loading={loginMutation.isPending}>
               登录
             </LoadingButton>
-          </div>
-
-          <div className="text-center text-sm">
-            还没有账号？{" "}
-            <RouterLink to="/signup" className="underline underline-offset-4">
-              注册
-            </RouterLink>
           </div>
         </form>
       </Form>
