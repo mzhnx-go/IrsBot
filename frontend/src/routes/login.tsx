@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
   createFileRoute,
+  Link as RouterLink,
   redirect,
 } from "@tanstack/react-router"
 import { useForm } from "react-hook-form"
@@ -20,6 +21,7 @@ import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { PasswordInput } from "@/components/ui/password-input"
 import useAuth, { isLoggedIn } from "@/hooks/useAuth"
+import { usePublicSettings } from "@/hooks/useDeploymentSettings"
 
 const formSchema = z.object({
   username: z.email(),
@@ -51,6 +53,10 @@ export const Route = createFileRoute("/login")({
 
 function Login() {
   const { loginMutation } = useAuth()
+  // 是否显示「注册」入口由服务端运行时开关决定（默认关闭 = 单用户模式）。
+  // 这个查询走公开端点，未登录也能拿到；后端不可用时静默不显示，
+  // 避免登录页因为一个附加链接而出现报错态。
+  const { data: publicSettings } = usePublicSettings()
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     mode: "onBlur",
@@ -119,6 +125,15 @@ function Login() {
               登录
             </LoadingButton>
           </div>
+
+          {publicSettings?.open_registration === true && (
+            <div className="text-center text-sm" data-testid="signup-link">
+              还没有账号？{" "}
+              <RouterLink to="/signup" className="underline underline-offset-4">
+                注册
+              </RouterLink>
+            </div>
+          )}
         </form>
       </Form>
     </AuthLayout>

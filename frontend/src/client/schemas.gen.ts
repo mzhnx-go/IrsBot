@@ -184,6 +184,57 @@ export const ConversationResponseSchema = {
     description: '对话响应'
 } as const;
 
+export const DeploymentSettingsPublicSchema = {
+    properties: {
+        open_registration: {
+            type: 'boolean',
+            title: 'Open Registration'
+        },
+        mode: {
+            type: 'string',
+            enum: ['single_user', 'multi_tenant'],
+            title: 'Mode'
+        },
+        user_count: {
+            type: 'integer',
+            title: 'User Count'
+        },
+        env_open_registration: {
+            type: 'boolean',
+            title: 'Env Open Registration'
+        }
+    },
+    type: 'object',
+    required: ['open_registration', 'mode', 'user_count', 'env_open_registration'],
+    title: 'DeploymentSettingsPublic',
+    description: `部署设置状态（GET/PATCH 共用响应，仅超管可读）。
+
+Attributes:
+    open_registration: 当前生效值（本表有记录则取本表，否则回落 .env）。
+    mode: **派生**的展示标签，由 open_registration 换算，不是独立配置项。
+          True → "multi_tenant"（登录页开放注册）；False → "single_user"。
+    user_count: 系统内账号数，供前端提示「切回单用户后已有账号仍可登录」。
+    env_open_registration: \`.env\` 里的兜底值。便于管理员理解「本表没有
+          记录时，系统在用什么」。超管专属端点，不对外泄露。`
+} as const;
+
+export const DeploymentSettingsUpdateSchema = {
+    properties: {
+        open_registration: {
+            type: 'boolean',
+            title: 'Open Registration'
+        }
+    },
+    type: 'object',
+    required: ['open_registration'],
+    title: 'DeploymentSettingsUpdate',
+    description: `更新部署设置请求。
+
+目前只有**一个**运行时开关——匿名自助注册是否开放。其余与「模式」
+相关的行为（超管建号、/admin 可见性、数据归属隔离）恒定不变，不随
+开关走，因此这里也只有一个字段。`
+} as const;
+
 export const DocumentOutSchema = {
     properties: {
         id: {
@@ -776,6 +827,22 @@ export const ProviderUpdateSchema = {
     type: 'object',
     title: 'ProviderUpdate',
     description: '更新请求体：所有字段可选'
+} as const;
+
+export const PublicSettingsSchema = {
+    properties: {
+        open_registration: {
+            type: 'boolean',
+            title: 'Open Registration'
+        }
+    },
+    type: 'object',
+    required: ['open_registration'],
+    title: 'PublicSettings',
+    description: `匿名可读的公开设置（仅用于登录页判断是否渲染「注册」入口）。
+
+只暴露这一位布尔：它本身可由「试一次 POST /users/signup」的结果推得，
+因此不构成额外泄露；而登录页必须在**鉴权之前**拿到它。`
 } as const;
 
 export const SystemPromptPublicSchema = {

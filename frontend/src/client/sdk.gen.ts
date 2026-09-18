@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AgentCreateConversationData, AgentCreateConversationResponse, AgentListConversationsData, AgentListConversationsResponse, AgentChatData, AgentChatResponse, AgentCreateMcpServerData, AgentCreateMcpServerResponse, AgentListMcpServersData, AgentListMcpServersResponse, AgentGetMcpServerData, AgentGetMcpServerResponse, AgentUpdateMcpServerData, AgentUpdateMcpServerResponse, AgentDeleteMcpServerData, AgentDeleteMcpServerResponse, AgentConnectMcpServerData, AgentConnectMcpServerResponse, AgentListSkillsResponse, AgentGetSkillDetailData, AgentGetSkillDetailResponse, AgentDeleteSkillData, AgentDeleteSkillResponse, AgentScanSkillsResponse, AgentInstallSkillData, AgentInstallSkillResponse, KnowledgeBaseListKbsResponse, KnowledgeBaseCreateKbData, KnowledgeBaseCreateKbResponse, KnowledgeBaseGetKbData, KnowledgeBaseGetKbResponse, KnowledgeBaseDeleteKbData, KnowledgeBaseDeleteKbResponse, KnowledgeBaseUploadKbDocumentData, KnowledgeBaseUploadKbDocumentResponse, KnowledgeBaseListKbDocumentsData, KnowledgeBaseListKbDocumentsResponse, KnowledgeBaseQueryKbData, KnowledgeBaseQueryKbResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginResetPasswordData, LoginResetPasswordResponse, PrivateCreateUserData, PrivateCreateUserResponse, ProvidersListProvidersResponse, ProvidersCreateProviderData, ProvidersCreateProviderResponse, ProvidersUpdateProviderData, ProvidersUpdateProviderResponse, ProvidersDeleteProviderData, ProvidersDeleteProviderResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersReadMySystemPromptResponse, UsersUpdateMySystemPromptData, UsersUpdateMySystemPromptResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsHealthCheckResponse } from './types.gen';
+import type { AgentCreateConversationData, AgentCreateConversationResponse, AgentListConversationsData, AgentListConversationsResponse, AgentChatData, AgentChatResponse, AgentCreateMcpServerData, AgentCreateMcpServerResponse, AgentListMcpServersData, AgentListMcpServersResponse, AgentGetMcpServerData, AgentGetMcpServerResponse, AgentUpdateMcpServerData, AgentUpdateMcpServerResponse, AgentDeleteMcpServerData, AgentDeleteMcpServerResponse, AgentConnectMcpServerData, AgentConnectMcpServerResponse, AgentListSkillsResponse, AgentGetSkillDetailData, AgentGetSkillDetailResponse, AgentDeleteSkillData, AgentDeleteSkillResponse, AgentScanSkillsResponse, AgentInstallSkillData, AgentInstallSkillResponse, KnowledgeBaseListKbsResponse, KnowledgeBaseCreateKbData, KnowledgeBaseCreateKbResponse, KnowledgeBaseGetKbData, KnowledgeBaseGetKbResponse, KnowledgeBaseDeleteKbData, KnowledgeBaseDeleteKbResponse, KnowledgeBaseUploadKbDocumentData, KnowledgeBaseUploadKbDocumentResponse, KnowledgeBaseListKbDocumentsData, KnowledgeBaseListKbDocumentsResponse, KnowledgeBaseQueryKbData, KnowledgeBaseQueryKbResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginResetPasswordData, LoginResetPasswordResponse, PrivateCreateUserData, PrivateCreateUserResponse, ProvidersListProvidersResponse, ProvidersCreateProviderData, ProvidersCreateProviderResponse, ProvidersUpdateProviderData, ProvidersUpdateProviderResponse, ProvidersDeleteProviderData, ProvidersDeleteProviderResponse, SettingsReadDeploymentSettingsResponse, SettingsUpdateDeploymentSettingsData, SettingsUpdateDeploymentSettingsResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersReadMySystemPromptResponse, UsersUpdateMySystemPromptData, UsersUpdateMySystemPromptResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsHealthCheckResponse, UtilsReadPublicSettingsResponse } from './types.gen';
 
 export class AgentService {
     /**
@@ -593,6 +593,58 @@ export class ProvidersService {
     }
 }
 
+export class SettingsService {
+    /**
+     * Read Deployment Settings
+     * 读取部署设置（**超管专属**）。
+     *
+     * Args:
+     * session: 数据库会话。
+     *
+     * Returns:
+     * 当前部署设置；`env_open_registration` 是 `.env` 里的兜底值，
+     * 便于管理员判断「我改了网页开关，为什么 `.env` 不生效」。
+     * @returns DeploymentSettingsPublic Successful Response
+     * @throws ApiError
+     */
+    public static readDeploymentSettings(): CancelablePromise<SettingsReadDeploymentSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/settings/deployment'
+        });
+    }
+    
+    /**
+     * Update Deployment Settings
+     * 更新部署设置（**超管专属**），保存即生效、无需重启。
+     *
+     * Args:
+     * session: 数据库会话。
+     * body: `open_registration` 目标值。
+     *
+     * Returns:
+     * 更新后的部署设置。
+     *
+     * Note:
+     * 关闭注册**不会**删除或停用任何已有账号；已存在的账号仍可正常登录。
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns DeploymentSettingsPublic Successful Response
+     * @throws ApiError
+     */
+    public static updateDeploymentSettings(data: SettingsUpdateDeploymentSettingsData): CancelablePromise<SettingsUpdateDeploymentSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/settings/deployment',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+}
+
 export class UsersService {
     /**
      * Read Users
@@ -739,6 +791,10 @@ export class UsersService {
     /**
      * Register User
      * Create new user without the need to be logged in.
+     *
+     * 受运行时开关约束：默认关闭（单用户模式），关闭时该端点直接 403，
+     * 账号由管理员在 /admin 页创建。管理员可在 /admin 页切换「多租户」
+     * 即时开放（无需重启）。
      * @param data The data for the request.
      * @param data.requestBody
      * @returns UserPublic Successful Response
@@ -833,6 +889,33 @@ export class UtilsService {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/v1/utils/health-check/'
+        });
+    }
+    
+    /**
+     * Read Public Settings
+     * 读取公开设置（**无需登录**）。
+     *
+     * 存在的唯一原因：登录页要在**鉴权之前**决定是否渲染「注册」入口。
+     *
+     * ⚠️ 只放可以公开的信息。目前只有 `open_registration` 一位布尔——
+     * 它本身就能由「试一次 POST /users/signup」的结果推得，因此不构成
+     * 额外泄露；敏感配置（`.env` 兜底值等）只在超管专属的
+     * `GET /settings/deployment` 里返回。
+     *
+     * Args:
+     * session: 数据库会话。
+     *
+     * Returns:
+     * PublicSettings：`open_registration` 为当前生效值
+     * （`app_settings` 表 > `.env`）。
+     * @returns PublicSettings Successful Response
+     * @throws ApiError
+     */
+    public static readPublicSettings(): CancelablePromise<UtilsReadPublicSettingsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/utils/public-settings'
         });
     }
 }
