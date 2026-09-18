@@ -13,6 +13,7 @@
 7. Skill           —— 已安装技能
 8. Persona         —— 智能体人设
 9. AgentRun        —— Agent 执行记录
+10. AppSetting     —— 运行时配置（通用 KV，与 .env 的部署级配置区分）
 """
 
 import uuid
@@ -473,3 +474,44 @@ class AgentRun(SQLModel, table=True):
     )
 
     conversation: Conversation | None = Relationship(back_populates="runs")
+
+
+# ── 10. AppSetting（运行时配置）────────────────────────────────
+
+
+class AppSetting(SQLModel, table=True):
+    """运行时配置表（通用 KV）。
+
+    存放**可在运行时变更**的系统配置，与 `Settings`（`.env`，进程启动时
+    读取、需重启生效）区分开：
+
+    - `.env`：部署级配置，改了要重启；也是运行时配置的**兜底初值**
+    - 本表：超管在网页上即可变更，立即生效，无需重启
+
+    通用 KV 而非类型化单行表，是为了后续增加运行开关时**不必再写迁移**
+    （加一个键即可）；类型校验由 `app/core/settings_runtime.py` 的读取
+    助手承担。
+
+    ⚠️ 键名必须走 `settings_runtime` 里的常量，不要在各处手写字符串——
+    KV 表没有 schema，拼错键不会报错，只会**静默新增一行**、配置看起来
+    「改了不生效」。
+
+    Attributes:
+        key: 主键，如 "users.open_registration"。
+        value: 值，统一按字符串存（"true"/"false"/...），读取时类型化。
+        updated_at: 最后更新时间（UTC），便于审计。
+    """
+
+    __tablename__ = "app_settings"
+
+    key: str = Field(sa_type=String(100), max_length=100, primary_key=True)
+    value: str = Field(sa_type=Text)
+    updated_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True),
+            default=get_datetime_utc,
+            onupdate=get_datetime_utc,
+            nullable=False,
+        ),
+    )
