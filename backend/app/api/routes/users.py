@@ -12,7 +12,6 @@ from app.api.deps import (
 from app.core import crud
 from app.core.agent.prompts import resolve_system_prompt
 from app.core.auth.security import get_password_hash, verify_password
-from app.core.config import settings
 from app.core.db.sqlmodel_models import (
     Message,
     SystemPromptPublic,
@@ -26,6 +25,7 @@ from app.core.db.sqlmodel_models import (
     UserUpdate,
     UserUpdateMe,
 )
+from app.core.settings_runtime import signup_allowed
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -183,12 +183,16 @@ def register_user(session: SessionDep, user_in: UserRegister) -> Any:
     """
     Create new user without the need to be logged in.
 
-    受 USERS_OPEN_REGISTRATION 开关约束：本地单用户部署默认关闭，
-    关闭时该端点直接 403，账号只能由管理员创建。
+    受运行时开关约束：默认关闭（单用户模式），关闭时该端点直接 403，
+    账号由管理员在 /admin 页创建。管理员可在 /admin 页切换「多租户」
+    即时开放（无需重启）。
     """
     # 守卫必须在查重之前：否则未开放时也能从「该邮箱已存在」的报错里
     # 反推出系统内已有哪些账号（把注册闸门变成账号枚举探测面）。
-    if not settings.USERS_OPEN_REGISTRATION:
+    #
+    # 判断依据统一走 signup_allowed()（app_settings 表 > .env），
+    # 不要在这里直接读 settings —— 否则运行时开关会形同虚设。
+    if not signup_allowed(session):
         raise HTTPException(
             status_code=403,
             detail="Open user registration is forbidden on this server",

@@ -161,9 +161,11 @@ class Settings(BaseSettings):
     FILE_WRITE_ROOTS: Annotated[list[str], BeforeValidator(parse_path_list)] = []
 
     # ── 注册开关（安全默认：不开放自助注册）───────────────────
-    # 本地单用户部署下，账号只应由管理员创建（/admin 页或 superuser 的
-    # POST /users/）。如需恢复模板的多用户自助注册（例如复用到另一个
-    # 多用户项目），在 .env 设 true。
+    # ⚠️ 这是**兜底初值**，不是最终生效值。部署后在 /admin 页切换
+    # 「单用户 / 多租户」保存即生效（值存 app_settings 表），运行时值
+    # **优先级高于本变量**。判断统一走 settings_runtime.signup_allowed()，
+    # 不要在别处直接读本字段。
+    # 关时 POST /users/signup 直接 403，账号只由管理员创建。
     USERS_OPEN_REGISTRATION: bool = False
 
     # ── 内容安全 ───────────────────────────────────────────────

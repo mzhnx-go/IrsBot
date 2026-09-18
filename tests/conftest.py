@@ -76,6 +76,7 @@ def db() -> Generator[Session, None, None]:
         # 按外键依赖顺序清空（子表在前、父表在后），保证每次测试可重复运行
         from app.core.db.models import (  # noqa: F401
             AgentRun,
+            AppSetting,
             Conversation,
             Document,
             KnowledgeBase,
@@ -97,6 +98,10 @@ def db() -> Generator[Session, None, None]:
             ProviderConfig,
             Skill,
             User,
+            # ⚠️ 必清：运行时配置是全库共享的（无 user_id），一旦某条测试把
+            # users.open_registration 写成 true，后续所有测试的注册闸门断言
+            # 都会连带失效。
+            AppSetting,
         ]:
             session.execute(delete(model))
         session.commit()
