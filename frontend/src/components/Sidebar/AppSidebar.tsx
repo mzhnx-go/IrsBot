@@ -1,9 +1,10 @@
 import {
   Home,
+  Library,
   MessageSquare,
   PanelLeftClose,
   Settings,
-  Users,
+  Users
 } from "lucide-react"
 
 import { SidebarAppearance } from "@/components/Common/Appearance"
@@ -24,6 +25,7 @@ import { User } from "./User"
 const baseItems: Item[] = [
   { icon: Home, title: "Dashboard", path: "/" },
   { icon: MessageSquare, title: "聊天", path: "/chat" },
+  { icon: Library, title: "知识库", path: "/knowledge-base" },
   { icon: Settings, title: "设置", path: "/settings" },
 ]
 
