@@ -23,12 +23,12 @@
 
 | 项 | 值 |
 |---|---|
-| **当前阶段** | **🎉 Phase D1–D7 ✅ + D5.1b ✅ 全完成**；**已建 git 回退基线**（独立仓库 `d:/AIpy/full-stack/IrsBot/.git`，分支 `feat/agent-platform`）；**✅ §10.6 Provider 实测 a–f 全部通过（2026-09-18）**：a 列表/b 新增/c 设默认/e 加密/f RAG 向量化 ✅；**d 项缺陷（删默认源后无默认）已修复**（`a746d10`：`delete_provider` 自动补位 + 7 条回归测试 + 实机 A/B 验证），详见第八节；**✅ 系统提示词功能已实施并实机验收（2026-09-17）**：User.system_prompt 列+迁移 `a1b2c3d4e5f6`、`prompts.py`、Agent 注入 SystemMessage、GET/PATCH `/users/me/system-prompt`、设置页「系统提示词」tab、client 已重新生成；**✅ 注册闸门已收口（2026-09-18）**：新增 `USERS_OPEN_REGISTRATION` 开关（安全默认 `false`，沿用 D6 工具开关范式）、`/users/signup` 加守卫（**置于查重之前**，防账号枚举）、前端登录页移除「注册」入口，+3 条测试并双层证伪 —— ⚠️ **前端 `frontend/dist` 需重新构建后 UI 才生效**（构建产物仍是旧版）→ **已重建**：用**仓库根** `node_modules` 跑 `vite build`（12.90s），新产物 `login-CP8ls77z.js`，旧产物与「还没有账号」字符串均已消失；dist 为绑定挂载 → 刷新浏览器即生效。**✅ 容器同步已完成（2026-09-18）**：`docker compose up -d --build backend` 重建镜像成功（db / milvus / prestart / backend 全部 Recreate，**命名卷 `app-db-data` 数据保留**），容器内 `config.py`（`USERS_OPEN_REGISTRATION`）与 `users.py`（403 守卫）已确认为新版；**实机复测 `POST /users/signup` → 403 + 约定话术、防枚举响应逐字节一致、无账号落库**，详见第八节末「容器同步 + 注册闸门实机验证」 |
+| **当前阶段** | **🎉 Phase D1–D7 ✅ + D5.1b ✅ 全完成**；**已建 git 回退基线**（独立仓库 `d:/AIpy/full-stack/IrsBot/.git`，分支 `feat/agent-platform`）；**✅ §10.6 Provider 实测 a–f 全部通过（2026-09-18）**：a 列表/b 新增/c 设默认/e 加密/f RAG 向量化 ✅；**d 项缺陷（删默认源后无默认）已修复**（`a746d10`：`delete_provider` 自动补位 + 7 条回归测试 + 实机 A/B 验证），详见第八节；**✅ 系统提示词功能已实施并实机验收（2026-09-17）**：User.system_prompt 列+迁移 `a1b2c3d4e5f6`、`prompts.py`、Agent 注入 SystemMessage、GET/PATCH `/users/me/system-prompt`、设置页「系统提示词」tab、client 已重新生成；**✅ 注册闸门已收口（2026-09-18）**：新增 `USERS_OPEN_REGISTRATION` 开关（安全默认 `false`，沿用 D6 工具开关范式）、`/users/signup` 加守卫（**置于查重之前**，防账号枚举）、前端登录页移除「注册」入口，+3 条测试并双层证伪 —— ⚠️ **前端 `frontend/dist` 需重新构建后 UI 才生效**（构建产物仍是旧版）→ **已重建**：用**仓库根** `node_modules` 跑 `vite build`（12.90s），新产物 `login-CP8ls77z.js`，旧产物与「还没有账号」字符串均已消失；dist 为绑定挂载 → 刷新浏览器即生效。**✅ 容器同步已完成（2026-09-18）**：`docker compose up -d --build backend` 重建镜像成功（db / milvus / prestart / backend 全部 Recreate，**命名卷 `app-db-data` 数据保留**），容器内 `config.py`（`USERS_OPEN_REGISTRATION`）与 `users.py`（403 守卫）已确认为新版；**实机复测 `POST /users/signup` → 403 + 约定话术、防枚举响应逐字节一致、无账号落库**，详见第八节末「容器同步 + 注册闸门实机验证」；**✅ 部署模式运行时开关已实施（2026-09-18，第七轮）**：新增 `app_settings` KV 表 + `settings_runtime` 读取层，超管在 `/admin` 页切换「单用户 / 多租户」**即时生效**（`.env` 的 `USERS_OPEN_REGISTRATION` 降为兜底初值）；登录页按开关显示注册入口；+33 条测试，详见第八节末「部署模式运行时开关」 |
 | **代码状态** | 🔶 **有代码改动**：`backend/Dockerfile`（修 Python 版本）/ `backend/app/main.py`（静态托管）/ `frontend/src/main.tsx` + `routes/_layout/chat.tsx` + `hooks/useAgentChat.ts`（相对路径）/ `frontend/vite.config.ts`（proxy）/ `frontend/.env` + 配置类改动（见第四点五节） |
 | **运行状态** | ✅ **全栈运行中（2026-09-18 重建后）**：`irsbot-backend-1` / `irsbot-db-1` / `irsbot-milvus-1` 全部 healthy，**backend 容器内代码 = 最新提交**（不再是「构建中」）；前端 `dist` 经绑定挂载 `/app/frontend-dist` 生效 |
 | **文档状态** | ✅ **已一致**（含 2026-09-18 **D2 语义拆分回查**）：`istbot-implement-plan.md` **第六轮同步**——把「Phase 11 因单用户整体降级」拆为 **(A) 多用户运营化**（降级不做）与 **(B) 归属隔离**（已实现为硬约束），共修 **15 处活引用**（0.0 决策表 / 0.2 / 0.4 / 0.5 / 一节阶段表 / Phase 3 / Phase 3.5 / SC11 / SC D10 / 6.1 能力矩阵 / 8.0 / 8.1 / 8.4 / 5.x 已移出表 / 第九节变更说明），`~~划掉~~` 与历轮留痕按「追溯性引用」**一律保留**；`local-deployment-plan.md` 已升 **v7.2**；详见第八节末「文档同步：D2 语义拆分」 |
 | **当前分支** | `feat/agent-platform`（未推送远端） |
-| **测试基线** | ✅ **全量最新实跑：`pytest ../tests -q` → 321 passed, 0 failed（123.29s，2026-09-18）**（上次 311；新增 = §10.6 修复 7 条 + 注册闸门 3 条；工作区另有未提交的 Provider 多租户加固测试，一并跑通）；后端 `py_compile` ✅；**前端 `tsc -p tsconfig.build.json --noEmit` → ExitCode 0 ✅**（`frontend/node_modules` 内无依赖、仅 vite 缓存 → 改用**仓库根** `node_modules/typescript/bin/tsc`）；**`vite build` ✅ 12.90s** 重建 dist |
+| **测试基线** | ✅ **全量最新实跑（2026-09-18 第七轮）：`pytest ../tests -q` → 354 条总量，343 passed / 1 failed / 10 errors**（622.62s）。**11 条失败/错误全部是 `knowledge_base` 的 Milvus 连接失败**（`irsbot-milvus-1` 同期处于 `health: starting` 重启循环，环境问题，非本次改动）；**非 Milvus 用例 0 失败**。**新增 33 条（`test_settings_runtime.py` 15 + `test_settings.py` 18）单独跑全过**（2.40s）。上次基线：321 passed / 0 failed（318 + 注册闸门 3）。后端 `py_compile` ✅；**前端 `tsc -p tsconfig.build.json --noEmit` 当前 ExitCode 2** —— 唯一报错是**用户 WIP 文件** `src/hooks/useKnowledgeBase.ts(1,79) TS1005`（未擅自改动，全仓无引用）；`vite build` ✅ 16.35s 重建 dist |
 | **阻塞项** | **无** —— 容器同步已闭环（2026-09-18）；**D1.3a 已实机验证通过**（见下方验收表）；镜像构建是 D1.3c 分发优化，非阻塞 |
 | **施工前必做** | **M1 待做（非阻塞）**；**M2 / M3 ✅ 已完成**；**Q1–Q3 ✅ 已确认**；Q4–Q10 待确认（见第九点五节） |
 
@@ -136,7 +136,7 @@
 |---|---|---|
 | D1 | 网页部署独立成另一个项目 | 本项目**单形态**；Phase 16 移出 |
 | D2 | 本地版单用户 | **拆分**（2026-09-18）：**多用户运营化降级**（不做自助注册/配额/计费）；**归属隔离已实现为硬约束**（`user_id` 必填 + fail closed，`ef08cc1`）。另保留 cache 淘汰 + `is_default` 约束 |
-| **D2.1** | **注册入口默认关闭** | `USERS_OPEN_REGISTRATION=false` → `/users/signup` 直接 403；守卫置于查重之前防账号枚举（`41cccfd`） |
+| **D2.1** | **注册入口默认关闭（可由超管运行时开启）** | `/users/signup` 默认 403；守卫置于查重之前防账号枚举（`41cccfd`）。**2026-09-18 第七轮修订**：改为**运行时开关** —— 超管在 `/admin` 页切换「单用户 / 多租户」即时生效，`.env` 的 `USERS_OPEN_REGISTRATION` **降为兜底初值** |
 | ~~D3~~ | ~~Docker 与裸机脚本都做~~ | ➖ **已变更** —— 见 D5 |
 | **D4** | **保持 PostgreSQL + Milvus**（不换 SQLite / FAISS） | **L1 / L2 阶段全部作废**；`local-deployment-plan.md` 整份重写 |
 | **D5** | **部署形态 = Docker 一键启动**（唯一前置：装 Docker） | 放弃裸机脚本路线；采用容器内全栈方案 |
@@ -725,6 +725,72 @@ Container irsbot-backend-1 Started
 
 ---
 
+### ✅ 部署模式运行时开关（2026-09-18，第七轮 —— D2.1 由「写死」改为「可切换」）
+
+**用户指令**：「关于多租户问题，管理员可以选择多租户和单用户开关」。计划文档：[multi-tenant-plan.md](./multi-tenant-plan.md)（v2）。
+
+**现状核查结论（决定方案尺度）**：
+
+| 层 | 现状 | 结论 |
+|---|---|---|
+| 数据层 | `ProviderConfig` / `Conversation` / `Message` / `KnowledgeBase` / `Document` / `MCPServer` / `Persona` / `AgentRun` **全部**带 `user_id` + `ON DELETE CASCADE` | **已是完整多租户**，开关不需要新建任何归属结构 |
+| 隔离逻辑 | `provider.py` 双分支 `user_id` 过滤 + 缓存键含 `user_id` + fail closed（`ef08cc1`） | **安全边界**，两模式下都不动 |
+| 运行时配置机制 | **不存在**（开关全在 `.env`） | 需新建 |
+
+> 一句话：**开关控制的是「策略」，不是「代码路径」**。数据层的多租户能力一直都在。
+
+**用户三项决策**：① 载体 = **运行时**（DB + `/admin` 页）② 严格度 = **仅关自助注册，超管仍可建号** ③ 先出计划文档。
+
+> ⚠️ 决策 ② 两次推翻初稿：先推翻「单用户下隐藏 `/admin` 与侧边栏入口」（超管要建号就必须保留 `/admin`），再推翻「两个配置键」（见下）。
+
+**实施清单**：
+
+| 件 | 路径 | 说明 |
+|---|---|---|
+| 模型 | `backend/app/core/db/models.py` | 新增 `AppSetting`（`key` 主键 / `value` / `updated_at`），第 10 张表 |
+| 迁移 | `backend/app/alembic/versions/d4e5f6a7b8c9_add_app_settings_table.py` | `create_table` / `drop_table` 对称，`down_revision = a1b2c3d4e5f6` |
+| 读取层 | `backend/app/core/settings_runtime.py`（新建） | 键名常量 + `get_setting` / `set_setting` + **`signup_allowed()`（全项目唯一判断点）** + `deployment_mode()`（展示标签）+ `count_users()` |
+| Schema | `backend/app/core/db/sqlmodel_models.py` | `DeploymentSettingsUpdate` / `DeploymentSettingsPublic` / `PublicSettings` |
+| 注册闸门 | `backend/app/api/routes/users.py` | 守卫改读 `signup_allowed(session)`，**位置不变、仍在查重之前**（防枚举）；移除对 `settings` 的直接依赖 |
+| 公开端点 | `backend/app/api/routes/utils.py` | `GET /utils/public-settings`（**匿名**，只暴露 `open_registration` 一位布尔，登录页渲染注册入口用） |
+| 超管端点 | `backend/app/api/routes/settings.py`（新建） | `GET` / `PATCH /settings/deployment`，超管专属 |
+| 路由注册 | `backend/app/api/main.py` | `include_router(settings_routes.router)` |
+| 配置注释 | `.env` / `.env.example` / `config.py` | `USERS_OPEN_REGISTRATION` 注释改为「**首次兜底值**；部署后以网页开关为准」 |
+| 测试隔离 | `tests/conftest.py` | **`AppSetting` 必须加入收尾清表列表** —— 运行时配置**全库共享**（无 `user_id`），漏清会让某条用例写下的 `true` **漏给后续所有注册闸门断言** |
+| 前端 hook | `frontend/src/hooks/useDeploymentSettings.ts`（新建） | `deploymentSettingsQuery` / `updateDeploymentSettings` / `usePublicSettings` |
+| 前端组件 | `frontend/src/components/Admin/DeploymentMode.tsx`（新建） | 「单用户 / 多租户」两态开关 + 切到多租户时**二次确认**（写明「任何人可注册并消耗你的 API Key」）+ `user_count` 提示 + `.env` 被覆盖时的告警 |
+| 前端接入 | `routes/_layout/admin.tsx` / `routes/login.tsx` | `/admin` 页顶部插入开关卡；登录页按 `open_registration` **条件**恢复「注册」入口（`f8ea244` 删掉的入口） |
+| client 再生成 | `frontend/src/client/**` | `openapi.json` 重新导出 + `openapi-ts` 生成 `SettingsService` / `UtilsService.readPublicSettings` |
+
+**核心语义（唯一判断点）**：
+
+```
+signup_allowed(session) = app_settings 表有记录 ? 表里的值 : .env 的 USERS_OPEN_REGISTRATION
+```
+
+- **优先级：`app_settings` 表 > `.env` > 代码默认值**
+- 表里没记录时回落 `.env` → **升级后现网行为零变化**；现有 3 条注册闸门测试（monkeypatch `settings.USERS_OPEN_REGISTRATION`）因此**无需改写**
+- **不做进程内缓存**：多 worker / WS 进程各持副本必然不一致，而主键单行查询开销可忽略
+
+**⚠️ 一个刻意的收窄：只留一个开关（v2 砍掉 `mode` 键）**
+
+v1 原设计两个键（`deployment.mode` + `deployment.open_registration`），派生 `signup_allowed = (mode=="multi_tenant") AND open_registration`。复查时发现**冗余状态缺陷**：因为决策 ② 让超管在两种模式下都能建号、`/admin` 两种模式都保留、归属隔离两种模式都生效，于是「**多租户 + 关注册**」与「**单用户**」在**所有可观测行为上完全等同**（注册都 403、超管都能建号、`/admin` 都可见、隔离都生效）。
+
+→ 留两个开关只会造出一个产出相同结果的档位，读设置的人无从判断该选哪个；维护者还会误以为 `mode` 管着什么。**冗余状态比缺失状态更危险：它让人以为存在一道其实不存在的约束。**
+
+处置：配置层只留 `users.open_registration` 一键；「单用户 / 多租户」降为**呈现层标签**（由布尔派生）；互斥 400 校验取消；防误触由「双开关两步」改为「单开关 + 二次确认」。完整推演见 `multi-tenant-plan.md` 第十一节（v1 设计与问题**完整留痕**，未删）。
+
+**测试（33 条新增）**：
+
+| 文件 | 条数 | 覆盖 |
+|---|---|---|
+| `tests/core/test_settings_runtime.py` | 15 | 布尔解析参数化（含乱值 → None 回落）；**优先级矩阵**（无记录回落 `.env` ×2 / 记录覆盖 `.env` ×2）；类型化写入往返；通用 KV 覆盖写；键名常量锁定 |
+| `tests/api/routes/test_settings.py` | 18 | `GET /settings/deployment` 超管 200 / 普通 403 / 匿名 401；`PATCH` **立即影响**后续 `signup`（开→200、关→403）；普通用户改不动且**确实没生效**；非布尔 422；字段缺失 422；**超管在关注册时仍可建号**（决策 ②）；**来回切换不改变账号数**；`/utils/public-settings` 匿名可读且**只返回一个字段**、跟随运行时值 |
+
+**⚠️ 一个容易漏的坑**：`tests/conftest.py` 的收尾清表列表必须加 `AppSetting`。运行时配置与其它表不同——它**没有 `user_id`**，是全库共享的；某条用例把 `users.open_registration` 写成 `true` 后若不清，**后续所有依赖「默认关闭」的用例都会连带失效**。
+
+---
+
 ## 九、施工前必做调研（M1–M3 —— **M2 / M3 已完成，M1 待做**）
 
 | 编号 | 待调研 | 为什么必须先做 | 阻塞 | 状态 |
@@ -867,3 +933,5 @@ docker compose watch                   # 或：另开常驻终端持续同步
 | 2026-09-18 01:3x（⚠️ 本行补记于此，**实际发生时间早于上方 01:33 行**） | **✅ 注册闸门收口（用户批准「方案 a」）**：起因 = 用户问「为什么有多用户」，调研发现 `/users/signup` **完全无守卫**（探针实测：匿名 `POST /users/signup` → **HTTP 200 建号成功**，新号可立即登录拿 token；根因 = 模板原版的 `if not settings.USERS_OPEN_REGISTRATION` 守卫**被删掉**且 `config.py` 根本没有该字段），而前端 `routes/signup.tsx` 是完整注册页、`login.tsx:126` 还有「注册」链接 → **「单用户」从事实降级成了假设**。**实施（沿用 D6 工具开关范式：安全默认 + `.env` 显式开启）**：① `config.py` 新增 `USERS_OPEN_REGISTRATION: bool = False`；② `users.py::register_user` 加守卫，**严格要求置于查重之前**（否则未开放时「400 邮箱已存在」与「403」的差异会变成**账号枚举探测面**），并清掉排障残留（`import traceback` + `print("=== SIGNUP ERROR ===")`）；③ `.env` 补显式声明与注释（与 `ENABLE_SHELL` 等排在一起）；④ 前端 `login.tsx` 删「注册」链接及随之无用的 `Link as RouterLink` import（`createFileRoute`/`redirect` 仍在用）。**测试 +3**：`forbidden_when_disabled`（403 且不落库）、`signup_disabled_does_not_leak_email_existence`（已存在 vs 全新邮箱响应**逐字节一致**）、`users_open_registration_default_is_false`（锁字段默认值不受 `.env` 影响）；原 2 条注册测试改为 `monkeypatch` 打开开关后运行。**双层证伪**：短路守卫 → 恰好 2 条失败；把守卫**挪到查重之后** → 恰好 1 条（防枚举那条）失败 → 两条约束均被真实锁住。**全量回归 321 passed / 0 failed**（318 + 3）。**前端已收尾**：`tsc -p tsconfig.build.json --noEmit` → ExitCode 0（**必须用仓库根 `node_modules`** —— `frontend/node_modules` 里其实没有依赖，只有 vite 缓存）；`vite build` 12.90s 重建 `frontend/dist`（新产物 `login-CP8ls77z.js`，旧产物连同「还没有账号」字符串一并清除）→ dist 为**绑定挂载**，刷新浏览器即生效。⚠️ **唯一未完成项**：backend 容器内代码仍是旧版（沙箱 `docker` CLI 本次完全不可用，连 `docker --version` 都报 `/usr/bin/env: 'sh'`），实测打真实接口 `POST /users/signup` **仍返回 200** → 需用户 `docker compose up -d --build backend`（或 `docker compose watch`）后复测应得 403。三层多用户残留溯源已留档 memory 日志 |
 | 2026-09-18 10:35 | **📋 部署模式运行时开关计划已写（提交 `plan/multi-tenant-plan.md`，未编码，待确认）**：用户指令「关于多租户问题，管理员可以选择多租户和单用户开关」。**现状核查关键结论**：① 数据层**已是完整多租户**——`ProviderConfig`/`Conversation`/`Message`/`KnowledgeBase`/`Document`/`MCPServer`/`Persona`/`AgentRun` 全部带 `user_id` + `ON DELETE CASCADE`，开关**不需要**新建任何归属结构；② 隔离逻辑（`ef08cc1`）是**安全边界**，两模式下都必须保留；③ 本项目**不存在运行时可配置机制**（所有开关都在 `.env`），需新建。**用户三项决策**：(1) 载体 = **运行时而非部署级**（DB + `/admin` 页，超管切换即时生效）；(2) 严格度 = **仅关自助注册，超管仍可建号**——此决策**推翻了初稿**「单用户下隐藏 `/admin` 与侧边栏入口」的设想（超管要建号就必须保留 `/admin`）；(3) 先写计划文档。**方案要点**：新增 `app_settings` 通用 KV 表（后续加运行开关不必再写迁移）+ `DEPLOYMENT_MODE` 兜底配置；派生规则 `signup_allowed = (mode=="multi_tenant") AND open_registration` 设为**唯一派生点**（禁止各处自行拼条件，且 AND 派生构成双保险——即便 KV 被手工写脏也不会误开注册）；`GET /utils/public-settings`（匿名，只暴露 `signup_enabled` 供登录页渲染注册链接）+ `GET/PATCH /settings/deployment`（超管）；**不做进程内缓存**（多 worker/WS 进程各持副本会导致不一致，主键单行查询开销可忽略）；注册守卫改为读派生值但**位置不变，仍在查重之前**（防枚举，沿用 `41cccfd` 教训）。**测试矩阵 4 组**含「单用户 + 直写 KV 开注册 → 仍 403」的绕过用例；现有 3 条注册闸门测试因**兜底链**（DB 无记录 → 取 `.env`）应保持通过。**待确认 5 项**见计划第十节（表形态 / 公开端点 / PATCH 校验风格 / `/admin` 保留 / **D2.1 表述要从「硬约束」改回「运行时开关默认关」**）。⚠️ 这将是 D2 相关表述的**第三次**修订（`41cccfd` → `d1630f5` → 本次） |
 | 2026-09-18 10:50 | **🔧 计划自我复查 → v1 砍掉一个配置键（发布 v2）**：用户追问「这样好吗，你推荐怎么样」，复查中发现 v1 存在**冗余状态缺陷**。**缺陷**：v1 设 `deployment.mode`（single_user/multi_tenant）+ `deployment.open_registration` 两个键，派生 `signup_allowed = (mode=="multi_tenant") AND open_registration`；但**决策 2（单用户下超管仍可建号）使 `mode` 失去约束力**——它既不限制超管建号，也不影响 `/admin` 可见性 → **「单用户」与「多租户+关注册」在所有可观测行为上完全等同**（注册都 403、超管都能建号、`/admin` 都可见、隔离都生效）。**危害**：设置页出现两个产出相同结果的档位，读设置的人无法判断该选哪个，维护者还会误以为 `mode` 管着什么——**冗余状态比缺失状态更危险（让人以为存在一道其实不存在的约束）**。**处置（v2）**：配置层**只留 `users.open_registration` 一键**，「单用户/多租户」降为**呈现层标签**（由布尔派生），`AND` 派生简化为直读，互斥 400 校验取消，`DEPLOYMENT_MODE` 配置项不再新增；「防误触」由**双开关**改为**单开关 + 二次确认对话框**（文案写明「任何人可注册并消耗你的 API Key」）。**关键语义**：KV 有记录则**覆盖 `.env`**（运行时优先），无记录回落 `.env`（升级后行为零变化，现有 3 条注册闸门测试保持通过）→ 测试矩阵改为**优先级矩阵 4 组**专门锁这条。**方法论要点**：`mode` 类型的键只要**不对任何行为产生约束**，就是空壳——要么给它牙齿，要么砍掉。若将来需要「多用户 + 仅管理员建号」，届时 KV 加键**零迁移**（这正是选 KV 表的收益）。**待确认收敛为 4 项**：砍 `mode` / 匿名公开端点 / 开关入口位置（`/admin` vs 设置页超管 tab）/ D2.1 表述修订 |
+| 2026-09-18 11:0x | **✅ 部署模式运行时开关已实施（第七轮，用户确认入口放 `/admin`）**：用户答「开关入口放 `/admin`（本来就只有超管能进）」，其余三项按推荐执行。**改动清单**：① `db/models.py` 新增 `AppSetting`（第 10 张表）+ 迁移 `d4e5f6a7b8c9`；② 新建 `core/settings_runtime.py`（键常量 + 通用 KV 读写 + **`signup_allowed()` 全项目唯一判断点** + `deployment_mode()` 展示标签 + `count_users()`）；③ `sqlmodel_models.py` 加 3 个 Schema；④ `users.py` 注册守卫改读 `signup_allowed(session)`，**位置仍在查重之前**（防枚举），并移除对 `settings` 的直接 import；⑤ 新建 `api/routes/settings.py`（`GET`/`PATCH /settings/deployment`，超管）+ `main.py` 注册；⑥ `utils.py` 加 `GET /utils/public-settings`（**匿名**，只暴露一位布尔，登录页渲染注册入口用）；⑦ `.env`/`.env.example`/`config.py` 三处注释改为「首次兜底值，网页开关优先」；⑧ **`tests/conftest.py` 收尾清表列表补 `AppSetting`**（运行时配置**无 `user_id`、全库共享**，漏清会让某条用例写的 `true` 漏给后续所有注册闸门断言）；⑨ 前端：新建 `hooks/useDeploymentSettings.ts` + `components/Admin/DeploymentMode.tsx`（两态开关 + 切多租户**二次确认** + `user_count` 提示 + `.env` 被覆盖告警），`admin.tsx` 顶部接入，`login.tsx` 按开关**条件**恢复「注册」入口，`openapi.json` 重导 + `openapi-ts` 重新生成 client。**验证**：后端 `py_compile` ✅ / `app.api.main` 导入并列出新路由 ✅（`/users/signup`、`/utils/public-settings`、`/settings/deployment` ×2）/ 新增 **33 条测试全过**（`tests/core/test_settings_runtime.py` 15 + `tests/api/routes/test_settings.py` 18，2.40s）；全量 `pytest ../tests -q` → **1 failed, 343 passed, 10 errors, 622.62s**，总数 354 = 上次 321 + 33 ✅ **全部 11 条失败/错误均为 `tests/core/knowledge_base/*` 与 `test_knowledge_base.py` 的 Milvus 连接失败**（`UNAVAILABLE: failed to connect to all addresses … 127.0.0.1:64349`，每条重试 75 次 × 3s → 也是本轮耗时 622s 的原因）；**同期 `docker ps` 显示 `irsbot-milvus-1` 为 `Up Less than a second (health: starting)`（正在重启循环）**，属**环境问题、与本次改动无关**（改动不触碰 Milvus 任何代码路径）。前端 `vite build` ✅（`VITE_EXIT=0`，16.35s，新产物 `useDeploymentSettings-BzzkBDBE.js` / `login-jRLDmgqR.js` / `admin-yZes78BQ.js`）→ 重建 `frontend/dist`。⚠️ **`tsc` 未通过（非本次改动）**：`src/hooks/useKnowledgeBase.ts(1,79): error TS1005: ';' expected.` —— 该文件第 1 行两条 `import` 被挤在同一行、hook 体为空，是**用户正在写的 WIP**（全仓无引用），**未擅自改动**；因 `npm run build` 含 `tsc` 会挂，本轮改用 `vite build` 直接出产物 |
+| 2026-09-18 11:0x | **🔍 本轮发现的两个结构性问题（未修，留档待定）**：① **`tests/conftest.py` 的清表列表是「硬编码模型清单」**——新增表若忘了加进来，就会静默产生跨用例污染（本轮 `AppSetting` 差点中招）。建议改为遍历 `SQLModel.metadata.sorted_tables` 反向清空，一处生效。② **全仓存在三套互不相干的「D 编号」**：`istbot-implement-plan.md` 0.0 决策表 `D1–D7 / D2.1`、同文件 SC 验收表 `D1–D10`、`local-deployment-plan.md` 施工阶段 `D1–D7 + D1.1…`；`PROGRESS.md` 里 `D2.1` 同时有「注册入口」与「Windows 启动脚本」两义。本轮**不擅自重编号**（会大面积波及引用），已在 `istbot-implement-plan.md` 第九节留档 |
