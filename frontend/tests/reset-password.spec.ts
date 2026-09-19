@@ -8,9 +8,7 @@ test.use({ storageState: { cookies: [], origins: [] } })
 test("Password Recovery title is visible", async ({ page }) => {
   await page.goto("/recover-password")
 
-  await expect(
-    page.getByRole("heading", { name: "找回密码" }),
-  ).toBeVisible()
+  await expect(page.getByRole("heading", { name: "找回密码" })).toBeVisible()
 })
 
 test("Input is visible, empty and editable", async ({ page }) => {
@@ -119,7 +117,5 @@ test("Weak new password validation", async ({ page, request }) => {
   await page.getByTestId("confirm-password-input").fill(weakPassword)
   await page.getByRole("button", { name: "重置密码" }).click()
 
-  await expect(
-    page.getByText("密码长度至少为 8 个字符"),
-  ).toBeVisible()
+  await expect(page.getByText("密码长度至少为 8 个字符")).toBeVisible()
 })

@@ -1,19 +1,19 @@
-import AppSidebar from "@/components/Sidebar/AppSidebar";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
-import { isLoggedIn } from "@/hooks/useAuth";
 import {
   createFileRoute,
   Outlet,
   redirect,
   useRouterState,
-} from "@tanstack/react-router";
-import { PanelLeftOpen } from "lucide-react";
-import { useEffect, useState } from "react"; // 引入必要的 React Hooks
+} from "@tanstack/react-router"
+import { PanelLeftOpen } from "lucide-react"
+import { useEffect, useState } from "react" // 引入必要的 React Hooks
+import AppSidebar from "@/components/Sidebar/AppSidebar"
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar"
+import { isLoggedIn } from "@/hooks/useAuth"
 
 export const Route = createFileRoute("/_layout")({
   component: Layout,

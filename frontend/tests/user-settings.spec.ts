@@ -174,9 +174,7 @@ test.describe("Change password validation", () => {
     await page.getByTestId("confirm-password-input").fill(weakPassword)
     await page.getByRole("button", { name: "更新密码" }).click()
 
-    await expect(
-      page.getByText("密码长度至少为 8 个字符"),
-    ).toBeVisible()
+    await expect(page.getByText("密码长度至少为 8 个字符")).toBeVisible()
   })
 
   test("New password and confirmation password do not match", async ({

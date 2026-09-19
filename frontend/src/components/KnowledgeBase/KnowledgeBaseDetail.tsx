@@ -26,7 +26,10 @@ const STATUS_META: Record<string, { label: string; className: string }> = {
     label: "解析中",
     className: "text-amber-600 dark:text-amber-500",
   },
-  done: { label: "已入库", className: "text-emerald-600 dark:text-emerald-500" },
+  done: {
+    label: "已入库",
+    className: "text-emerald-600 dark:text-emerald-500",
+  },
   error: { label: "失败", className: "text-destructive" },
 }
 
@@ -81,7 +84,8 @@ const DocumentRow = ({
             <DialogHeader>
               <DialogTitle>删除文档</DialogTitle>
               <DialogDescription>
-                确定删除「{doc.filename}」吗？其向量分块与磁盘文件将一并清除，该操作不可撤销。
+                确定删除「{doc.filename}
+                」吗？其向量分块与磁盘文件将一并清除，该操作不可撤销。
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="mt-4">
@@ -107,7 +111,8 @@ const DocumentRow = ({
 }
 
 const KnowledgeBaseDetail = ({ kbId }: { kbId: string }) => {
-  const { kbQuery, docsQuery, uploadDoc, deleteDoc, queryKb } = useKbDetail(kbId)
+  const { kbQuery, docsQuery, uploadDoc, deleteDoc, queryKb } =
+    useKbDetail(kbId)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState("")
 

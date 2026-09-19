@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react"
 
-import {
-  Button,
-} from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import useSystemPrompt from "@/hooks/useSystemPrompt"
 
 const MAX_LENGTH = 10000
@@ -41,9 +39,7 @@ const SystemPromptSettings = () => {
 
       <textarea
         className="min-h-48 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-        placeholder={
-          isCustom ? "" : "留空使用默认提示词；填写后保存即自定义"
-        }
+        placeholder={isCustom ? "" : "留空使用默认提示词；填写后保存即自定义"}
         maxLength={MAX_LENGTH}
         value={value}
         onChange={(e) => setValue(e.target.value)}

@@ -1,12 +1,11 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-    type Body_knowledge_base_upload_kb_document,
-    type KBCreate,
-    KnowledgeBaseService,
+  type Body_knowledge_base_upload_kb_document,
+  type KBCreate,
+  KnowledgeBaseService,
 } from "@/client"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-
 
 /**
  * 知识库列表层的数据 hook。
@@ -18,38 +17,38 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
  * 库内文档与检索的能力见 useKbDetail。
  */
 const useKnowledgeBase = () => {
-    const queryClient = useQueryClient()
-    const { showSuccessToast, showErrorToast } = useCustomToast()
+  const queryClient = useQueryClient()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
 
-    const kbListQuery = useQuery({
-        queryKey: ["knowledge-base"],
-        queryFn: () => KnowledgeBaseService.listKbs(),
-    })
+  const kbListQuery = useQuery({
+    queryKey: ["knowledge-base"],
+    queryFn: () => KnowledgeBaseService.listKbs(),
+  })
 
-    const createKb = useMutation({
-        mutationFn: (body: KBCreate) =>
-            KnowledgeBaseService.createKb({ requestBody: body }),
-        onSuccess: () => {
-            showSuccessToast("知识库已创建")
-        },
-        onError: handleError.bind(showErrorToast),
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ["knowledge-base"] })
-        },
-    })
+  const createKb = useMutation({
+    mutationFn: (body: KBCreate) =>
+      KnowledgeBaseService.createKb({ requestBody: body }),
+    onSuccess: () => {
+      showSuccessToast("知识库已创建")
+    },
+    onError: handleError.bind(showErrorToast),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["knowledge-base"] })
+    },
+  })
 
-    const deleteKb = useMutation({
-        mutationFn: (kbId: string) => KnowledgeBaseService.deleteKb({ kbId }),
-        onSuccess: () => {
-            showSuccessToast("知识库已删除")
-        },
-        onError: handleError.bind(showErrorToast),
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ["knowledge-base"] })
-        },
-    })
+  const deleteKb = useMutation({
+    mutationFn: (kbId: string) => KnowledgeBaseService.deleteKb({ kbId }),
+    onSuccess: () => {
+      showSuccessToast("知识库已删除")
+    },
+    onError: handleError.bind(showErrorToast),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["knowledge-base"] })
+    },
+  })
 
-    return { kbListQuery, createKb, deleteKb }
+  return { kbListQuery, createKb, deleteKb }
 }
 
 /**
@@ -64,62 +63,62 @@ const useKnowledgeBase = () => {
  * 职责边界：同样只负责「调接口 + 管缓存」。
  */
 export const useKbDetail = (kbId: string) => {
-    const queryClient = useQueryClient()
-    const { showSuccessToast, showErrorToast } = useCustomToast()
+  const queryClient = useQueryClient()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
 
-    const kbQuery = useQuery({
-        // key 以 ["knowledge-base"] 开头 → 列表层失效时会连带刷新本库详情
-        queryKey: ["knowledge-base", kbId],
-        queryFn: () => KnowledgeBaseService.getKb({ kbId }),
-    })
+  const kbQuery = useQuery({
+    // key 以 ["knowledge-base"] 开头 → 列表层失效时会连带刷新本库详情
+    queryKey: ["knowledge-base", kbId],
+    queryFn: () => KnowledgeBaseService.getKb({ kbId }),
+  })
 
-    const docsQuery = useQuery({
-        queryKey: ["kb-documents", kbId],
-        queryFn: () => KnowledgeBaseService.listKbDocuments({ kbId }),
-    })
+  const docsQuery = useQuery({
+    queryKey: ["kb-documents", kbId],
+    queryFn: () => KnowledgeBaseService.listKbDocuments({ kbId }),
+  })
 
-    const uploadDoc = useMutation({
-        mutationFn: (file: File) =>
-            // 传普通对象而非 FormData 实例：客户端 getFormData() 会用
-            // Object.entries() 遍历它自己组装 multipart——FormData 实例
-            // 遍历出来是空数组，会发一个空表单（后端 422: file 字段缺失）。
-            // 双重断言绕生成器 bug（file 被标成 string，运行时是 File）。
-            KnowledgeBaseService.uploadKbDocument({
-                kbId,
-                formData: { file } as unknown as Body_knowledge_base_upload_kb_document,
-            }),
-        onSuccess: () => {
-            showSuccessToast("文档已上传，正在解析入库")
-        },
-        onError: handleError.bind(showErrorToast),
-        onSettled: () => {
-            // 文档列表变了；库列表的 document_count 也变了 → 两个 key 都要失效
-            queryClient.invalidateQueries({ queryKey: ["kb-documents"] })
-            queryClient.invalidateQueries({ queryKey: ["knowledge-base"] })
-        },
-    })
+  const uploadDoc = useMutation({
+    mutationFn: (file: File) =>
+      // 传普通对象而非 FormData 实例：客户端 getFormData() 会用
+      // Object.entries() 遍历它自己组装 multipart——FormData 实例
+      // 遍历出来是空数组，会发一个空表单（后端 422: file 字段缺失）。
+      // 双重断言绕生成器 bug（file 被标成 string，运行时是 File）。
+      KnowledgeBaseService.uploadKbDocument({
+        kbId,
+        formData: { file } as unknown as Body_knowledge_base_upload_kb_document,
+      }),
+    onSuccess: () => {
+      showSuccessToast("文档已上传，正在解析入库")
+    },
+    onError: handleError.bind(showErrorToast),
+    onSettled: () => {
+      // 文档列表变了；库列表的 document_count 也变了 → 两个 key 都要失效
+      queryClient.invalidateQueries({ queryKey: ["kb-documents"] })
+      queryClient.invalidateQueries({ queryKey: ["knowledge-base"] })
+    },
+  })
 
-    const deleteDoc = useMutation({
-        mutationFn: (docId: string) =>
-            KnowledgeBaseService.deleteKbDocument({ kbId, docId }),
-        onSuccess: () => {
-            showSuccessToast("文档已删除")
-        },
-        onError: handleError.bind(showErrorToast),
-        onSettled: () => {
-            // 文档列表变了；库列表的 document_count 也变了 → 两个 key 都要失效
-            queryClient.invalidateQueries({ queryKey: ["kb-documents"] })
-            queryClient.invalidateQueries({ queryKey: ["knowledge-base"] })
-        },
-    })
+  const deleteDoc = useMutation({
+    mutationFn: (docId: string) =>
+      KnowledgeBaseService.deleteKbDocument({ kbId, docId }),
+    onSuccess: () => {
+      showSuccessToast("文档已删除")
+    },
+    onError: handleError.bind(showErrorToast),
+    onSettled: () => {
+      // 文档列表变了；库列表的 document_count 也变了 → 两个 key 都要失效
+      queryClient.invalidateQueries({ queryKey: ["kb-documents"] })
+      queryClient.invalidateQueries({ queryKey: ["knowledge-base"] })
+    },
+  })
 
-    const queryKb = useMutation({
-        mutationFn: (query: string) =>
-            KnowledgeBaseService.queryKb({ kbId, requestBody: { query } }),
-        onError: handleError.bind(showErrorToast),
-    })
+  const queryKb = useMutation({
+    mutationFn: (query: string) =>
+      KnowledgeBaseService.queryKb({ kbId, requestBody: { query } }),
+    onError: handleError.bind(showErrorToast),
+  })
 
-    return { kbQuery, docsQuery, uploadDoc, deleteDoc, queryKb }
+  return { kbQuery, docsQuery, uploadDoc, deleteDoc, queryKb }
 }
 
 export default useKnowledgeBase

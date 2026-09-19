@@ -7,9 +7,7 @@ import { logInUser } from "./utils/user"
 test("Admin page is accessible and shows correct title", async ({ page }) => {
   await page.goto("/admin")
   await expect(page.getByRole("heading", { name: "用户" })).toBeVisible()
-  await expect(
-    page.getByText("管理用户账号与权限"),
-  ).toBeVisible()
+  await expect(page.getByText("管理用户账号与权限")).toBeVisible()
 })
 
 test("Add User button is visible", async ({ page }) => {
@@ -119,9 +117,7 @@ test.describe("Admin user management", () => {
 
     await page.getByRole("button", { name: "删除" }).click()
 
-    await expect(
-      page.getByText("用户删除成功"),
-    ).toBeVisible()
+    await expect(page.getByText("用户删除成功")).toBeVisible()
 
     await expect(
       page.getByRole("row").filter({ hasText: email }),
@@ -160,9 +156,7 @@ test.describe("Admin user management", () => {
     await page.getByPlaceholder("密码").last().fill("short")
     await page.getByRole("button", { name: "保存" }).click()
 
-    await expect(
-      page.getByText("密码长度至少为 8 个字符"),
-    ).toBeVisible()
+    await expect(page.getByText("密码长度至少为 8 个字符")).toBeVisible()
   })
 
   test("Passwords must match", async ({ page }) => {

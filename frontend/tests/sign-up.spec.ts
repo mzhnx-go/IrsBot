@@ -100,9 +100,7 @@ test("Sign up with weak password", async ({ page }) => {
   await fillForm(page, fullName, email, password, password)
   await page.getByRole("button", { name: "注册" }).click()
 
-  await expect(
-    page.getByText("密码长度至少为 8 个字符"),
-  ).toBeVisible()
+  await expect(page.getByText("密码长度至少为 8 个字符")).toBeVisible()
 })
 
 test("Sign up with mismatched passwords", async ({ page }) => {

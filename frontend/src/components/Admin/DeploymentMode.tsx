@@ -90,8 +90,8 @@ const DeploymentMode = () => {
 
           {settings.user_count > 1 && (
             <p className="text-sm text-muted-foreground">
-              系统内已有 {settings.user_count} 个账号；
-              关闭自助注册<strong>不会</strong>删除或停用它们，它们仍可正常登录。
+              系统内已有 {settings.user_count} 个账号； 关闭自助注册
+              <strong>不会</strong>删除或停用它们，它们仍可正常登录。
             </p>
           )}
 

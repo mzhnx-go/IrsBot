@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test"
 import { createUser } from "./utils/privateApi"
 import {
-    randomEmail,
-    randomItemDescription,
-    randomItemTitle,
-    randomPassword,
+  randomEmail,
+  randomItemDescription,
+  randomItemTitle,
+  randomPassword,
 } from "./utils/random"
 import { logInUser } from "./utils/user"
 
@@ -107,9 +107,7 @@ test.describe("Items management", () => {
 
       await page.getByRole("button", { name: "删除" }).click()
 
-      await expect(
-        page.getByText("物品删除成功"),
-      ).toBeVisible()
+      await expect(page.getByText("物品删除成功")).toBeVisible()
       await expect(page.getByText(itemTitle)).not.toBeVisible()
     })
   })
