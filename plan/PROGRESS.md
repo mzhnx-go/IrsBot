@@ -847,7 +847,7 @@ v1 原设计两个键（`deployment.mode` + `deployment.open_registration`），
 | 4 | ~~随手修~~ **已完成（2026-09-20）**：① `_chat_cache`/`_embed_cache` 换 `_LRUCache`（maxsize=32）② `is_default` 加 DB 级部分唯一索引（迁移 e7f8a9b0c1d2，先去重再建索引）；索引顺带暴露并修复 `delete_provider` 先晋升后删会短暂双默认的隐患；宿主 364 passed，容器已迁移+健康 200 | 8.4 保留两项 | ✅ 提交 `b266f31` |
 | 5 | **Phase D1.3c 分发优化**（镜像体积/wheelhouse） | PROGRESS §5.3 | 非阻塞，可延后 |
 | 6 | ~~补后端「删除文档」端点~~ **已完成（2026-09-19）**：`DELETE /api/v1/kb/{kb_id}/documents/{doc_id}` 已实现（三处清理：Milvus 按 doc_id / 磁盘 / DB，4 条回归测试）；前端详情页删除按钮已接线并实机验收通过（方案 A 第四章） | KB 管理 UI 施工中发现（2026-09-18） | ✅ 全链路完成 |
-| 7 | **RAG 检索质量优化**：① CJK 单字分词改 jieba（BM25 路召回更准）② 加 reranker 段（计划 15 项 P1，依赖 8.3） | 2026-09-19 检索测试发现（「单元测试」排在第二条） | 待评估；库小时影响不大，与「LLM 倾向 `top_k=10`」一并观察 |
+| 7 | ~~RAG 检索质量优化~~ **已完成（2026-09-20）**：① 中文分词单字切分 → jieba.cut_for_search ② 新增 rerank 重排段（SiliconFlow BAAI/bge-reranker-v2-m3，复用 embedding Key，ENABLE_RERANK 默认开，失败降级纯 RRF）；候选取 RERANK_CANDIDATES=10；+10 测试，全量 374 passed，容器真实 API 验证排序正确 | 2026-09-19 检索测试发现 | ✅ 提交 `df89723`；**遗留**：查询改写/HyDE 可以后续评估 |
 | 8 | **删除文档软删除（回收站）**：当前三处物理删除不可逆，可用「Milvus 立即删 + DB 软删 + 磁盘保留 N 天」；短期可先强化确认文案（「请确保本地还有原件」） | 2026-09-19 用户提出误删风险 | 待评估（单用户自用场景风险窗口小） |
 
 **验证命令速查**（宿主机 PowerShell；⚠️ PowerShell stdout 常不回显 → 一律 `Out-File` 落盘再 `Read`）：
