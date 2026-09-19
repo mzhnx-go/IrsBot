@@ -1,43 +1,42 @@
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { useNavigate, useRouterState } from "@tanstack/react-router"
 import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Download,
+  ListChecks,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react"
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog"
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import {
-    SidebarGroup,
-    SidebarGroupContent,
-    SidebarGroupLabel,
-    SidebarMenu,
-    SidebarMenuAction,
-    SidebarMenuButton,
-    SidebarMenuItem,
-    useSidebar,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import useConversations from "@/hooks/useConversations"
-import { useNavigate, useRouterState } from "@tanstack/react-router"
-import {
-    Download,
-    ListChecks,
-    MoreHorizontal,
-    Pencil,
-    Plus,
-    Trash2,
-} from "lucide-react"
-import { useState } from "react"
 
 /**
  * 侧边栏「最近对话」列表：
@@ -69,9 +68,10 @@ export function ConversationList() {
     title: string
   } | null>(null)
   // 重命名（存 id + 当前输入值）
-  const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(
-    null,
-  )
+  const [renaming, setRenaming] = useState<{
+    id: string
+    title: string
+  } | null>(null)
   // 批量管理主面板
   const [batchOpen, setBatchOpen] = useState(false)
   // 批量面板里勾选中的会话 id
@@ -290,16 +290,21 @@ export function ConversationList() {
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>对话批量管理</span>
-              <label className="flex items-center gap-2 text-sm font-normal text-muted-foreground">
+              {/* 用原生 input[type=checkbox]：label 可正确关联（a11y）、自带键盘支持；
+                  Radix Checkbox 渲染成 button，label 关联不到表单控件反而报错 */}
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-normal text-muted-foreground">
                 全选
-                <Checkbox
+                <input
+                  type="checkbox"
+                  className="size-4 cursor-pointer"
+                  style={{ accentColor: "var(--primary)" }}
                   checked={
                     conversations.length > 0 &&
                     selectedIds.size === conversations.length
                   }
-                  onCheckedChange={(checked) =>
+                  onChange={(e) =>
                     setSelectedIds(
-                      checked
+                      e.target.checked
                         ? new Set(conversations.map((c) => c.id))
                         : new Set(),
                     )
@@ -317,9 +322,13 @@ export function ConversationList() {
                 className="flex cursor-pointer items-center justify-between gap-3 rounded-md px-2 py-2.5 text-sm transition-colors duration-150 ease-out hover:bg-muted"
               >
                 <span className="truncate">{conv.title}</span>
-                <Checkbox
+                {/* 点击/键盘统一走 checkbox 原生行为，label 自动关联 */}
+                <input
+                  type="checkbox"
+                  className="size-4 shrink-0 cursor-pointer"
+                  style={{ accentColor: "var(--primary)" }}
                   checked={selectedIds.has(conv.id)}
-                  onCheckedChange={() => toggleSelected(conv.id)}
+                  onChange={() => toggleSelected(conv.id)}
                 />
               </label>
             ))}
