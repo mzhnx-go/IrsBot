@@ -8,6 +8,7 @@
 """
 
 import uuid
+from collections import OrderedDict
 from typing import Any
 
 from sqlmodel import Session, col, select
@@ -122,6 +123,31 @@ def get_model_capabilities(provider_type: str, model_name: str) -> dict | None:
 # ── Provider 管理器（原 manager.py 内容）──────────────────────
 
 
+class _LRUCache(OrderedDict):
+    """容量受限的 LRU 缓存（单进程内使用，无锁）。
+
+    超出 maxsize 时淘汰最久未使用的条目，防止用户/模型组合不断增长
+    导致缓存无界膨胀（每个条目是一个完整的模型客户端对象）。
+    """
+
+    def __init__(self, maxsize: int = 32):
+        super().__init__()
+        self.maxsize = maxsize
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        super().__setitem__(key, value)
+        self.move_to_end(key)
+        while len(self) > self.maxsize:
+            self.popitem(last=False)
+
+    def get_hit(self, key: str) -> Any | None:
+        """命中则返回值并刷新为最近使用；未命中返回 None。"""
+        if key not in self:
+            return None
+        self.move_to_end(key)
+        return self[key]
+
+
 class ProviderManager:
     """管理 LangChain ChatModel 与 Embeddings 实例。
 
@@ -139,8 +165,8 @@ class ProviderManager:
             session: SQLAlchemy 数据库会话。
         """
         self.session = session
-        self._chat_cache: dict[str, Any] = {}
-        self._embed_cache: dict[str, Any] = {}
+        self._chat_cache: _LRUCache = _LRUCache()
+        self._embed_cache: _LRUCache = _LRUCache()
 
     # -- 对话模型 ChatModel ----------------------------------------
 
@@ -179,8 +205,9 @@ class ProviderManager:
         # ⚠️ cache key 必须含 user_id：否则不同用户用同一 provider_id=None 时
         #    会命中同一缓存条目，拿到别人的模型实例。
         cache_key = f"{user_id}:{provider_id}:{model_name}:{temperature}"
-        if cache_key in self._chat_cache:
-            return self._chat_cache[cache_key]
+        hit = self._chat_cache.get_hit(cache_key)
+        if hit is not None:
+            return hit
 
         if provider_id:
             stmt = select(ProviderConfig).where(
@@ -274,8 +301,9 @@ class ProviderManager:
             raise RuntimeError("No active embedding provider configured.")
 
         cache_key = str(pc.id)
-        if cache_key in self._embed_cache:
-            return self._embed_cache[cache_key]
+        hit = self._embed_cache.get_hit(cache_key)
+        if hit is not None:
+            return hit
 
         provider_type = pc.provider_type.lower()
         # api_key 在库中加密存储，构建 Embeddings 时必须先解密，
@@ -502,8 +530,14 @@ class ProviderManager:
         if obj is None:
             return False
 
-        # 先选好接替者再删：删掉的恰好是默认源时，避免出现无默认源的空窗
-        if obj.is_default:
+        # 先删原默认并 flush，再晋升接替者：
+        # 部分唯一索引要求任一时刻该用户只有一条默认，若先晋升再删，
+        # 同一事务 flush 时会短暂出现两条默认而撞索引。
+        # 删除与晋升在同一事务内完成，对读方不存在「无默认空窗」。
+        was_default = obj.is_default
+        self.session.delete(obj)
+        self.session.flush()
+        if was_default:
             successor_stmt = (
                 select(ProviderConfig)
                 .where(
@@ -518,7 +552,6 @@ class ProviderManager:
             if successor is not None:
                 successor.is_default = True
 
-        self.session.delete(obj)
         self.session.commit()
         return True
 

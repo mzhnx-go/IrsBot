@@ -19,7 +19,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Column, DateTime, String, Text
+from sqlalchemy import JSON, Column, DateTime, Index, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -50,6 +50,18 @@ class ProviderConfig(SQLModel, table=True):
     """
 
     __tablename__ = "provider_configs"
+
+    # DB 级约束：同一用户最多一条 is_default=True 的配置。
+    # 应用层的互斥清零（clear_default）只是「尽力而为」，并发写入仍可能产生
+    # 两条默认源；部分唯一索引在数据库层面兜底（只约束 is_default=true 的行）。
+    __table_args__ = (
+        Index(
+            "uq_provider_configs_default_per_user",
+            "user_id",
+            unique=True,
+            postgresql_where=text("is_default"),
+        ),
+    )
 
     id: uuid.UUID = Field(
         default_factory=uuid.uuid4,

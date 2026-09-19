@@ -230,3 +230,34 @@ def test_delete_default_promotes_successor(
     assert len(defaults) == 1, f"删默认后应恰好剩 1 条默认，实际 {len(defaults)} 条"
     assert defaults[0]["id"] != a["id"]
     assert defaults[0]["is_active"] is True, "接替者必须启用中，否则取默认仍会失败"
+
+
+# ── DB 级部分唯一索引 ─────────────────────────────────────────
+
+
+def test_default_unique_index_enforced_at_db_level(db: Session) -> None:
+    """部分唯一索引兜底：绕过 API 直接往 DB 插第二条默认源必须被拒绝。
+
+    应用层互斥清零防不住并发写；e7f8a9b0c1d2 迁移建的
+    uq_provider_configs_default_per_user（postgresql_where=is_default）
+    才是最终防线。
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    user_id = db.exec(
+        select(ProviderConfig).where(ProviderConfig.name == "default")
+    ).one().user_id
+
+    dup = ProviderConfig(
+        user_id=user_id,
+        name=f"{_NAME_PREFIX}dup-default-{uuid.uuid4().hex[:8]}",
+        provider_type="openai",
+        api_key="enc:v1:test",
+        model_name="gpt-4o",
+        is_active=True,
+        is_default=True,  # 该用户已有一条默认（种子 default），再插必须撞索引
+    )
+    db.add(dup)
+    with pytest.raises(IntegrityError):
+        db.flush()
+    db.rollback()
