@@ -453,6 +453,13 @@ export type KnowledgeBaseListKbDocumentsData = {
 
 export type KnowledgeBaseListKbDocumentsResponse = (Array<DocumentOut>);
 
+export type KnowledgeBaseDeleteKbDocumentData = {
+    docId: string;
+    kbId: string;
+};
+
+export type KnowledgeBaseDeleteKbDocumentResponse = (unknown);
+
 export type KnowledgeBaseQueryKbData = {
     kbId: string;
     requestBody: KBQueryRequest;

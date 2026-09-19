@@ -136,8 +136,15 @@ class VectorStore:
 
         注意：只有打了 doc_id 标记的块才能被删到——旧数据（标记机制上线前
         写入的块）没有该字段，匹配不到，只能靠整库删除兜底。
+        更旧的 collection 连 doc_id 字段本身都没有（schema 建于烙印机制之前），
+        此时 delete 表达式会解析失败（field not exist），直接跳过即可。
         """
         if not self.client.has_collection(self.collection_name):
+            return 0
+        schema_fields = {
+            f["name"] for f in self.client.describe_collection(self.collection_name)["fields"]
+        }
+        if "doc_id" not in schema_fields:
             return 0
         res = self.client.delete(
             collection_name = self.collection_name,

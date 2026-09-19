@@ -100,11 +100,17 @@ export const useKbDetail = (kbId: string) => {
     })
 
     const deleteDoc = useMutation({
-        // 待第四章：跑 generate-client 生成 deleteKbDocument 后接通
-        mutationFn: async () => {
-            throw new Error("删除文档端点尚未实现")
+        mutationFn: (docId: string) =>
+            KnowledgeBaseService.deleteKbDocument({ kbId, docId }),
+        onSuccess: () => {
+            showSuccessToast("文档已删除")
         },
         onError: handleError.bind(showErrorToast),
+        onSettled: () => {
+            // 文档列表变了；库列表的 document_count 也变了 → 两个 key 都要失效
+            queryClient.invalidateQueries({ queryKey: ["kb-documents"] })
+            queryClient.invalidateQueries({ queryKey: ["knowledge-base"] })
+        },
     })
 
     const queryKb = useMutation({

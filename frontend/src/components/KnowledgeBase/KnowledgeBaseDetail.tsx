@@ -1,10 +1,20 @@
 import { Link } from "@tanstack/react-router"
-import { ArrowLeft, FileText, Search, Upload } from "lucide-react"
+import { ArrowLeft, FileText, Search, Trash2, Upload } from "lucide-react"
 import { useRef, useState } from "react"
 
 import type { DocumentOut } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
 import { useKbDetail } from "@/hooks/useKnowledgeBase"
@@ -26,11 +36,20 @@ const formatSize = (bytes: number) => {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-const DocumentRow = ({ doc }: { doc: DocumentOut }) => {
+const DocumentRow = ({
+  doc,
+  onDelete,
+  deleting,
+}: {
+  doc: DocumentOut
+  onDelete: (docId: string) => void
+  deleting: boolean
+}) => {
   const meta = STATUS_META[doc.status] ?? {
     label: doc.status,
     className: "text-muted-foreground",
   }
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   return (
     <div className="flex items-center justify-between rounded-lg border px-4 py-3">
@@ -43,15 +62,52 @@ const DocumentRow = ({ doc }: { doc: DocumentOut }) => {
           </p>
         </div>
       </div>
-      <Badge variant="outline" className={`shrink-0 ${meta.className}`}>
-        {meta.label}
-      </Badge>
+      <div className="flex shrink-0 items-center gap-2">
+        <Badge variant="outline" className={meta.className}>
+          {meta.label}
+        </Badge>
+        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive"
+              disabled={deleting}
+            >
+              <Trash2 />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>删除文档</DialogTitle>
+              <DialogDescription>
+                确定删除「{doc.filename}」吗？其向量分块与磁盘文件将一并清除，该操作不可撤销。
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="mt-4">
+              <DialogClose asChild>
+                <Button variant="outline">取消</Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                disabled={deleting}
+                onClick={() => {
+                  onDelete(doc.id)
+                  setConfirmOpen(false)
+                }}
+              >
+                删除
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   )
 }
 
 const KnowledgeBaseDetail = ({ kbId }: { kbId: string }) => {
-  const { kbQuery, docsQuery, uploadDoc, queryKb } = useKbDetail(kbId)
+  const { kbQuery, docsQuery, uploadDoc, deleteDoc, queryKb } = useKbDetail(kbId)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState("")
 
@@ -119,7 +175,12 @@ const KnowledgeBaseDetail = ({ kbId }: { kbId: string }) => {
         ) : (
           <div className="flex flex-col gap-2">
             {docs.map((doc) => (
-              <DocumentRow key={doc.id} doc={doc} />
+              <DocumentRow
+                key={doc.id}
+                doc={doc}
+                deleting={deleteDoc.isPending && deleteDoc.variables === doc.id}
+                onDelete={(docId) => deleteDoc.mutate(docId)}
+              />
             ))}
           </div>
         )}
