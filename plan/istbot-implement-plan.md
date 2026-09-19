@@ -705,9 +705,10 @@ AstrBot 三层能力
 - [ ] 测试：有/无 Rerank 两条路径；顺序断言（稠密 → 稀疏 → RRF → Rerank）
 
 #### 14.2 RAG 聚合模式
-- [ ] `knowledge_base_query` 工具支持 Agentic 模式（LLM 自行决定检索词与次数）
-- [ ] 对应 AstrBot `kb_agentic_mode`
-- [ ] 测试：Agent 可自主决定是否检索、检索几次
+- [x] `knowledge_base_query` 工具支持 Agentic 模式（LLM 自行决定检索词与次数）—— **2026-09-19 完成**：`builtins/kb_query.py` 由占位改为真实实现（ContextVar 传身份 + fail closed + 多租户过滤 + `top_k` 夹取 [1,10] + 未指定 kb_id 时遍历用户所有库聚合）；`agent.py` 在 `run()`/`stream()` 开头 `set_kb_user(self.user_uuid)`
+- [x] 对应 AstrBot `kb_agentic_mode` —— 对应其 Agentic 分支（非 Pipeline 强注入）
+- [x] 测试：Agent 可自主决定是否检索、检索几次 —— 单元 2 条（fail closed / 非法 kb_id）+ 实机验收（容器内真 LLM 自主调用两次、ToolMessage 含真实 Milvus 分块）
+- [ ] 遗留：`top_k` 上限是否从 10 收紧（LLM 倾向要满额，库大时撑上下文）；与 14.1 的 Rerank 一并评估
 
 #### 14.3 Persona 与统计
 - [ ] `PersonaManager`：CRUD + 会话级绑定（模型已存在，需补 Manager）
