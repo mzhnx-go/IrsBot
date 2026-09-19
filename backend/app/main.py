@@ -68,5 +68,10 @@ if WEBUI_INDEX.exists():
             accept = request.headers.get("accept", "")
             # 只对"想要 HTML"的请求回退；静态资源（图片等）缺失时保持 404
             if "text/html" in accept:
-                return FileResponse(WEBUI_INDEX)
+                # no-cache = 每次都向服务器校验（ETag 协商，命中 304 不重复下载）。
+                # index.html 引用带哈希的 assets 文件名，若 html 本身被浏览器缓存，
+                # 重新构建后会继续加载旧 bundle，用户看不到新版本（本次删除按钮就踩过）。
+                return FileResponse(
+                    WEBUI_INDEX, headers={"Cache-Control": "no-cache"}
+                )
         return await http_exception_handler(request, exc)
