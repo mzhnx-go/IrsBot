@@ -1,4 +1,5 @@
 # ── 标准库 ──
+import shutil
 import uuid
 from pathlib import Path
 
@@ -15,7 +16,6 @@ from app.core.db.models import KnowledgeBase as KBRecord
 from app.core.knowledge_base.manager import KBManager, invalidate_kb_cache
 from app.core.knowledge_base.vec_store import VectorStore
 
-import shutil
 router = APIRouter(prefix="/kb", tags=["knowledge-base"])
 
 UPLOAD_ROOT = Path(settings.KB_FILE_STORAGE_DIR)  # 上传文件落盘目录（按环境隔离）
@@ -137,7 +137,9 @@ async def upload_kb_document(
 
     mgr = KBManager(session=session)
     try:
-        record = await mgr.upload_document(kb_id=kb_id, file_path=str(dest), filename=stored_name, user_id=current_user.id)
+        # filename 存原始名（展示用），磁盘文件仍是带 UUID 的 stored_name（file_path 已记录），
+        # 展示层从此看不到 UUID
+        record = await mgr.upload_document(kb_id=kb_id, file_path=str(dest), filename=safe_name, user_id=current_user.id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"文档处理失败: {e}")
 
