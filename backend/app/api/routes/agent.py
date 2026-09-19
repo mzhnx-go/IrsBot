@@ -3,14 +3,18 @@ import shutil
 import uuid
 import zipfile
 from pathlib import Path
+from typing import Literal
+from urllib.parse import quote
 
 # ── 第三方库 ──
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi.responses import Response
 
 # ── 项目内部 ──
 from app.api.deps import CurrentUser, SessionDep
 from app.core import crud
 from app.core.agent.conversation import ConversationManager
+from app.core.agent.export import render_export
 from app.core.db.sqlmodel_models import (
     ChatRequest,
     ChatResponse,
@@ -40,6 +44,34 @@ from app.core.skills.security import (
 )
 
 router = APIRouter(prefix="/agent",tags=["agent"])
+
+
+#: 单会话导出的消息条数上限。
+#: 导出是一次性把全部消息拼进内存再返回，必须有个明确上限兜底；
+#: 正常对话远达不到这个量级，真触发说明数据异常，宁可截断也不能把进程撑爆。
+EXPORT_MESSAGE_LIMIT = 10000
+
+
+def _content_disposition(filename: str) -> str:
+    """拼出支持中文文件名的 Content-Disposition 头。
+
+    为什么不能只写 filename="中文.docx"：
+        响应头按 latin-1 编码，非 ASCII 字符会让 Starlette 直接抛
+        UnicodeEncodeError（表现为 500）。RFC 6266 的解法是双写——
+        给老客户端一个纯 ASCII 的 filename 兜底，再给现代浏览器一个
+        filename*=UTF-8''<百分号编码> 的真名，浏览器优先取后者。
+
+    参数:
+        filename: 目标文件名（可能含中文）。
+
+    返回:
+        完整的 Content-Disposition 头值。
+    """
+    ascii_name = filename.encode("ascii", "ignore").decode("ascii") or "conversation"
+    return (
+        f'attachment; filename="{ascii_name}"; '
+        f"filename*=UTF-8''{quote(filename, safe='')}"
+    )
 
 
 @router.post("/conversations", response_model=ConversationResponse)
@@ -130,6 +162,49 @@ def delete_conversation(
     if not deleted:
         raise HTTPException(status_code=404, detail="对话不存在")
     return {"message": "对话已删除"}
+
+
+@router.get("/conversations/{conversation_id}/export")
+def export_conversation(
+    conversation_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+    format: Literal["md", "txt", "json", "docx", "pdf"] = Query(
+        default="md",
+        description="导出格式：md / txt / json / docx / pdf",
+    ),
+):
+    """把整个对话导出成文件下载。
+
+    与其它会话端点一致，先按 user_id 校验归属，越权一律 404
+    （而不是 403 —— 403 会泄露「这个 id 真实存在」）。
+
+    参数:
+        conversation_id: 会话 ID。
+        format: 导出格式，取自 ExportFormat。
+
+    返回:
+        附件响应（Content-Disposition: attachment），
+        Content-Type 与扩展名由格式决定。
+    """
+    conversation = crud.get_conversation(
+        session,
+        conv_id=conversation_id,
+        user_id=current_user.id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="对话不存在")
+
+    messages = ConversationManager(session).get_messages(
+        conversation.id, limit=EXPORT_MESSAGE_LIMIT
+    )
+    exported = render_export(conversation, messages, format)
+
+    return Response(
+        content=exported.content,
+        media_type=exported.media_type,
+        headers={"Content-Disposition": _content_disposition(exported.filename)},
+    )
 
 
 @router.post("/conversations/{conversation_id}/chat",response_model=ChatResponse)

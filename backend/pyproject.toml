@@ -21,6 +21,8 @@ dependencies = [
     "cryptography>=44.0.0",
     "docx2txt>=0.9",
     "jieba>=0.42.1",
+    "python-docx>=1.2.0",
+    "reportlab>=5.0.1",
 ]
 
 [project.optional-dependencies]

@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AgentCreateConversationData, AgentCreateConversationResponse, AgentListConversationsData, AgentListConversationsResponse, AgentRenameConversationData, AgentRenameConversationResponse, AgentDeleteConversationData, AgentDeleteConversationResponse, AgentChatData, AgentChatResponse, AgentCreateMcpServerData, AgentCreateMcpServerResponse, AgentListMcpServersData, AgentListMcpServersResponse, AgentGetMcpServerData, AgentGetMcpServerResponse, AgentUpdateMcpServerData, AgentUpdateMcpServerResponse, AgentDeleteMcpServerData, AgentDeleteMcpServerResponse, AgentConnectMcpServerData, AgentConnectMcpServerResponse, AgentListSkillsResponse, AgentGetSkillDetailData, AgentGetSkillDetailResponse, AgentDeleteSkillData, AgentDeleteSkillResponse, AgentScanSkillsResponse, AgentInstallSkillData, AgentInstallSkillResponse, KnowledgeBaseListKbsResponse, KnowledgeBaseCreateKbData, KnowledgeBaseCreateKbResponse, KnowledgeBaseListTrashResponse, KnowledgeBaseRestoreTrashedDocumentData, KnowledgeBaseRestoreTrashedDocumentResponse, KnowledgeBasePurgeTrashedDocumentData, KnowledgeBasePurgeTrashedDocumentResponse, KnowledgeBaseGetKbData, KnowledgeBaseGetKbResponse, KnowledgeBaseDeleteKbData, KnowledgeBaseDeleteKbResponse, KnowledgeBaseUploadKbDocumentData, KnowledgeBaseUploadKbDocumentResponse, KnowledgeBaseListKbDocumentsData, KnowledgeBaseListKbDocumentsResponse, KnowledgeBaseDeleteKbDocumentData, KnowledgeBaseDeleteKbDocumentResponse, KnowledgeBaseQueryKbData, KnowledgeBaseQueryKbResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginResetPasswordData, LoginResetPasswordResponse, PrivateCreateUserData, PrivateCreateUserResponse, ProvidersListProvidersResponse, ProvidersCreateProviderData, ProvidersCreateProviderResponse, ProvidersUpdateProviderData, ProvidersUpdateProviderResponse, ProvidersDeleteProviderData, ProvidersDeleteProviderResponse, SettingsReadDeploymentSettingsResponse, SettingsUpdateDeploymentSettingsData, SettingsUpdateDeploymentSettingsResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersReadMySystemPromptResponse, UsersUpdateMySystemPromptData, UsersUpdateMySystemPromptResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsHealthCheckResponse, UtilsReadPublicSettingsResponse } from './types.gen';
+import type { AgentCreateConversationData, AgentCreateConversationResponse, AgentListConversationsData, AgentListConversationsResponse, AgentRenameConversationData, AgentRenameConversationResponse, AgentDeleteConversationData, AgentDeleteConversationResponse, AgentExportConversationData, AgentExportConversationResponse, AgentChatData, AgentChatResponse, AgentCreateMcpServerData, AgentCreateMcpServerResponse, AgentListMcpServersData, AgentListMcpServersResponse, AgentGetMcpServerData, AgentGetMcpServerResponse, AgentUpdateMcpServerData, AgentUpdateMcpServerResponse, AgentDeleteMcpServerData, AgentDeleteMcpServerResponse, AgentConnectMcpServerData, AgentConnectMcpServerResponse, AgentListSkillsResponse, AgentGetSkillDetailData, AgentGetSkillDetailResponse, AgentDeleteSkillData, AgentDeleteSkillResponse, AgentScanSkillsResponse, AgentInstallSkillData, AgentInstallSkillResponse, KnowledgeBaseListKbsResponse, KnowledgeBaseCreateKbData, KnowledgeBaseCreateKbResponse, KnowledgeBaseListTrashResponse, KnowledgeBaseRestoreTrashedDocumentData, KnowledgeBaseRestoreTrashedDocumentResponse, KnowledgeBasePurgeTrashedDocumentData, KnowledgeBasePurgeTrashedDocumentResponse, KnowledgeBaseGetKbData, KnowledgeBaseGetKbResponse, KnowledgeBaseDeleteKbData, KnowledgeBaseDeleteKbResponse, KnowledgeBaseUploadKbDocumentData, KnowledgeBaseUploadKbDocumentResponse, KnowledgeBaseListKbDocumentsData, KnowledgeBaseListKbDocumentsResponse, KnowledgeBaseDeleteKbDocumentData, KnowledgeBaseDeleteKbDocumentResponse, KnowledgeBaseQueryKbData, KnowledgeBaseQueryKbResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginResetPasswordData, LoginResetPasswordResponse, PrivateCreateUserData, PrivateCreateUserResponse, ProvidersListProvidersResponse, ProvidersCreateProviderData, ProvidersCreateProviderResponse, ProvidersUpdateProviderData, ProvidersUpdateProviderResponse, ProvidersDeleteProviderData, ProvidersDeleteProviderResponse, SettingsReadDeploymentSettingsResponse, SettingsUpdateDeploymentSettingsData, SettingsUpdateDeploymentSettingsResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersReadMySystemPromptResponse, UsersUpdateMySystemPromptData, UsersUpdateMySystemPromptResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsHealthCheckResponse, UtilsReadPublicSettingsResponse } from './types.gen';
 
 export class AgentService {
     /**
@@ -87,6 +87,42 @@ export class AgentService {
             url: '/api/v1/agent/conversations/{conversation_id}',
             path: {
                 conversation_id: data.conversationId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Export Conversation
+     * 把整个对话导出成文件下载。
+     *
+     * 与其它会话端点一致，先按 user_id 校验归属，越权一律 404
+     * （而不是 403 —— 403 会泄露「这个 id 真实存在」）。
+     *
+     * 参数:
+     * conversation_id: 会话 ID。
+     * format: 导出格式，取自 ExportFormat。
+     *
+     * 返回:
+     * 附件响应（Content-Disposition: attachment），
+     * Content-Type 与扩展名由格式决定。
+     * @param data The data for the request.
+     * @param data.conversationId
+     * @param data.format 导出格式：md / txt / json / docx / pdf
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static exportConversation(data: AgentExportConversationData): CancelablePromise<AgentExportConversationResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/agent/conversations/{conversation_id}/export',
+            path: {
+                conversation_id: data.conversationId
+            },
+            query: {
+                format: data.format
             },
             errors: {
                 422: 'Validation Error'

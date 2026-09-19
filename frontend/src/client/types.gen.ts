@@ -382,6 +382,16 @@ export type AgentDeleteConversationData = {
 
 export type AgentDeleteConversationResponse = (unknown);
 
+export type AgentExportConversationData = {
+    conversationId: string;
+    /**
+     * 导出格式：md / txt / json / docx / pdf
+     */
+    format?: 'md' | 'txt' | 'json' | 'docx' | 'pdf';
+};
+
+export type AgentExportConversationResponse = (unknown);
+
 export type AgentChatData = {
     conversationId: string;
     requestBody: ChatRequest;

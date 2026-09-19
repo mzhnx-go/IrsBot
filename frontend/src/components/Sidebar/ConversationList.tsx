@@ -13,6 +13,9 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -26,7 +29,9 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@/components/ui/sidebar"
-import useConversations from "@/hooks/useConversations"
+import useConversations, {
+    type ConversationExportFormat,
+} from "@/hooks/useConversations"
 import { useNavigate, useRouterState } from "@tanstack/react-router"
 import {
     Download,
@@ -38,18 +43,31 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 
+/** 导出格式下拉项。value 必须是后端 Literal 支持的取值，label 只负责展示 */
+const EXPORT_FORMATS: { value: ConversationExportFormat; label: string }[] = [
+  { value: "md", label: "Markdown (.md)" },
+  { value: "docx", label: "Word (.docx)" },
+  { value: "pdf", label: "PDF (.pdf)" },
+  { value: "txt", label: "纯文本 (.txt)" },
+  { value: "json", label: "JSON (.json)" },
+]
+
 /**
  * 侧边栏「最近对话」列表：
  * - 顶部「新对话」按钮
  * - 会话项：单行截断，选中项浅灰底；hover 浮出「…」菜单
- * - 「…」→ 重命名 / 批量管理 / 导出（占位）/ 删除（均带确认或表单）
+ * - 「…」→ 重命名 / 批量管理 / 导出（二级菜单选格式）/ 删除（均带确认或表单）
  *
  * 视觉只动颜色和透明度（150ms ease-out），不做位移/缩放 —— 列表是
  * 高频浏览区域，动效必须几乎不可感知。
  */
 export function ConversationList() {
-  const { conversationsQuery, deleteConversation, renameConversation } =
-    useConversations()
+  const {
+    conversationsQuery,
+    deleteConversation,
+    renameConversation,
+    exportConversation,
+  } = useConversations()
   const navigate = useNavigate()
   const { isMobile, setOpenMobile } = useSidebar()
 
@@ -163,6 +181,10 @@ export function ConversationList() {
               const isDeleting =
                 deleteConversation.isPending &&
                 deleteConversation.variables === conv.id
+              // 正在导出这一条时锁住菜单，避免连点触发多次下载
+              const isExporting =
+                exportConversation.isPending &&
+                exportConversation.variables?.conversationId === conv.id
 
               return (
                 <SidebarMenuItem key={conv.id}>
@@ -178,7 +200,10 @@ export function ConversationList() {
                   {/* 「…」菜单：hover 或选中时浮出（showOnHover 由 sidebar 组件内置） */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <SidebarMenuAction showOnHover disabled={isDeleting}>
+                      <SidebarMenuAction
+                        showOnHover
+                        disabled={isDeleting || isExporting}
+                      >
                         <MoreHorizontal />
                         <span className="sr-only">更多操作</span>
                       </SidebarMenuAction>
@@ -201,11 +226,29 @@ export function ConversationList() {
                         <ListChecks />
                         <span>批量管理</span>
                       </DropdownMenuItem>
-                      {/* 导出对话：入口占位，Word/PDF/TXT/Json 后续实现 */}
-                      <DropdownMenuItem disabled>
-                        <Download />
-                        <span>导出对话</span>
-                      </DropdownMenuItem>
+                      {/* 导出对话：二级菜单选格式，选中即请求并触发下载 */}
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger disabled={isExporting}>
+                          <Download />
+                          <span>导出对话</span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          {EXPORT_FORMATS.map((item) => (
+                            <DropdownMenuItem
+                              key={item.value}
+                              disabled={isExporting}
+                              onClick={() =>
+                                exportConversation.mutate({
+                                  conversationId: conv.id,
+                                  format: item.value,
+                                })
+                              }
+                            >
+                              <span>{item.label}</span>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() =>
