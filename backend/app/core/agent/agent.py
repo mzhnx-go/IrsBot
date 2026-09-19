@@ -12,6 +12,10 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+# 触发 builtin 工具的注册（注册是导入 app.core.agent.builtins 的副作用，
+# 其是否注册 shell/file_write 由 config 的 ENABLE_SHELL / ENABLE_FILE_WRITE 决定）。
+import app.core.agent.builtins  # noqa: F401
+from app.core.agent.builtins.kb_query import set_kb_user
 from app.core.agent.graph import create_compiled_agent_graph
 from app.core.agent.prompts import resolve_system_prompt
 from app.core.agent.provider import ProviderManager
@@ -19,10 +23,6 @@ from app.core.agent.state import AgentState
 from app.core.agent.tools import ToolRegistry
 from app.core.config import settings
 from app.core.db.sqlmodel_models import User
-
-# 触发 builtin 工具的注册（注册是导入 app.core.agent.builtins 的副作用，
-# 其是否注册 shell/file_write 由 config 的 ENABLE_SHELL / ENABLE_FILE_WRITE 决定）。
-import app.core.agent.builtins  # noqa: F401
 
 
 class Agent:
@@ -75,6 +75,8 @@ class Agent:
             except ValueError:
                 user_uuid = None
 
+        # 存为实例属性：run/stream 每次运行前要把它挂到 ContextVar 上
+        self.user_uuid = user_uuid
         # 读取当前用户的自定义系统提示词（未设置/为空时 resolve 回落默认）。
         # 用已有 session + user_id 查库，WS 路由与 Pipeline 两条链路都无需改动。
         self.system_prompt: str | None = None
@@ -116,7 +118,7 @@ class Agent:
             "messages": messages,
             "tools": self.tools,
             "llm": self.llm,
-            "knowledge_base": None,      # Phase 7 填充
+            "knowledge_base": None,  # Phase 7 填充
             "max_steps": settings.MAX_AGENT_STEPS,
             "step_count": 0,
             "conversation_id": self.conversation_id,
@@ -135,6 +137,9 @@ class Agent:
         Returns:
             最终的 AgentState 字典
         """
+        # 把当前用户身份挂到任务上下文，供 kb_query 等工具在任意深度读取
+        set_kb_user(self.user_uuid)
+
         # 组装消息列表：系统提示词（最前）+ 历史消息 + 新用户消息
         messages: list = [SystemMessage(content=resolve_system_prompt(self.system_prompt))]
         messages.extend(history or [])
@@ -148,7 +153,9 @@ class Agent:
 
         return result
 
-    async def stream(self, user_message: str, history: list | None = None) -> AsyncGenerator:
+    async def stream(
+        self, user_message: str, history: list | None = None
+    ) -> AsyncGenerator:
         """运行 Agent（流式）
 
         边跑边产出事件，用于 WebSocket 实时推送。
@@ -160,15 +167,18 @@ class Agent:
         Yields:
             LangGraph 的 astream_events 事件字典
         """
+        # 把当前用户身份挂到任务上下文，供 kb_query 等工具在任意深度读取
+        set_kb_user(self.user_uuid)
+
         # 组装消息列表：系统提示词（最前）+ 历史消息 + 新用户消息
-        messages: list = [SystemMessage(content=resolve_system_prompt(self.system_prompt))]
+        messages: list = [
+            SystemMessage(content=resolve_system_prompt(self.system_prompt))
+        ]
         messages.extend(history or [])
         messages.append(HumanMessage(content=user_message))
 
         initial_state = self._build_initial_state(messages)
 
         # 流式调用图
-        async for event in self.graph.astream_events(
-            initial_state, version="v2"
-        ):
+        async for event in self.graph.astream_events(initial_state, version="v2"):
             yield event

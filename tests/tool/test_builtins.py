@@ -79,13 +79,23 @@ class TestShellExecute:
 
 
 class TestKBQuery:
-    def test_kb_query_placeholder(self):
-        from app.core.agent.builtins.kb_query import knowledge_base_query
+    def test_kb_query_fail_closed_without_user(self):
+        """未挂用户身份时必须拒绝查询（fail closed），绝不回落成"查全部" """
+        from app.core.agent.builtins.kb_query import knowledge_base_query, set_kb_user
+        set_kb_user(None)
         result = _aiter(knowledge_base_query.ainvoke({"query": "test query", "top_k": 3}))
-        assert "test query" in result
-        assert "placeholder" in result.lower() or "configured" in result.lower()
+        assert "无法确定当前用户身份" in result
 
-    def test_kb_query_with_kb_id(self):
-        from app.core.agent.builtins.kb_query import knowledge_base_query
-        result = _aiter(knowledge_base_query.ainvoke({"query": "query", "kb_id": "kb-123", "top_k": 5}))
-        assert "kb-123" in result
+    def test_kb_query_rejects_invalid_kb_id(self):
+        """身份有效时，LLM 传来的非法 kb_id 应返回友好错误而非异常"""
+        import uuid
+
+        from app.core.agent.builtins.kb_query import knowledge_base_query, set_kb_user
+        set_kb_user(uuid.uuid4())
+        try:
+            result = _aiter(
+                knowledge_base_query.ainvoke({"query": "query", "kb_id": "kb-123", "top_k": 5})
+            )
+            assert "不是合法的 UUID" in result
+        finally:
+            set_kb_user(None)  # 清理，防止身份残留影响其他测试
