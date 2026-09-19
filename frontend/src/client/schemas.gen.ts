@@ -150,6 +150,21 @@ export const ConversationCreateSchema = {
     description: '创建对话请求'
 } as const;
 
+export const ConversationRenameSchema = {
+    properties: {
+        title: {
+            type: 'string',
+            maxLength: 255,
+            minLength: 1,
+            title: 'Title'
+        }
+    },
+    type: 'object',
+    required: ['title'],
+    title: 'ConversationRename',
+    description: '重命名对话请求'
+} as const;
+
 export const ConversationResponseSchema = {
     properties: {
         id: {
@@ -176,6 +191,18 @@ export const ConversationResponseSchema = {
                 }
             ],
             title: 'Created At'
+        },
+        updated_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Updated At'
         }
     },
     type: 'object',

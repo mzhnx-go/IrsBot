@@ -15,6 +15,7 @@ from app.core.db.sqlmodel_models import (
     ChatRequest,
     ChatResponse,
     ConversationCreate,
+    ConversationRename,
     ConversationResponse,
     MCPServerConnectResponse,
     MCPServerCreate,
@@ -58,6 +59,7 @@ def create_conversation(
         title=conversation.title,
         session_id=conversation.session_id,
         created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
     )
 
 @router.get("/conversations", response_model=list[ConversationResponse])
@@ -80,9 +82,54 @@ def list_conversations(
             title=c.title,
             session_id=c.session_id,
             created_at=c.created_at,
+            updated_at=c.updated_at,
         )
         for c in conversations
     ]
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
+def rename_conversation(
+    conversation_id: uuid.UUID,
+    body: ConversationRename,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """重命名一个对话"""
+    conversation = crud.get_conversation(
+        session,
+        conv_id=conversation_id,
+        user_id=current_user.id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    conversation.title = body.title
+    session.commit()
+    session.refresh(conversation)
+    return ConversationResponse(
+        id=conversation.id,
+        title=conversation.title,
+        session_id=conversation.session_id,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+    )
+
+
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(
+    conversation_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """删除一个对话（会话内的消息随之级联删除）"""
+    deleted = crud.delete_conversation(
+        session,
+        conv_id=conversation_id,
+        user_id=current_user.id,
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    return {"message": "对话已删除"}
 
 
 @router.post("/conversations/{conversation_id}/chat",response_model=ChatResponse)

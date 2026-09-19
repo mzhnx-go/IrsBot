@@ -4,11 +4,12 @@ import {
   MessageSquare,
   PanelLeftClose,
   Settings,
-  Users
+  Users,
 } from "lucide-react"
 
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
+import ConversationList from "@/components/Sidebar/ConversationList"
 import {
   Sidebar,
   SidebarContent,
@@ -47,6 +48,8 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <Main items={items} />
+        {/* 历史对话（Phase 15.1）：仅在有会话数据的聊天场景展示 */}
+        <ConversationList />
       </SidebarContent>
       <SidebarFooter>
         <SidebarAppearance />

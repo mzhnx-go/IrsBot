@@ -45,6 +45,13 @@ export type ConversationCreate = {
 };
 
 /**
+ * 重命名对话请求
+ */
+export type ConversationRename = {
+    title: string;
+};
+
+/**
  * 对话响应
  */
 export type ConversationResponse = {
@@ -52,6 +59,7 @@ export type ConversationResponse = {
     title: string;
     session_id: string;
     created_at?: (string | null);
+    updated_at?: (string | null);
 };
 
 /**
@@ -342,6 +350,19 @@ export type AgentListConversationsData = {
 };
 
 export type AgentListConversationsResponse = (Array<ConversationResponse>);
+
+export type AgentRenameConversationData = {
+    conversationId: string;
+    requestBody: ConversationRename;
+};
+
+export type AgentRenameConversationResponse = (ConversationResponse);
+
+export type AgentDeleteConversationData = {
+    conversationId: string;
+};
+
+export type AgentDeleteConversationResponse = (unknown);
 
 export type AgentChatData = {
     conversationId: string;

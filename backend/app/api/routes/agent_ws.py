@@ -19,10 +19,17 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.api.deps import SessionDep, get_current_user_ws
 from app.core.agent.agent import Agent
-from app.core.db.sqlmodel_models import User
 from app.core.agent.conversation import ConversationManager
+from app.core.db.sqlmodel_models import User
 
 router = APIRouter()
+
+# 新建会话时的默认标题。与 models.py 中 Conversation.title 的默认值保持一致：
+# 标题还等于它，说明用户从没手动改过名，此时才允许被首条消息覆盖。
+DEFAULT_CONVERSATION_TITLE = "新对话"
+
+# 自动标题的最大长度（按字符截断，超出部分丢弃）
+AUTO_TITLE_MAX_LEN = 20
 
 
 class WSMessageType:
@@ -156,6 +163,22 @@ async def chat_ws(
                     role=WSMessageRole.USER,
                     content=data[WSMsgKey.CONTENT],
                 )
+                # 首条消息自动成标题：让侧边栏不再是一堆「新对话」。
+                # 两个条件缺一不可：
+                #   1) 标题仍是默认值 —— 用户（或后续重命名功能）设过标题就不覆盖；
+                #   2) 这是会话的第一条消息 —— add_message 刚写完，故 count == 1。
+                if (
+                    conversation.title == DEFAULT_CONVERSATION_TITLE
+                    and conv_manager.count_messages(conversation.id) == 1
+                ):
+                    # 多行输入压成一行、去掉首尾空白，再截断到 20 字
+                    title = (
+                        str(data[WSMsgKey.CONTENT]).strip().replace("\n", " ")
+                    )[:AUTO_TITLE_MAX_LEN]
+                    if title:
+                        # ORM 脏跟踪：改了属性，commit 即落库（updated_at 自动刷新）
+                        conversation.title = title
+                        session.commit()
                 history = conv_manager.get_context_messages(conversation.id)
 
                 agent = Agent(

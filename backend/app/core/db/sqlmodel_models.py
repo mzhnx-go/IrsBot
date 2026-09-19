@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Literal
+from typing import Literal, Optional
 
-from pydantic import EmailStr
+from pydantic import EmailStr, field_validator
 from sqlalchemy import DateTime, Text
 from sqlmodel import Field, Relationship, SQLModel
+
 
 def get_datetime_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -100,6 +101,20 @@ class ConversationCreate(SQLModel):
     title: str = "新对话"
 
 
+class ConversationRename(SQLModel):
+    """重命名对话请求"""
+
+    title: str = Field(min_length=1, max_length=255)
+
+    @field_validator("title")
+    @classmethod
+    def title_not_blank(cls, v: str) -> str:
+        """拒绝纯空白标题（min_length 管不住 "   "），并顺手去掉首尾空白"""
+        if not v.strip():
+            raise ValueError("标题不能为空白")
+        return v.strip()
+
+
 class ChatRequest(SQLModel):
     """发送消息请求"""
     message: str
@@ -111,6 +126,7 @@ class ConversationResponse(SQLModel):
     title: str
     session_id: str
     created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class ChatResponse(SQLModel):

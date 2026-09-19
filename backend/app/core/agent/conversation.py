@@ -12,6 +12,7 @@ from typing import Any
 from sqlmodel import Session, col, func, select
 
 from app.core.db.models import Conversation, Message
+from app.core.db.sqlmodel_models import get_datetime_utc
 
 
 class ConversationManager:
@@ -139,6 +140,10 @@ class ConversationManager:
 
         返回:
             已写入数据库并刷新后的 Message 对象。
+
+        副作用:
+            刷新所属会话的 updated_at —— 会话列表按最近活跃倒序排列，
+            不刷新的话聊了很多轮的会话会一直停在首次发言时的位置。
         """
         # 序列化内容为 JSON 安全的 dict
         if isinstance(content, dict):
@@ -154,6 +159,13 @@ class ConversationManager:
             tool_call_id=tool_call_id,
         )
         self.session.add(obj)
+
+        # 显式赋一次值才会触发 UPDATE（行没变化时 SQLAlchemy 不会写库，
+        # 列上的 onupdate 也就不会生效）
+        conversation = self.session.get(Conversation, conv_id)
+        if conversation:
+            conversation.updated_at = get_datetime_utc()
+
         self.session.commit()
         self.session.refresh(obj)
         return obj
@@ -217,9 +229,9 @@ class ConversationManager:
             LangChain Message 对象列表（按创建时间升序）。
         """
         from langchain_core.messages import (
-            SystemMessage,
-            HumanMessage,
             AIMessage,
+            HumanMessage,
+            SystemMessage,
             ToolMessage,
         )
 
@@ -339,9 +351,9 @@ class ConversationManager:
             LangChain Message 列表（顺序与入参一致）。
         """
         from langchain_core.messages import (
-            SystemMessage,
-            HumanMessage,
             AIMessage,
+            HumanMessage,
+            SystemMessage,
             ToolMessage,
         )
 

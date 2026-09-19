@@ -1,56 +1,61 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { useQueryClient } from "@tanstack/react-query"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { ArrowUp } from "lucide-react"
 import { type FormEvent, useEffect, useState } from "react"
 
+import { AgentService } from "@/client"
 import { type ChatMessage, useAgentChat } from "@/hooks/useAgentChat"
 
 export const Route = createFileRoute("/_layout/chat")({
+  // 会话 ID 走 URL search param（/chat?c=<uuid>）：
+  // - 侧边栏点会话 → 带 c 进入，直接恢复该会话
+  // - 不带 c 进入 → effect 自动建新会话，再 replace 回写参数（不产生历史记录）
+  validateSearch: (search: Record<string, unknown>) => ({
+    c: typeof search.c === "string" && search.c ? search.c : undefined,
+  }),
   component: ChatPage,
 })
 
-/** 外层组件：负责创建会话（拿到真实 UUID），就绪后才挂载聊天室 */
+/** 外层组件：保证 URL 里有一个有效会话 ID，就绪后才挂载聊天室 */
 function ChatPage() {
-  const [conversationId, setConversationId] = useState<string | null>(null)
+  const { c: conversationId } = Route.useSearch()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [error, setError] = useState("")
 
   useEffect(() => {
+    if (conversationId) return
     let cancelled = false
 
-    // 调后端 POST /agent/conversations，创建会话拿到真实 UUID
-    const createConversation = async () => {
-      try {
-        // 用同源相对路径（与 main.tsx 的 OpenAPI.BASE = "" 保持一致）。
-        // ⚠️ 不要把 VITE_API_URL 改成 "/api" 后再拼这里 —— 会得到
-        //    "/api/api/v1/agent/conversations"（路径重复）。
-        const res = await fetch("/api/v1/agent/conversations", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-          body: JSON.stringify({ title: "新对话" }),
+    // 没有会话 ID → 创建新会话并 replace 回写 ?c=（失败给错误态）
+    AgentService.createConversation({
+      requestBody: { title: "新对话" },
+    })
+      .then((conv) => {
+        if (cancelled) return
+        queryClient.invalidateQueries({ queryKey: ["conversations"] })
+        navigate({
+          to: "/chat",
+          search: { c: conv.id },
+          replace: true,
         })
-        if (!res.ok) {
-          throw new Error(`创建会话失败（HTTP ${res.status}）`)
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : String(e))
         }
-        const data = await res.json()
-        if (!cancelled) setConversationId(data.id)
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
-      }
-    }
+      })
 
-    createConversation()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [conversationId, navigate, queryClient])
 
   if (error) {
     return <div className="py-40 text-center text-destructive">{error}</div>
   }
 
-  // 会话还没创建好，不能渲染聊天室（否则 WS 连到一个空 ID 上）
+  // 会话还没就绪，不能渲染聊天室（否则 WS 连到一个空 ID 上）
   if (!conversationId) {
     return (
       <div className="py-40 text-center text-muted-foreground">
@@ -59,8 +64,8 @@ function ChatPage() {
     )
   }
 
-  // 会话 ID 就绪 → 挂载聊天室。条件挂载组件是 React 合法模式
-  return <ChatRoom conversationId={conversationId} />
+  // key=conversationId：切换会话时整个聊天室（含 WS 连接）重建
+  return <ChatRoom key={conversationId} conversationId={conversationId} />
 }
 
 /** 内层组件：conversationId 一定有效，useAgentChat 在这里调用 */
@@ -68,6 +73,15 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
   const { messages, isConnected, isStreaming, sendMessage } =
     useAgentChat(conversationId)
   const [input, setInput] = useState("")
+  const queryClient = useQueryClient()
+
+  // 一轮对话结束（done）→ 刷新侧边栏列表：
+  // 首条消息可能刚生成了新标题，且该会话的 updated_at 已变，应浮到最前
+  useEffect(() => {
+    if (!isStreaming) {
+      queryClient.invalidateQueries({ queryKey: ["conversations"] })
+    }
+  }, [isStreaming, queryClient])
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -146,16 +160,20 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   return (
     <div className={isUser ? "flex justify-end" : "flex justify-start"}>
       <div
-        className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${
-          isUser ? "bg-primary text-primary-foreground" : "bg-muted"
-        }`}
+        className={
+          isUser
+            ? "max-w-[80%] rounded-2xl rounded-br-sm bg-[var(--chat-accent)] px-4 py-2.5 text-sm leading-6 text-white"
+            : "max-w-[80%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-sm leading-6 text-foreground"
+        }
       >
-        {message.content}
-        {/* 流式生成中的闪烁光标 */}
-        {message.streaming && <span className="animate-pulse">▍</span>}
+        {/* 工具调用状态行（AI 消息且有工具调用时显示） */}
+        {message.toolCalls?.map((tc, i) => (
+          <p key={i} className="mb-1 text-xs text-muted-foreground">
+            [{tc.phase === "start" ? "调用" : "完成"}] {tc.name}
+          </p>
+        ))}
+        <p className="whitespace-pre-wrap">{message.content}</p>
       </div>
     </div>
   )
 }
-
-export default ChatPage
