@@ -1,42 +1,42 @@
-import { useNavigate, useRouterState } from "@tanstack/react-router"
-import {
-  Download,
-  ListChecks,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react"
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import {
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuAction,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarGroupLabel,
+    SidebarMenu,
+    SidebarMenuAction,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    useSidebar,
 } from "@/components/ui/sidebar"
 import useConversations from "@/hooks/useConversations"
+import { useNavigate, useRouterState } from "@tanstack/react-router"
+import {
+    Download,
+    ListChecks,
+    MoreHorizontal,
+    Pencil,
+    Plus,
+    Trash2,
+} from "lucide-react"
+import { useState } from "react"
 
 /**
  * 侧边栏「最近对话」列表：
@@ -284,7 +284,7 @@ export function ConversationList() {
         </DialogContent>
       </Dialog>
 
-      {/* 批量管理面板（：列表 + 复选框 + 全选 + 底部操作栏） */}
+      {/* 批量管理面板：列表 + 复选框 + 全选 + 底部操作栏 */}
       <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
         <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-lg">
           <DialogHeader>
