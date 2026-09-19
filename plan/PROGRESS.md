@@ -842,7 +842,7 @@ v1 原设计两个键（`deployment.mode` + `deployment.open_registration`），
 | # | 待办 | 依据 | 状态 |
 |---|---|---|---|
 | 1 | **D8「可分发」验证**：把仓库拷到干净机器/他人环境，装 Docker 后一条命令跑通（验证无本机隐式依赖） | SC **D8** ⬜ | 唯一未达成的 SC；需**另一台机器**，本机做不了 |
-| 2 | **D9 补验**：在**容器环境内**复跑 294 单测 + 18 集成测试（当前 321 passed 是宿主机跑的结果） | SC **D9** 🔶 | 容器内跑：`docker compose exec backend pytest ../tests -q` |
+| 2 | ~~D9 补验~~ **已完成（2026-09-20）**：容器内全量 **377 passed**（359 单测 + 18 集成，0 失败）；过程中暴露并修复真 bug——`shell_execute` 给 `create_subprocess_shell` 传不存在的 `timeout=` 参数，Linux 下必抛 TypeError（宿主 win32 分支掩盖），改用 `asyncio.wait_for`；`test_config` 的 MILVUS_URI 断言去环境耦合 | SC **D9** ✅ | 提交 `810344c`。注意：生产镜像不含 pytest/dev 依赖，需 `uv pip install` 临时装入容器；skills 目录镜像里为空，需 `docker cp` |
 | 3 | ~~Phase 15.1 历史对话侧边栏~~ **已完成（2026-09-20）**：后端补 DELETE/PATCH 端点 + ConversationResponse.updated_at；WS 首条消息自动成标题（前 20 字、换行压空格、自定义标题不覆盖）；`add_message` 修复会话 `updated_at` 从不刷新的 bug（列表才能按最近活跃排序）；前端 `useConversations` hook + `ConversationList`（最近对话列表/新对话/单行截断/hover「…」菜单：重命名、批量管理（多选+全选+批量删）、删除二次确认；导出对话入口占位待实现）；会话 ID 改走 `/chat?c=` 路由参数，修掉「每次进 /chat 都新建会话」的要害；19 条路由测试，全量 359 passed | 8.5 / 15.1 | ✅ 全链路完成；**遗留**：对话导出（Word/PDF/TXT/Json，菜单入口已留）、会话分组（未做，用户暂不需要） |
 | 4 | **随手修（同属 `provider.py` / `models.py`）**：① `_chat_cache`/`_embed_cache` 加 LRU 或 TTL ② `is_default` 加 DB 级部分唯一索引 | 8.4 保留两项 | 与用户数无关，遇到就改 |
 | 5 | **Phase D1.3c 分发优化**（镜像体积/wheelhouse） | PROGRESS §5.3 | 非阻塞，可延后 |
