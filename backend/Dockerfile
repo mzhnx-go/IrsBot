@@ -73,23 +73,23 @@ ENV PYTHONPATH=/app/backend
 #    app 本身**不装包**：prestart.sh / CMD 都在 /app/backend 下以 cwd 导入 app/，
 #    无需 pip 元数据（还省去离线构建 sdist 需要的 hatchling 依赖问题）。
 #
-#    wheelhouse / wheelhouse-req.txt 的生成命令（宿主机，仓库根）：
-#      1) uv export --frozen --all-extras --no-dev --package app \
-#           --format requirements.txt -o wheelhouse-req.txt --no-emit-package app
-#         （--no-emit-package app 必须加：否则首行是 `-e ./backend`，pip 会报
-#           "editable requirement ... cannot be installed when requiring hashes"）
-#      2) 过滤掉 win32 专属包块（pip 跨平台下载按**本机**环境评估标记，
-#         `sys_platform == 'win32'` 的行会直接报错）：删 colorama / pywin32 / tzdata
-#      3) python -m pip download -r wheelhouse-req.txt -d wheelhouse \
-#           --platform manylinux2014_x86_64 --platform manylinux_2_28_x86_64 \
-#           --platform manylinux_2_27_x86_64 --platform manylinux_2_26_x86_64 \
-#           --platform manylinux_2_17_x86_64 \
-#           --python-version 3.13 --only-binary=:all: --no-deps \
-#           -i https://pypi.tuna.tsinghua.edu.cn/simple
-#         ⚠️ 带 `sys_platform != 'win32'` 标记的 linux-only 包（faiss-cpu /
-#         pyarrow / uvloop / milvus-lite）会被 pip 按本机平台跳过 ——
-#         把它们写成**无标记**的临时清单再跑一遍同样的 pip download 补齐。
-#         实测：136 个 wheel 共 150MB，清华源 1m15s 下完（容器内同量要 30-60 分钟）。
+#    wheelhouse / wheelhouse-req.txt 的生成与校验（宿主机，仓库根）→ scripts/wheelhouse.py：
+#      python scripts/wheelhouse.py update   # 重新导出清单（已过滤 win32 包）+ 只补下缺失的 wheel
+#      python scripts/wheelhouse.py check    # 校验清单与 uv.lock 一致、且 wheelhouse/ 内哈希匹配
+#
+#    ⚠️ 依赖一变（pyproject.toml / uv.lock）就必须重跑 update 再 build —— 忘掉的后果是
+#       **静默缺件**：清单里没有那个新包，离线安装照样「成功」，应用启动后才 ImportError。
+#       `check` 就是把这个静默故障变成显式报错（退出码非 0），提交前/构建前跑一次即可。
+#
+#    历史上手写这两条命令踩过的坑，都已固化进脚本（见其注释与常量）：
+#      - `uv export` 必须带 `--no-emit-package app`：否则首行是 `-e ./backend`，pip 会报
+#        "editable requirement ... cannot be installed when requiring hashes"
+#      - 清单要删掉 win32 专属包块（colorama / pywin32 / tzdata）：pip 跨平台下载时按
+#        **本机**环境评估标记，`sys_platform == 'win32'` 的行会直接报错
+#      - 下载要**去掉环境标记**并显式给 `--platform manylinux*`：否则 linux-only 包
+#        （faiss-cpu / pyarrow / uvloop / milvus-lite）会被 pip 按本机平台静默跳过
+#      - jieba 在 PyPI 只有 sdist，下载它必须换 `--no-binary=:all:`
+#      - 实测：142 个文件约 150MB，清华源 1-2 分钟下完（容器内同量要 30-60 分钟）。
 RUN --mount=type=bind,source=wheelhouse,target=/app/wheelhouse \
     --mount=type=bind,source=wheelhouse-req.txt,target=/app/wheelhouse-req.txt \
     uv venv /app/.venv && \
