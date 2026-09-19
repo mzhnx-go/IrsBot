@@ -138,6 +138,12 @@ class Settings(BaseSettings):
     KB_CHUNK_SIZE: int = 500
     KB_CHUNK_OVERLAP: int = 50
     KB_TOP_K: int = 3
+    # 重排段：RRF 融合后的候选用 rerank 模型按 query 相关度精排。
+    # 复用 EMBEDDING_API_KEY / EMBEDDING_BASE_URL（SiliconFlow 同一账号）；
+    # 调用失败自动降级为不重排（纯 RRF 排序），不影响检索可用性。
+    ENABLE_RERANK: bool = True
+    RERANK_MODEL: str = "BAAI/bge-reranker-v2-m3"
+    RERANK_CANDIDATES: int = 10  # 送入重排的候选数（融合结果先截到此数再精排）
     MILVUS_URI: str = "http://localhost:19530"  # Docker 网络中使用 milvus:19530
     # 每个环境用不同前缀，避免测试/开发/生产的向量集合互相污染
     MILVUS_COLLECTION_PREFIX: str = "irsbot_kb"

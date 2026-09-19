@@ -20,6 +20,7 @@ dependencies = [
     "pwdlib[argon2,bcrypt]>=0.3.0",
     "cryptography>=44.0.0",
     "docx2txt>=0.9",
+    "jieba>=0.42.1",
 ]
 
 [project.optional-dependencies]

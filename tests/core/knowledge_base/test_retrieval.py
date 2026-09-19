@@ -77,6 +77,39 @@ class TestBM25Retriever:
         assert len(retriever.retrieve("文档 内容", top_k=2)) == 2
 
 
+# ---------- 纯单元测试：jieba 分词 ----------
+
+class TestTokenize:
+    def test_chinese_not_single_char(self):
+        """中文不再退化为纯单字：整词/子词出现"""
+        from app.core.knowledge_base.retrieval import _tokenize
+        toks = _tokenize("单元测试很重要")
+        assert "单元测试" in toks or ("单元" in toks and "测试" in toks)
+        assert "元测" not in toks  # 旧单字切分的伪词不应出现
+
+    def test_ascii_unchanged(self):
+        """纯 ASCII 行为不变：整词一个 token、小写化"""
+        from app.core.knowledge_base.retrieval import _tokenize
+        assert _tokenize("Hello World 123") == ["hello", "world", "123"]
+
+    def test_mixed_text(self):
+        """中英混排：英文整词 + 中文 jieba 词"""
+        from app.core.knowledge_base.retrieval import _tokenize
+        toks = _tokenize("用 pytest 跑单元测试")
+        assert "pytest" in toks
+        assert any(t in toks for t in ("单元测试", "单元", "测试"))
+
+    def test_keyword_match_ranks_exact_chinese_term_first(self):
+        """「单元测试」查询：含整词的文档排最前（旧单字分词的回归场景）"""
+        docs = [
+            Document("关于元测试的历史考据"),  # 只有单字碎片沾边
+            Document("单元测试是保障代码质量的手段"),
+        ]
+        retriever = BM25Retriever(docs)
+        results = retriever.retrieve("单元测试", top_k=2)
+        assert results[0].page_content == "单元测试是保障代码质量的手段"
+
+
 # ---------- 集成测试：混合检索（需要 Milvus + Embedding） ----------
 
 class TestHybridRetriever:

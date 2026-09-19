@@ -10,13 +10,17 @@ RAG 检索分两条腿，各有擅长：
 
 import re
 
+import jieba
 from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 
+from app.core.config import settings
+from app.core.knowledge_base.reranker import rerank
+
 _DEFAULT_RRF_K = 60
 
-# 匹配连续的 ASCII 字母数字（作为一个词）+ 单个 CJK 字符（一个 token）
-_TOKEN_RE = re.compile(r"[A-Za-z0-9]+|[\u4e00-\u9fff]")
+# 匹配连续的 ASCII 字母数字（作为一个词）+ 连续 CJK 段（交给 jieba 细分）
+_TOKEN_RE = re.compile(r"[A-Za-z0-9]+|[\u4e00-\u9fff]+")
 
 
 def _doc_key(doc: Document) -> str:
@@ -29,12 +33,20 @@ def _doc_key(doc: Document) -> str:
 
 
 def _tokenize(text: str) -> list[str]:
-    """中文友好的简单分词
+    """中文友好分词：ASCII 整词 + CJK 段用 jieba 搜索引擎模式
 
-    rank_bm25 需要 token 列表。ASCII 单词整体作为一个 token，
-    中文没有空格分词，就按单字切分（够用于相似度排序）。
+    rank_bm25 需要 token 列表。ASCII 单词整体作为一个 token；
+    中文用 jieba.cut_for_search（粗细粒度兼顾，"单元测试"既出
+    「单元测试」也出「测试」），相比旧版单字切分，BM25 打分不再
+    被单字噪声稀释。
     """
-    return [tok.lower() for tok in _TOKEN_RE.findall(text)]
+    tokens: list[str] = []
+    for seg in _TOKEN_RE.findall(text):
+        if seg.isascii():
+            tokens.append(seg.lower())
+        else:
+            tokens.extend(t for t in jieba.cut_for_search(seg) if t.strip())
+    return tokens
 
 
 def rrf_fuse(result_lists: list[list[Document]], k: int = _DEFAULT_RRF_K) -> list[Document]:
@@ -139,4 +151,7 @@ class HybridRetriever:
         vec_results = self._vector_store.search(query, top_k=self._candidate_top_k)
         kw_results = self._bm25.retrieve(query, self._candidate_top_k)
         fused = rrf_fuse([vec_results, kw_results])
-        return fused[:top_k]
+        # 重排段：融合候选截到 RERANK_CANDIDATES 后送 cross-encoder 精排；
+        # 开关关闭或 API 失败时 rerank() 内部降级为原序截断，行为与旧版一致
+        candidates = fused[: settings.RERANK_CANDIDATES]
+        return rerank(query, candidates, top_n=top_k)
