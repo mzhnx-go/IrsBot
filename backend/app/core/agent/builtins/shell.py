@@ -5,7 +5,6 @@ import shlex
 
 from app.core.agent.tools import register_tool
 
-
 # Commands allowed in shell_execute
 ALLOWED_COMMANDS = {"echo", "cat", "ls", "pwd", "whoami", "date", "head", "tail", "wc", "grep", "find", "sort", "uniq", "du", "df", "uname", "env", "printenv"}
 BLOCKED_PATTERNS = {"rm ", "rm -", "sudo", "mkfs", "dd ", ": >", ">/dev/sd", "chmod 777", "wget ", "curl ", "nc ", "ncat", "bash -c", "sh -c", "python -c", "node -e"}
@@ -51,22 +50,15 @@ async def shell_execute(command: str, timeout: float = 30.0) -> str:
         return f"Error: Command '{base_cmd}' not in allowed list"
 
     try:
-        import sys
-        if sys.platform == "win32":
-            # Windows asyncio doesn't support timeout in create_subprocess_shell
-            proc = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-        else:
-            proc = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                timeout=timeout,
-            )
-        stdout, stderr = await proc.communicate()
+        # create_subprocess_shell 没有 timeout 参数（任何平台都没有）；
+        # 超时控制统一用 asyncio.wait_for 包住 communicate()。
+        # 之前 Linux 分支传 timeout= 会抛 TypeError —— 宿主机 win32 分支掩盖了它。
+        proc = await asyncio.create_subprocess_shell(
+            command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         output = stdout.decode("utf-8", errors="replace").strip()
         if stderr:
             output += f"\n[stderr] {stderr.decode('utf-8', errors='replace').strip()}"
