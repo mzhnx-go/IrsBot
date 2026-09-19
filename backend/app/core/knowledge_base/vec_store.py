@@ -124,3 +124,24 @@ class VectorStore:
     def close(self) -> None:
         """关闭连接"""
         self.client.close()
+
+    def delete_by_doc_id ( self, doc_id: str ) -> int :
+        """按 doc_id 精准删除某个文档的全部向量块
+
+        Args:
+            doc_id: 文档记录的 UUID（字符串形式）
+
+        Returns:
+            删除的行数（仅作日志参考，Milvus 对某些版本可能返回 -1）
+
+        注意：只有打了 doc_id 标记的块才能被删到——旧数据（标记机制上线前
+        写入的块）没有该字段，匹配不到，只能靠整库删除兜底。
+        """
+        if not self.client.has_collection(self.collection_name):
+            return 0
+        res = self.client.delete(
+            collection_name = self.collection_name,
+            filter=f'doc_id == "{doc_id}"',
+        )
+        self.client.flush(self.collection_name)
+        return res.get("delete_count", 0) if isinstance(res, dict) else 0

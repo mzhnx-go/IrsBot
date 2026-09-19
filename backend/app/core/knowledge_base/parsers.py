@@ -2,13 +2,15 @@
 
 支持的格式：
 - PDF (PyPDFLoader)
+- Word docx (Docx2txtLoader)
 - 纯文本 / Markdown (TextLoader)
 """
 
 from pathlib import Path
 
+from langchain_community.document_loaders import Docx2txtLoader, PyPDFLoader, TextLoader
 from langchain_core.documents import Document
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
+
 
 class DocumentParser:
     """文档解析器
@@ -16,7 +18,7 @@ class DocumentParser:
     根据文件扩展名选择对应的 loader，
     统一返回 list[Document]。
     """
-    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
+    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".docx"}
 
     @staticmethod
     async def parse(file_path: str) -> list[Document]:
@@ -45,6 +47,8 @@ class DocumentParser:
         
         if ext == ".pdf":
             return await DocumentParser.parse_pdf(str(path))
+        if ext == ".docx":
+            return await DocumentParser.parse_docx(str(path))
         return await DocumentParser.parse_text(str(path))
 
 
@@ -57,6 +61,12 @@ class DocumentParser:
         return await loader.aload()
 
     
+    @staticmethod
+    async def parse_docx(file_path: str) -> list[Document]:
+        """解析 Word docx：整个文件一个 Document"""
+        loader = Docx2txtLoader(file_path)
+        return await loader.aload()
+
     @staticmethod
     async def parse_text(file_path: str) -> list[Document]:
         """解析纯文本 / Markdown：整个文件一个 Document"""

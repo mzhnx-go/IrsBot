@@ -155,6 +155,26 @@ def list_kb_documents(kb_id: uuid.UUID, session: SessionDep, current_user: Curre
         for d in docs
     ]
 
+@router.delete("/{kb_id}/documents/{doc_id}")
+def delete_kb_document(
+    kb_id: uuid.UUID,
+    doc_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """删除单个文档：Milvus 向量块 + 磁盘文件 + DB 记录，三处都要清"""
+    kb = _get_owned_kb(kb_id, session, current_user)
+    doc = session.get(DocumentRecord, doc_id)
+    if not doc or doc.kb_id != kb.id:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    VectorStore(kb_id=str(kb_id)).delete_by_doc_id(str(doc_id))
+    Path(doc.file_path).unlink(missing_ok=True)
+    invalidate_kb_cache(str(kb_id))
+    session.delete(doc)
+    session.commit()
+    return {"message": "文档已删除"}
+
 # ── 检索 ──
 @router.post("/{kb_id}/query", response_model=KBQueryResponse)
 def query_kb(

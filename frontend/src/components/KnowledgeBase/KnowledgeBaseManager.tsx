@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
+import { Link } from "@tanstack/react-router"
 import { FolderOpen, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
@@ -8,22 +9,22 @@ import type { KBOut } from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog"
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { LoadingButton } from "@/components/ui/loading-button"
@@ -145,11 +146,15 @@ const KbRow = ({ kb, onDelete }: KbRowProps) => {
   return (
     <div className="flex items-center justify-between rounded-lg border p-4">
       <div className="min-w-0">
-        <div className="flex items-center gap-2">
+        <Link
+          to="/knowledge-base/$kbId"
+          params={{ kbId: kb.id }}
+          className="flex w-fit items-center gap-2 hover:underline"
+        >
           <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
           <span className="font-medium">{kb.name}</span>
           <Badge variant="outline">{kb.document_count} 个文档</Badge>
-        </div>
+        </Link>
         {kb.description && (
           <p className="truncate text-sm text-muted-foreground">
             {kb.description}

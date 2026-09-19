@@ -54,6 +54,9 @@ class KBManager:
                 else Chunkers.recursive_character(docs)
             )
 
+            for chunk in chunks:
+                chunk.metadata["doc_id"] = str(record.id)
+
             # 4. 向量化写入 Milvus
             VectorStore(kb_id=str(kb_id)).add_documents(chunks)
 

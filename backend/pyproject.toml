@@ -19,6 +19,7 @@ dependencies = [
     "pyjwt>=2.8.0,<3.0.0",
     "pwdlib[argon2,bcrypt]>=0.3.0",
     "cryptography>=44.0.0",
+    "docx2txt>=0.9",
 ]
 
 [project.optional-dependencies]

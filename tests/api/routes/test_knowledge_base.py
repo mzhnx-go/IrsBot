@@ -7,6 +7,8 @@
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
@@ -239,6 +241,132 @@ class TestQueryKB:
             json={"query": ""},
         )
         assert r.status_code == 422
+
+
+class TestDeleteDocument:
+    """删除文档端点：DB 记录真实操作，VectorStore/磁盘 mock 或容错处理"""
+
+    @pytest.fixture()
+    def superuser_id(self, db) -> uuid.UUID:
+        from sqlmodel import select
+
+        from app.models import User
+
+        user = db.exec(
+            select(User).where(User.email == settings.FIRST_SUPERUSER)
+        ).first()
+        assert user is not None
+        return user.id
+
+    @pytest.fixture()
+    def mock_vec_delete(self, monkeypatch):
+        """mock 掉 Milvus 删除（测试环境不依赖 Milvus），返回 MagicMock 便于断言调用"""
+        from app.api.routes import knowledge_base as kb_routes_mod
+
+        fake = MagicMock(return_value={"delete_count": 3})
+        monkeypatch.setattr(
+            kb_routes_mod.VectorStore, "delete_by_doc_id", fake
+        )
+        return fake
+
+    def _create_doc(self, db, user_id, kb_id) -> "DocumentRecord":
+        from app.core.db.models import Document as DocumentRecord
+
+        record = DocumentRecord(
+            kb_id=kb_id,
+            user_id=user_id,
+            filename="test_doc.md",
+            # 指向不存在的路径：unlink(missing_ok=True) 应容错
+            file_path="./uploads/kb_test/__no_such_file__.md",
+            status="done",
+            chunks_count=3,
+            file_size=100,
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        return record
+
+    def test_delete_success(
+        self,
+        client: TestClient,
+        db,
+        superuser_token_headers,
+        superuser_id,
+        mock_vec_delete,
+    ):
+        """删除自己的文档 → 200 + Milvus 删了 + 列表里消失"""
+        kb_id = uuid.UUID(_create_kb(client, superuser_token_headers)["id"])
+        doc = self._create_doc(db, superuser_id, kb_id)
+
+        r = client.delete(
+            f"{settings.API_V1_STR}/kb/{kb_id}/documents/{doc.id}",
+            headers=superuser_token_headers,
+        )
+        assert r.status_code == 200
+        # Milvus 删除按 doc_id 调用了一次
+        mock_vec_delete.assert_called_once_with(str(doc.id))
+        # 列表里没了
+        docs = client.get(
+            f"{settings.API_V1_STR}/kb/{kb_id}/documents",
+            headers=superuser_token_headers,
+        ).json()
+        assert all(d["id"] != str(doc.id) for d in docs)
+
+    def test_delete_doc_of_another_kb_404(
+        self,
+        client: TestClient,
+        db,
+        superuser_token_headers,
+        superuser_id,
+        mock_vec_delete,
+    ):
+        """用 B 库的 URL 删 A 库的文档 → 404（跨库越权防线）"""
+        kb_a = uuid.UUID(_create_kb(client, superuser_token_headers)["id"])
+        kb_b = uuid.UUID(_create_kb(client, superuser_token_headers, "B库")["id"])
+        doc = self._create_doc(db, superuser_id, kb_a)
+
+        r = client.delete(
+            f"{settings.API_V1_STR}/kb/{kb_b}/documents/{doc.id}",
+            headers=superuser_token_headers,
+        )
+        assert r.status_code == 404
+        mock_vec_delete.assert_not_called()
+
+    def test_delete_other_user_404(
+        self,
+        client: TestClient,
+        db,
+        superuser_token_headers,
+        normal_user_token_headers,
+        superuser_id,
+        mock_vec_delete,
+    ):
+        """删别人的库里的文档 → 404"""
+        kb_id = uuid.UUID(_create_kb(client, superuser_token_headers)["id"])
+        doc = self._create_doc(db, superuser_id, kb_id)
+
+        r = client.delete(
+            f"{settings.API_V1_STR}/kb/{kb_id}/documents/{doc.id}",
+            headers=normal_user_token_headers,
+        )
+        assert r.status_code == 404
+        mock_vec_delete.assert_not_called()
+
+    def test_delete_nonexistent_doc_404(
+        self,
+        client: TestClient,
+        superuser_token_headers,
+        mock_vec_delete,
+    ):
+        """随机 doc_id → 404"""
+        kb_id = _create_kb(client, superuser_token_headers)["id"]
+        r = client.delete(
+            f"{settings.API_V1_STR}/kb/{kb_id}/documents/{uuid.uuid4()}",
+            headers=superuser_token_headers,
+        )
+        assert r.status_code == 404
+        mock_vec_delete.assert_not_called()
 
 
 class TestListDocuments:

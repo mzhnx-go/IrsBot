@@ -18,6 +18,8 @@ import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutChatRouteImport } from './routes/_layout/chat'
 import { Route as LayoutKnowledgeBaseRouteImport } from './routes/_layout/knowledge-base'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
+import { Route as LayoutKnowledgeBaseIndexRouteImport } from './routes/_layout/knowledge-base.index'
+import { Route as LayoutKnowledgeBaseKbIdRouteImport } from './routes/_layout/knowledge-base.$kbId'
 
 const LayoutRoute = LayoutRouteImport.update({
   id: '/_layout',
@@ -63,6 +65,17 @@ const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutKnowledgeBaseIndexRoute =
+  LayoutKnowledgeBaseIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => LayoutKnowledgeBaseRoute,
+  } as any)
+const LayoutKnowledgeBaseKbIdRoute = LayoutKnowledgeBaseKbIdRouteImport.update({
+  id: '/$kbId',
+  path: '/$kbId',
+  getParentRoute: () => LayoutKnowledgeBaseRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
@@ -71,8 +84,10 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/admin': typeof LayoutAdminRoute
   '/chat': typeof LayoutChatRoute
-  '/knowledge-base': typeof LayoutKnowledgeBaseRoute
+  '/knowledge-base': typeof LayoutKnowledgeBaseRouteWithChildren
   '/settings': typeof LayoutSettingsRoute
+  '/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
+  '/knowledge-base/': typeof LayoutKnowledgeBaseIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -80,9 +95,10 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/admin': typeof LayoutAdminRoute
   '/chat': typeof LayoutChatRoute
-  '/knowledge-base': typeof LayoutKnowledgeBaseRoute
   '/settings': typeof LayoutSettingsRoute
   '/': typeof LayoutIndexRoute
+  '/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
+  '/knowledge-base': typeof LayoutKnowledgeBaseIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -92,9 +108,11 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/chat': typeof LayoutChatRoute
-  '/_layout/knowledge-base': typeof LayoutKnowledgeBaseRoute
+  '/_layout/knowledge-base': typeof LayoutKnowledgeBaseRouteWithChildren
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/': typeof LayoutIndexRoute
+  '/_layout/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
+  '/_layout/knowledge-base/': typeof LayoutKnowledgeBaseIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -107,6 +125,8 @@ export interface FileRouteTypes {
     | '/chat'
     | '/knowledge-base'
     | '/settings'
+    | '/knowledge-base/$kbId'
+    | '/knowledge-base/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -114,9 +134,10 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/chat'
-    | '/knowledge-base'
     | '/settings'
     | '/'
+    | '/knowledge-base/$kbId'
+    | '/knowledge-base'
   id:
     | '__root__'
     | '/_layout'
@@ -128,6 +149,8 @@ export interface FileRouteTypes {
     | '/_layout/knowledge-base'
     | '/_layout/settings'
     | '/_layout/'
+    | '/_layout/knowledge-base/$kbId'
+    | '/_layout/knowledge-base/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -202,13 +225,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutSettingsRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/knowledge-base/': {
+      id: '/_layout/knowledge-base/'
+      path: '/'
+      fullPath: '/knowledge-base/'
+      preLoaderRoute: typeof LayoutKnowledgeBaseIndexRouteImport
+      parentRoute: typeof LayoutKnowledgeBaseRoute
+    }
+    '/_layout/knowledge-base/$kbId': {
+      id: '/_layout/knowledge-base/$kbId'
+      path: '/$kbId'
+      fullPath: '/knowledge-base/$kbId'
+      preLoaderRoute: typeof LayoutKnowledgeBaseKbIdRouteImport
+      parentRoute: typeof LayoutKnowledgeBaseRoute
+    }
   }
 }
+
+interface LayoutKnowledgeBaseRouteChildren {
+  LayoutKnowledgeBaseKbIdRoute: typeof LayoutKnowledgeBaseKbIdRoute
+  LayoutKnowledgeBaseIndexRoute: typeof LayoutKnowledgeBaseIndexRoute
+}
+
+const LayoutKnowledgeBaseRouteChildren: LayoutKnowledgeBaseRouteChildren = {
+  LayoutKnowledgeBaseKbIdRoute: LayoutKnowledgeBaseKbIdRoute,
+  LayoutKnowledgeBaseIndexRoute: LayoutKnowledgeBaseIndexRoute,
+}
+
+const LayoutKnowledgeBaseRouteWithChildren =
+  LayoutKnowledgeBaseRoute._addFileChildren(LayoutKnowledgeBaseRouteChildren)
 
 interface LayoutRouteChildren {
   LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutChatRoute: typeof LayoutChatRoute
-  LayoutKnowledgeBaseRoute: typeof LayoutKnowledgeBaseRoute
+  LayoutKnowledgeBaseRoute: typeof LayoutKnowledgeBaseRouteWithChildren
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
 }
@@ -216,7 +266,7 @@ interface LayoutRouteChildren {
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminRoute: LayoutAdminRoute,
   LayoutChatRoute: LayoutChatRoute,
-  LayoutKnowledgeBaseRoute: LayoutKnowledgeBaseRoute,
+  LayoutKnowledgeBaseRoute: LayoutKnowledgeBaseRouteWithChildren,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutIndexRoute: LayoutIndexRoute,
 }
