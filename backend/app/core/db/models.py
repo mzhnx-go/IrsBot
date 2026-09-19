@@ -266,6 +266,8 @@ class Document(SQLModel, table=True):
         file_size: 文件大小（字节）。
         file_type: 文件类型（如 md、pdf，可为空）。
         created_at: 创建时间（UTC）。
+        deleted_at: 软删除时间（UTC）。为 None 表示正常文档；有值表示已移入
+              回收站——磁盘文件仍保留，可恢复；超过保留期由惰性清理真正删除。
         kb: 反向关联的知识库对象。
     """
 
@@ -293,6 +295,11 @@ class Document(SQLModel, table=True):
         sa_column=Column(
             DateTime(timezone=True), default=get_datetime_utc, nullable=False
         ),
+    )
+    # 软删除标记：建索引是因为列表/回收站/清理三条路径都按它过滤
+    deleted_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True, index=True),
     )
 
     kb: KnowledgeBase | None = Relationship(back_populates="documents")

@@ -149,6 +149,9 @@ class Settings(BaseSettings):
     MILVUS_COLLECTION_PREFIX: str = "irsbot_kb"
     # 知识库上传文件的落盘根目录，按环境隔离
     KB_FILE_STORAGE_DIR: str = "./uploads/kb"
+    # 回收站保留天数：文档软删除后，磁盘文件在此期间保留以便恢复；
+    # 超过该天数的记录由惰性清理真正删除（见 routes/knowledge_base.py）。
+    KB_TRASH_RETENTION_DAYS: int = 30
 
     # ── MCP 配置 ───────────────────────────────────────────────
     ENABLE_MCP: bool = True

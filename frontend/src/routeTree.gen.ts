@@ -20,6 +20,7 @@ import { Route as LayoutKnowledgeBaseRouteImport } from './routes/_layout/knowle
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutKnowledgeBaseIndexRouteImport } from './routes/_layout/knowledge-base.index'
 import { Route as LayoutKnowledgeBaseKbIdRouteImport } from './routes/_layout/knowledge-base.$kbId'
+import { Route as LayoutKnowledgeBaseTrashRouteImport } from './routes/_layout/knowledge-base.trash'
 
 const LayoutRoute = LayoutRouteImport.update({
   id: '/_layout',
@@ -76,6 +77,12 @@ const LayoutKnowledgeBaseKbIdRoute = LayoutKnowledgeBaseKbIdRouteImport.update({
   path: '/$kbId',
   getParentRoute: () => LayoutKnowledgeBaseRoute,
 } as any)
+const LayoutKnowledgeBaseTrashRoute =
+  LayoutKnowledgeBaseTrashRouteImport.update({
+    id: '/trash',
+    path: '/trash',
+    getParentRoute: () => LayoutKnowledgeBaseRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/knowledge-base': typeof LayoutKnowledgeBaseRouteWithChildren
   '/settings': typeof LayoutSettingsRoute
   '/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
+  '/knowledge-base/trash': typeof LayoutKnowledgeBaseTrashRoute
   '/knowledge-base/': typeof LayoutKnowledgeBaseIndexRoute
 }
 export interface FileRoutesByTo {
@@ -98,6 +106,7 @@ export interface FileRoutesByTo {
   '/settings': typeof LayoutSettingsRoute
   '/': typeof LayoutIndexRoute
   '/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
+  '/knowledge-base/trash': typeof LayoutKnowledgeBaseTrashRoute
   '/knowledge-base': typeof LayoutKnowledgeBaseIndexRoute
 }
 export interface FileRoutesById {
@@ -112,6 +121,7 @@ export interface FileRoutesById {
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
+  '/_layout/knowledge-base/trash': typeof LayoutKnowledgeBaseTrashRoute
   '/_layout/knowledge-base/': typeof LayoutKnowledgeBaseIndexRoute
 }
 export interface FileRouteTypes {
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/knowledge-base'
     | '/settings'
     | '/knowledge-base/$kbId'
+    | '/knowledge-base/trash'
     | '/knowledge-base/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/'
     | '/knowledge-base/$kbId'
+    | '/knowledge-base/trash'
     | '/knowledge-base'
   id:
     | '__root__'
@@ -150,6 +162,7 @@ export interface FileRouteTypes {
     | '/_layout/settings'
     | '/_layout/'
     | '/_layout/knowledge-base/$kbId'
+    | '/_layout/knowledge-base/trash'
     | '/_layout/knowledge-base/'
   fileRoutesById: FileRoutesById
 }
@@ -239,16 +252,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutKnowledgeBaseKbIdRouteImport
       parentRoute: typeof LayoutKnowledgeBaseRoute
     }
+    '/_layout/knowledge-base/trash': {
+      id: '/_layout/knowledge-base/trash'
+      path: '/trash'
+      fullPath: '/knowledge-base/trash'
+      preLoaderRoute: typeof LayoutKnowledgeBaseTrashRouteImport
+      parentRoute: typeof LayoutKnowledgeBaseRoute
+    }
   }
 }
 
 interface LayoutKnowledgeBaseRouteChildren {
   LayoutKnowledgeBaseKbIdRoute: typeof LayoutKnowledgeBaseKbIdRoute
+  LayoutKnowledgeBaseTrashRoute: typeof LayoutKnowledgeBaseTrashRoute
   LayoutKnowledgeBaseIndexRoute: typeof LayoutKnowledgeBaseIndexRoute
 }
 
 const LayoutKnowledgeBaseRouteChildren: LayoutKnowledgeBaseRouteChildren = {
   LayoutKnowledgeBaseKbIdRoute: LayoutKnowledgeBaseKbIdRoute,
+  LayoutKnowledgeBaseTrashRoute: LayoutKnowledgeBaseTrashRoute,
   LayoutKnowledgeBaseIndexRoute: LayoutKnowledgeBaseIndexRoute,
 }
 

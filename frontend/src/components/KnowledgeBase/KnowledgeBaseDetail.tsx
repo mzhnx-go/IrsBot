@@ -85,7 +85,7 @@ const DocumentRow = ({
               <DialogTitle>删除文档</DialogTitle>
               <DialogDescription>
                 确定删除「{doc.filename}
-                」吗？其向量分块与磁盘文件将一并清除，该操作不可撤销。
+                」吗？文档会移入回收站并从检索中立即移除，可在保留期内恢复。
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="mt-4">

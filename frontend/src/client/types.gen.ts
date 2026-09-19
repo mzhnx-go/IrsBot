@@ -279,6 +279,24 @@ export type Token = {
     token_type?: string;
 };
 
+/**
+ * 回收站条目：DocumentOut 的字段 + 归属库 + 生命周期时间点。
+ *
+ * 带 kb_name 是因为回收站是跨库的扁平列表，用户需要知道「这是哪个库的文件」。
+ * expires_at 由后端算好下发，前端不必再复制一遍保留期规则。
+ */
+export type TrashDocumentOut = {
+    id: string;
+    kb_id: string;
+    kb_name: string;
+    filename: string;
+    status: string;
+    chunks_count: number;
+    file_size: number;
+    deleted_at: string;
+    expires_at: string;
+};
+
 export type UpdatePassword = {
     current_password: string;
     new_password: string;
@@ -448,6 +466,20 @@ export type KnowledgeBaseCreateKbData = {
 };
 
 export type KnowledgeBaseCreateKbResponse = (KBOut);
+
+export type KnowledgeBaseListTrashResponse = (Array<TrashDocumentOut>);
+
+export type KnowledgeBaseRestoreTrashedDocumentData = {
+    docId: string;
+};
+
+export type KnowledgeBaseRestoreTrashedDocumentResponse = (DocumentOut);
+
+export type KnowledgeBasePurgeTrashedDocumentData = {
+    docId: string;
+};
+
+export type KnowledgeBasePurgeTrashedDocumentResponse = (unknown);
 
 export type KnowledgeBaseGetKbData = {
     kbId: string;

@@ -178,7 +178,7 @@ const KbRow = ({ kb, onDelete }: KbRowProps) => {
               <DialogTitle>删除知识库</DialogTitle>
               <DialogDescription>
                 确定删除「{kb.name}
-                »吗？库内全部文档与向量数据将一并删除，该操作不可撤销。
+                」吗？库内全部文档（含回收站中的）与向量数据将一并删除，该操作不可撤销。
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="mt-4">
@@ -220,7 +220,15 @@ const KnowledgeBaseManager = () => {
             管理知识库。AI 对话时可基于库内文档回答问题。
           </p>
         </div>
-        <AddKbDialog />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/knowledge-base/trash">
+              <Trash2 />
+              回收站
+            </Link>
+          </Button>
+          <AddKbDialog />
+        </div>
       </div>
 
       {kbs.length === 0 ? (

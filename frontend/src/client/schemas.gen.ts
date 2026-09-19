@@ -936,6 +936,58 @@ export const TokenSchema = {
     title: 'Token'
 } as const;
 
+export const TrashDocumentOutSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        kb_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Kb Id'
+        },
+        kb_name: {
+            type: 'string',
+            title: 'Kb Name'
+        },
+        filename: {
+            type: 'string',
+            title: 'Filename'
+        },
+        status: {
+            type: 'string',
+            title: 'Status'
+        },
+        chunks_count: {
+            type: 'integer',
+            title: 'Chunks Count'
+        },
+        file_size: {
+            type: 'integer',
+            title: 'File Size'
+        },
+        deleted_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Deleted At'
+        },
+        expires_at: {
+            type: 'string',
+            format: 'date-time',
+            title: 'Expires At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'kb_id', 'kb_name', 'filename', 'status', 'chunks_count', 'file_size', 'deleted_at', 'expires_at'],
+    title: 'TrashDocumentOut',
+    description: `回收站条目：DocumentOut 的字段 + 归属库 + 生命周期时间点。
+
+带 kb_name 是因为回收站是跨库的扁平列表，用户需要知道「这是哪个库的文件」。
+expires_at 由后端算好下发，前端不必再复制一遍保留期规则。`
+} as const;
+
 export const UpdatePasswordSchema = {
     properties: {
         current_password: {

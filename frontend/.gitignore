@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+# TanStack Router 插件的构建临时目录（routeTree 生成过程的中间产物）
+.tanstack
 *.local
 openapi.json
 

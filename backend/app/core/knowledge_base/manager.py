@@ -41,29 +41,39 @@ class KBManager:
         self._session.add(record)
         self._session.commit()
 
+        await self.index_document(record)
+        return record
+
+    async def index_document(self, record: DocumentRecord) -> DocumentRecord:
+        """对已存在的记录跑完整写入流水线：解析 → 分块 → 向量化 → 回写状态。
+
+        与 upload_document 的分工：本方法只管「把这条记录变成可检索的」，
+        不负责建档（不 add / 不管 file_size）。回收站恢复走的是同一条路径——
+        软删除时向量已从 Milvus 摘掉，恢复就得按磁盘文件重新向量化一次。
+        幂等性说明：直接重跑会在 Milvus 留下重复块，调用方需保证只在
+        「该文档当前没有向量」时调用（恢复回收站文档正满足此前提）。
+        """
         try:
-            # 2. 解析成原始文档
             record.status = "processing"
             self._session.commit()
-            docs = await DocumentParser.parse(file_path)
+            docs = await DocumentParser.parse(record.file_path)
 
-            # 3. 分块：.md 用结构感知分块，其他用递归分块
+            # 分块：.md 用结构感知分块，其他用递归分块
             chunks = (
                 Chunkers.markdown(docs)
-                if Path(file_path).suffix.lower() in {".md", ".markdown"}
+                if Path(record.file_path).suffix.lower() in {".md", ".markdown"}
                 else Chunkers.recursive_character(docs)
             )
 
             for chunk in chunks:
                 chunk.metadata["doc_id"] = str(record.id)
 
-            # 4. 向量化写入 Milvus
-            VectorStore(kb_id=str(kb_id)).add_documents(chunks)
+            # 向量化写入 Milvus
+            VectorStore(kb_id=str(record.kb_id)).add_documents(chunks)
 
-            # 5. 更新记录
             record.status = "done"
             record.chunks_count = len(chunks)
-            invalidate_kb_cache(str(kb_id))  # 内容变了，旧索引作废
+            invalidate_kb_cache(str(record.kb_id))  # 内容变了，旧索引作废
         except Exception:
             record.status = "error"
             raise

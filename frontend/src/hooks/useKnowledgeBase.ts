@@ -1,11 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  type Body_knowledge_base_upload_kb_document,
-  type KBCreate,
-  KnowledgeBaseService,
+    type Body_knowledge_base_upload_kb_document,
+    type KBCreate,
+    KnowledgeBaseService,
 } from "@/client"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 /**
  * 知识库列表层的数据 hook。
@@ -102,7 +102,7 @@ export const useKbDetail = (kbId: string) => {
     mutationFn: (docId: string) =>
       KnowledgeBaseService.deleteKbDocument({ kbId, docId }),
     onSuccess: () => {
-      showSuccessToast("文档已删除")
+      showSuccessToast("文档已移入回收站")
     },
     onError: handleError.bind(showErrorToast),
     onSettled: () => {
@@ -119,6 +119,53 @@ export const useKbDetail = (kbId: string) => {
   })
 
   return { kbQuery, docsQuery, uploadDoc, deleteDoc, queryKb }
+}
+
+/**
+ * 回收站的数据 hook（跨知识库的已删文档）。
+ *
+ * - trashQuery: 回收站列表（缓存 key "kb-trash"）
+ * - restoreDoc: 恢复文档——后端会按磁盘文件重新向量化，比普通写操作慢
+ * - purgeDoc: 彻底删除（磁盘文件 + 记录，不可恢复）
+ *
+ * 三个 key 一起失效：回收站条目变了、原库的文档列表与文档计数也跟着变。
+ */
+export const useKbTrash = () => {
+  const queryClient = useQueryClient()
+  const { showSuccessToast, showErrorToast } = useCustomToast()
+
+  const trashQuery = useQuery({
+    queryKey: ["kb-trash"],
+    queryFn: () => KnowledgeBaseService.listTrash(),
+  })
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["kb-trash"] })
+    queryClient.invalidateQueries({ queryKey: ["kb-documents"] })
+    queryClient.invalidateQueries({ queryKey: ["knowledge-base"] })
+  }
+
+  const restoreDoc = useMutation({
+    mutationFn: (docId: string) =>
+      KnowledgeBaseService.restoreTrashedDocument({ docId }),
+    onSuccess: () => {
+      showSuccessToast("文档已恢复，正在重新入库")
+    },
+    onError: handleError.bind(showErrorToast),
+    onSettled: invalidateAll,
+  })
+
+  const purgeDoc = useMutation({
+    mutationFn: (docId: string) =>
+      KnowledgeBaseService.purgeTrashedDocument({ docId }),
+    onSuccess: () => {
+      showSuccessToast("文档已彻底删除")
+    },
+    onError: handleError.bind(showErrorToast),
+    onSettled: invalidateAll,
+  })
+
+  return { trashQuery, restoreDoc, purgeDoc }
 }
 
 export default useKnowledgeBase
