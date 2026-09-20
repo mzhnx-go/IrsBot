@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Plus, Star, Trash2 } from "lucide-react"
+import { Plus, Star, Trash2, Wallet } from "lucide-react"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import useProviderBalance from "@/hooks/useProviderBalance"
 import useProviders from "@/hooks/useProviders"
 
 const formSchema = z.object({
@@ -256,9 +257,27 @@ const ProviderRow = ({
   onDelete,
 }: ProviderRowProps) => {
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const { balanceQuery } = useProviderBalance(provider.id)
+
+  const balanceText = (() => {
+    if (balanceQuery.isFetching) return "查询中…"
+    if (balanceQuery.error) return "查询失败，请稍后重试"
+    const balance = balanceQuery.data
+    if (!balance) return null
+    if (!balance.supported) {
+      return balance.detail ?? "该服务商不支持余额查询"
+    }
+    if (balance.error) return balance.error
+    const symbol = balance.currency === "CNY" ? "¥" : "$"
+    const money =
+      balance.remaining == null
+        ? "未知"
+        : `${symbol}${balance.remaining.toFixed(2)}`
+    return `剩余额度 ${money}${balance.detail ? `（${balance.detail}）` : ""}`
+  })()
 
   return (
-    <div className="flex items-center justify-between rounded-lg border p-4">
+    <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-medium">{provider.name}</span>
@@ -271,8 +290,26 @@ const ProviderRow = ({
           {provider.model_name}
           {provider.base_url ? ` · ${provider.base_url}` : ""}
         </p>
+        {balanceText && (
+          <p
+            data-testid="provider-balance-result"
+            className="mt-1 text-sm text-muted-foreground"
+          >
+            {balanceText}
+          </p>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="provider-balance-button"
+          disabled={balanceQuery.isFetching}
+          onClick={() => balanceQuery.refetch()}
+        >
+          <Wallet />
+          {balanceQuery.isFetching ? "查询中" : "查余额"}
+        </Button>
         <Button
           variant="outline"
           size="sm"

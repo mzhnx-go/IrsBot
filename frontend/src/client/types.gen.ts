@@ -303,6 +303,20 @@ export type PrivateUserCreate = {
 };
 
 /**
+ * 归一化后的余额查询结果（各服务商字段口径不同，统一到这里）。
+ */
+export type ProviderBalanceOut = {
+    supported: boolean;
+    provider?: (string | null);
+    currency?: (string | null);
+    remaining?: (number | null);
+    total?: (number | null);
+    used?: (number | null);
+    detail?: (string | null);
+    error?: (string | null);
+};
+
+/**
  * 创建请求体
  */
 export type ProviderCreate = {
@@ -790,6 +804,12 @@ export type ProvidersCreateProviderData = {
 };
 
 export type ProvidersCreateProviderResponse = (ProviderOut);
+
+export type ProvidersGetProviderBalanceData = {
+    providerId: string;
+};
+
+export type ProvidersGetProviderBalanceResponse = (ProviderBalanceOut);
 
 export type ProvidersUpdateProviderData = {
     providerId: string;
