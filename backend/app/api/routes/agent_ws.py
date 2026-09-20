@@ -441,6 +441,8 @@ async def _run_turn_inner(
                 EventKey.CONVERSATION: conversation,
                 EventKey.USER_MESSAGE: content,
                 EventKey.HISTORY: history,
+                # 只传附件不打字是合法输入：PreProcess 据此放过空正文
+                EventKey.HAS_ATTACHMENTS: bool(att_meta),
             },
         )
     )
@@ -458,6 +460,26 @@ async def _run_turn_inner(
         })
         await ws.send_json({WSMsgKey.TYPE: WSMessageType.DONE})
         return
+
+    # ── 文档正文进模型上下文 ──
+    # 前置 Stage 已把用户输入清洗（去空白、按 4096 截断）写回 USER_MESSAGE，
+    # 以它为基础再拼文档文本：这样长度上限约束的仍是用户输入本身，
+    # 文档正文不会把用户的话挤掉。落库与气泡保持用户原话，不动。
+    # 附件读取失败已在 build_document_context 内部降级成说明性文字，不抛错。
+    user_text = context.event_data[EventKey.USER_MESSAGE]
+    doc_context = await attachments.build_document_context(
+        att_meta,
+        user_id=current_user.id,
+        conversation_id=conversation_id,
+    )
+    if doc_context:
+        model_content = f"{user_text}\n\n{doc_context}" if user_text else doc_context
+    elif att_meta:
+        # 只有图片附件（或全部解析不出文字）：给模型一句实话，别伪造用户话
+        model_content = user_text or "（用户只发送了附件，没有文字说明）"
+    else:
+        model_content = user_text
+    context.event_data[EventKey.USER_MESSAGE] = model_content
 
     agent = Agent(
         session=session,

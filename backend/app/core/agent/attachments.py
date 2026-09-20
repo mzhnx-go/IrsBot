@@ -197,6 +197,44 @@ def is_allowed_document(filename: str | None) -> bool:
     return extension_of(filename) in ALLOWED_DOC_EXTENSIONS
 
 
+async def build_document_context(
+    meta: list[dict],
+    *,
+    user_id: uuid.UUID | str,
+    conversation_id: uuid.UUID | str,
+) -> str:
+    """把文档附件解析成"随消息一起送模型"的文本块。
+
+    文档正文**不进历史上下文**（只在本轮有效）。这里刻意不缓存解析结果：
+    解析产物动辄上万字，存进消息表既撑大数据库，又会在历史回放时
+    被反复重放——重解析一次是更小的代价。
+
+    Returns:
+        拼好的文本块；没有文档附件时返回空串。
+    """
+    blocks: list[str] = []
+    for item in meta:
+        if item.get("kind") != KIND_DOCUMENT:
+            continue
+        att_id = item.get("id")
+        filename = item.get("filename") or "附件"
+        path = resolve(
+            user_id=user_id, conversation_id=conversation_id, att_id=str(att_id)
+        )
+        if path is None:
+            blocks.append(f"【附件：{filename}】\n（文件已失效，无法读取）")
+            continue
+        try:
+            text, truncated = await read_document_text(path)
+        except Exception:
+            logger.exception("附件读取失败: %s", filename)
+            blocks.append(f"【附件：{filename}】\n（解析失败，无法读取内容）")
+            continue
+        suffix = "\n（内容过长已截断）" if truncated else ""
+        blocks.append(f"【附件：{filename}】\n{text}{suffix}")
+    return "\n\n".join(blocks)
+
+
 def remove_conversation_dir(
     user_id: uuid.UUID | str, conversation_id: uuid.UUID | str
 ) -> None:

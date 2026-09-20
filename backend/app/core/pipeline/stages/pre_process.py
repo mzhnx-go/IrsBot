@@ -13,7 +13,8 @@ class PreProcessStage(Stage):
     async def process(self, context: PipelineContext) -> PipelineContext | None:
         text = str(context.event_data.get(EventKey.USER_MESSAGE, ""))
         text = text.strip()
-        if not text:
+        # 只传附件不打字是合法输入：正文可以为空，内容在附件里
+        if not text and not context.event_data.get(EventKey.HAS_ATTACHMENTS):
             context.stop_propagation()
             context.event_data[EventKey.ERROR] = "用户消息为空"
             return context

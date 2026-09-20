@@ -88,6 +88,20 @@ async def test_preprocess_rejects_empty():
 
 
 @pytest.mark.asyncio
+async def test_preprocess_allows_empty_text_with_attachments():
+    """只发附件不打字：正文为空仍应放行（内容在附件里）"""
+    stage = PreProcessStage(max_len=10)
+    ctx = make_context()
+    ctx.event_data[EventKey.USER_MESSAGE] = "  "
+    ctx.event_data[EventKey.HAS_ATTACHMENTS] = True
+
+    result = await stage.process(ctx)
+
+    assert result.stopped is False
+    assert EventKey.ERROR not in result.event_data
+
+
+@pytest.mark.asyncio
 async def test_preprocess_truncates_long():
     stage = PreProcessStage(max_len=10)
     ctx = make_context()

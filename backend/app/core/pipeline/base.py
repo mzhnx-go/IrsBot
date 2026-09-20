@@ -17,6 +17,9 @@ class EventKey:
     AGENT_RESULT = "agent_result"
     RATE_LIMITED = "rate_limited"
     ERROR = "error"
+    #: 本轮是否带附件。带附件的消息允许正文为空（只传文件不打字），
+    #: PreProcess 的空消息校验要据此放行。
+    HAS_ATTACHMENTS = "has_attachments"
 
 
 class PipelineContext(BaseModel):
