@@ -15,6 +15,7 @@ from sqlmodel import select
 # ── 项目内部 ──
 from app.api.deps import CurrentUser, SessionDep
 from app.core import crud
+from app.core.agent import attachments
 from app.core.agent.conversation import ConversationManager
 from app.core.agent.export import render_export
 from app.core.db.models import Conversation
@@ -185,6 +186,8 @@ def delete_conversation(
     )
     if not deleted:
         raise HTTPException(status_code=404, detail="对话不存在")
+    # 附件随会话删除而删（附件目录按 用户/会话 两级组织，整目录清掉即可）
+    attachments.remove_conversation_dir(current_user.id, conversation_id)
     return {"message": "对话已删除"}
 
 

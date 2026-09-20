@@ -152,6 +152,18 @@ class Settings(BaseSettings):
     # 超过该天数的记录由惰性清理真正删除（见 routes/knowledge_base.py）。
     KB_TRASH_RETENTION_DAYS: int = 30
 
+    # ── 聊天附件配置 ───────────────────────────────────────────
+    # 附件落盘根目录，按 {user_id}/{conversation_id}/ 两级组织，
+    # 删会话时整目录清理（见 core/agent/attachments.py）。
+    CHAT_ATTACHMENT_DIR: str = "./uploads/chat_attachments"
+    # 文档附件解析后注入上下文的最大字符数：超出即截断并回报 truncated。
+    # 与 CONTEXT_MAX_TOKENS 是两套预算，前者管单个附件、后者管整轮上下文，
+    # 这里留出足够余量，避免一个超大 PDF 直接吃掉整轮配额。
+    ATTACHMENT_MAX_CHARS: int = 60000
+    # 单文件字节上限（图片/文档分开设：图片要 base64 后进上下文，膨胀约 1/3）
+    ATTACHMENT_MAX_DOC_BYTES: int = 20 * 1024 * 1024
+    ATTACHMENT_MAX_IMAGE_BYTES: int = 10 * 1024 * 1024
+
     # ── MCP 配置 ───────────────────────────────────────────────
     ENABLE_MCP: bool = True
     MCP_TIMEOUT: float = 30.0
