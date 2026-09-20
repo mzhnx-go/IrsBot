@@ -179,6 +179,20 @@ export type KBQueryResponse = {
     context: string;
 };
 
+export type LogEntryOut = {
+    id: number;
+    ts: number;
+    level: string;
+    logger: string;
+    source: string;
+    message: string;
+};
+
+export type LogsOut = {
+    items: Array<LogEntryOut>;
+    latest_id: number;
+};
+
 /**
  * MCP Server 连接测试响应
  * 当用户测试连接MCP Server时返回的结果
@@ -817,6 +831,13 @@ export type LoginResetPasswordData = {
 };
 
 export type LoginResetPasswordResponse = (Message);
+
+export type LogsReadLogsData = {
+    afterId?: number;
+    limit?: number;
+};
+
+export type LogsReadLogsResponse = (LogsOut);
 
 export type PrivateCreateUserData = {
     requestBody: PrivateUserCreate;

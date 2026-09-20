@@ -12,6 +12,21 @@ from starlette.middleware.cors import CORSMiddleware
 
 from app.api.main import api_router
 from app.core.config import settings
+from app.core.logging import setup_logging
+
+# 尽早初始化：prestart / uvicorn 启动期日志才进得了环形缓冲
+setup_logging(settings.LOG_LEVEL)
+
+# 启动横幅（AstrBot 风格）：控制台页打开时有清晰的时间锚点可对齐
+import logging as _logging
+
+_startup_logger = _logging.getLogger("irsbot")
+_startup_logger.info("=" * 52)
+_startup_logger.info("  IrsBot · 本地优先的 Agent 平台")
+_startup_logger.info(
+    f"  环境: {settings.ENVIRONMENT}  WebUI+API 同端口 :8000"
+)
+_startup_logger.info("=" * 52)
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:

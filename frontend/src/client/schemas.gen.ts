@@ -596,6 +596,57 @@ export const KBQueryResponseSchema = {
     title: 'KBQueryResponse'
 } as const;
 
+export const LogEntryOutSchema = {
+    properties: {
+        id: {
+            type: 'integer',
+            title: 'Id'
+        },
+        ts: {
+            type: 'number',
+            title: 'Ts'
+        },
+        level: {
+            type: 'string',
+            title: 'Level'
+        },
+        logger: {
+            type: 'string',
+            title: 'Logger'
+        },
+        source: {
+            type: 'string',
+            title: 'Source'
+        },
+        message: {
+            type: 'string',
+            title: 'Message'
+        }
+    },
+    type: 'object',
+    required: ['id', 'ts', 'level', 'logger', 'source', 'message'],
+    title: 'LogEntryOut'
+} as const;
+
+export const LogsOutSchema = {
+    properties: {
+        items: {
+            items: {
+                '$ref': '#/components/schemas/LogEntryOut'
+            },
+            type: 'array',
+            title: 'Items'
+        },
+        latest_id: {
+            type: 'integer',
+            title: 'Latest Id'
+        }
+    },
+    type: 'object',
+    required: ['items', 'latest_id'],
+    title: 'LogsOut'
+} as const;
+
 export const MCPServerConnectResponseSchema = {
     properties: {
         success: {
