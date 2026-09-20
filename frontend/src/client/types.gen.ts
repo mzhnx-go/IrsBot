@@ -344,6 +344,7 @@ export type ProviderCreate = {
     model_name: string;
     base_url?: (string | null);
     is_default?: boolean;
+    supports_vision?: (boolean | null);
 };
 
 /**
@@ -357,6 +358,7 @@ export type ProviderOut = {
     base_url: (string | null);
     is_default: boolean;
     is_active: boolean;
+    supports_vision?: (boolean | null);
 };
 
 /**
@@ -368,6 +370,7 @@ export type ProviderUpdate = {
     model_name?: (string | null);
     base_url?: (string | null);
     is_default?: (boolean | null);
+    supports_vision?: (boolean | null);
 };
 
 /**

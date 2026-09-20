@@ -1300,6 +1300,17 @@ export const ProviderCreateSchema = {
             type: 'boolean',
             title: 'Is Default',
             default: false
+        },
+        supports_vision: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Supports Vision'
         }
     },
     type: 'object',
@@ -1345,6 +1356,17 @@ export const ProviderOutSchema = {
         is_active: {
             type: 'boolean',
             title: 'Is Active'
+        },
+        supports_vision: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Supports Vision'
         }
     },
     type: 'object',
@@ -1409,6 +1431,17 @@ export const ProviderUpdateSchema = {
                 }
             ],
             title: 'Is Default'
+        },
+        supports_vision: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Supports Vision'
         }
     },
     type: 'object',

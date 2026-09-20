@@ -46,6 +46,8 @@ const formSchema = z.object({
   model_name: z.string().min(1, { message: "模型名必填" }),
   base_url: z.string().optional(),
   is_default: z.boolean(),
+  // 三态：auto=自动（服务端按模型名推断）/ yes / no
+  supports_vision: z.enum(["auto", "yes", "no"]),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -55,6 +57,13 @@ const TYPE_LABELS: Record<string, string> = {
   anthropic: "Anthropic",
   gemini: "Gemini",
 }
+
+/** 三态 ↔ API 的 bool | null 互转（表单用字符串，接口用布尔/空） */
+const VISION_TO_FORM = (v: boolean | null | undefined) =>
+  v === true ? "yes" : v === false ? "no" : "auto"
+
+const VISION_FROM_FORM = (v: "auto" | "yes" | "no") =>
+  v === "auto" ? null : v === "yes"
 
 const AddProviderDialog = ({
   initialOpen = false,
@@ -74,6 +83,7 @@ const AddProviderDialog = ({
       model_name: "",
       base_url: "",
       is_default: false,
+      supports_vision: "auto",
     },
   })
 
@@ -86,6 +96,7 @@ const AddProviderDialog = ({
         model_name: data.model_name,
         base_url: data.base_url || undefined,
         is_default: data.is_default,
+        supports_vision: VISION_FROM_FORM(data.supports_vision),
       },
       {
         onSuccess: () => {
@@ -213,6 +224,35 @@ const AddProviderDialog = ({
 
               <FormField
                 control={form.control}
+                name="supports_vision"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>视觉能力</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="选择视觉能力" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="auto">
+                          自动判断（按模型名）
+                        </SelectItem>
+                        <SelectItem value="yes">支持视觉</SelectItem>
+                        <SelectItem value="no">不支持视觉</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      传图片时据此决定：支持则把图片直接发给模型，否则提示当前
+                      模型看不了图。
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="is_default"
                 render={({ field }) => (
                   <FormItem className="flex items-center gap-2">
@@ -249,12 +289,14 @@ interface ProviderRowProps {
   provider: ProviderOut
   onSetDefault: (id: string) => void
   onDelete: (id: string) => void
+  onSetVision: (id: string, value: boolean | null) => void
 }
 
 const ProviderRow = ({
   provider,
   onSetDefault,
   onDelete,
+  onSetVision,
 }: ProviderRowProps) => {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const { balanceQuery } = useProviderBalance(provider.id)
@@ -304,6 +346,28 @@ const ProviderRow = ({
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        <Select
+          value={VISION_TO_FORM(provider.supports_vision)}
+          onValueChange={(v) =>
+            onSetVision(
+              provider.id,
+              VISION_FROM_FORM(v as "auto" | "yes" | "no"),
+            )
+          }
+        >
+          <SelectTrigger
+            className="w-[7.5rem]"
+            aria-label="视觉能力"
+            data-testid="provider-vision-select"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">自动判断</SelectItem>
+            <SelectItem value="yes">支持视觉</SelectItem>
+            <SelectItem value="no">不支持视觉</SelectItem>
+          </SelectContent>
+        </Select>
         <Button
           variant="outline"
           size="sm"
@@ -400,6 +464,12 @@ const ProviderSettings = ({
                 })
               }
               onDelete={(id) => deleteProvider.mutate(id)}
+              onSetVision={(id, value) =>
+                updateProvider.mutate({
+                  providerId: id,
+                  body: { supports_vision: value },
+                })
+              }
             />
           ))}
         </div>
