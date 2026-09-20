@@ -599,6 +599,47 @@ const ProviderDetail = ({ provider }: ProviderDetailProps) => {
           </Select>
         </SettingRow>
       </div>
+
+      {/* 高级配置（前端占位，功能待实现）：
+          需要后端在 ProviderConfig 增加对应列并提供 PATCH 语义后才能启用，
+          参照 AstrBot：超时时间 / 代理地址 / 自定义请求头 */}
+      <h4 className="mt-6 flex items-center gap-2 text-base font-semibold">
+        高级配置…
+        <Badge variant="outline" className="font-normal text-muted-foreground">
+          待实现
+        </Badge>
+      </h4>
+      <div>
+        <SettingRow label="超时时间" description="超时时间，单位为秒。">
+          <Input disabled placeholder="120" title="待实现" />
+        </SettingRow>
+        <SettingRow
+          label="代理地址"
+          description="HTTP/HTTPS 代理地址，仅对该提供商的 API 请求生效。"
+        >
+          <Input
+            disabled
+            placeholder="http://127.0.0.1:7890"
+            title="待实现"
+          />
+        </SettingRow>
+        <SettingRow
+          label="自定义请求头"
+          description="键值对将合并到该提供商的 HTTP 请求头中，值必须为字符串。"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm text-muted-foreground">暂无项目</span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              title="待实现"
+            >
+              修改
+            </Button>
+          </div>
+        </SettingRow>
+      </div>
     </div>
   )
 }
