@@ -103,6 +103,14 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* 代码高亮（GitHub light 配色） */
+  --hljs-comment: #6e7781;
+  --hljs-keyword: #cf222e;
+  --hljs-string: #0a3069;
+  --hljs-number: #0550ae;
+  --hljs-title: #8250df;
+  --hljs-attr: #0550ae;
+  --hljs-meta: #1f2328;
 }
 
 .dark {
@@ -139,6 +147,14 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  /* 代码高亮（GitHub dark 配色） */
+  --hljs-comment: #8b949e;
+  --hljs-keyword: #ff7b72;
+  --hljs-string: #a5d6ff;
+  --hljs-number: #79c0ff;
+  --hljs-title: #d2a8ff;
+  --hljs-attr: #79c0ff;
+  --hljs-meta: #e6edf3;
 }
 
 @layer base {
@@ -171,4 +187,56 @@
       animation: none;
     }
   }
+}
+
+/* 聊天 Markdown 代码高亮 token 配色（rehype-highlight 输出 hljs-* 类）。
+   只上色不动版式；配色随 .dark 切换（见上方 --hljs-* 变量）。 */
+.chat-markdown .hljs-comment,
+.chat-markdown .hljs-quote {
+  color: var(--hljs-comment);
+  font-style: italic;
+}
+.chat-markdown .hljs-keyword,
+.chat-markdown .hljs-selector-tag,
+.chat-markdown .hljs-literal,
+.chat-markdown .hljs-doctag,
+.chat-markdown .hljs-operator {
+  color: var(--hljs-keyword);
+}
+.chat-markdown .hljs-string,
+.chat-markdown .hljs-regexp,
+.chat-markdown .hljs-addition,
+.chat-markdown .hljs-template-variable {
+  color: var(--hljs-string);
+}
+.chat-markdown .hljs-number,
+.chat-markdown .hljs-variable,
+.chat-markdown .hljs-deletion {
+  color: var(--hljs-number);
+}
+.chat-markdown .hljs-title,
+.chat-markdown .hljs-title.function_,
+.chat-markdown .hljs-title.class_,
+.chat-markdown .hljs-section,
+.chat-markdown .hljs-built_in {
+  color: var(--hljs-title);
+}
+.chat-markdown .hljs-attr,
+.chat-markdown .hljs-attribute,
+.chat-markdown .hljs-property,
+.chat-markdown .hljs-symbol,
+.chat-markdown .hljs-type {
+  color: var(--hljs-attr);
+}
+.chat-markdown .hljs-meta,
+.chat-markdown .hljs-name,
+.chat-markdown .hljs-bullet,
+.chat-markdown .hljs-link {
+  color: var(--hljs-meta);
+}
+.chat-markdown .hljs-emphasis {
+  font-style: italic;
+}
+.chat-markdown .hljs-strong {
+  font-weight: 600;
 }

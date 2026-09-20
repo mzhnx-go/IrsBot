@@ -1,9 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { ArrowUp } from "lucide-react"
-import { type FormEvent, useEffect, useState } from "react"
-
+import { type FormEvent, useEffect, useRef, useState } from "react"
 import { AgentService } from "@/client"
+import MarkdownContent from "@/components/Chat/MarkdownContent"
 import { type ChatMessage, useAgentChat } from "@/hooks/useAgentChat"
 
 export const Route = createFileRoute("/_layout/chat")({
@@ -74,6 +74,15 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
     useAgentChat(conversationId)
   const [input, setInput] = useState("")
   const queryClient = useQueryClient()
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  // 新消息/流式增量时贴底；用户已上滑阅读历史时不打断
+  useEffect(() => {
+    const el = document.documentElement
+    const nearBottom =
+      el.scrollHeight - window.scrollY - window.innerHeight < 160
+    if (nearBottom) bottomRef.current?.scrollIntoView({ block: "end" })
+  }, [messages])
 
   // 一轮对话结束（done）→ 刷新侧边栏列表：
   // 首条消息可能刚生成了新标题，且该会话的 updated_at 已变，应浮到最前
@@ -106,6 +115,7 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
             {messages.map((m) => (
               <MessageBubble key={m.id} message={m} />
             ))}
+            <div ref={bottomRef} />
           </div>
         )}
       </div>
@@ -163,7 +173,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         className={
           isUser
             ? "max-w-[80%] rounded-2xl rounded-br-sm bg-[var(--chat-accent)] px-4 py-2.5 text-sm leading-6 text-white"
-            : "max-w-[80%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-sm leading-6 text-foreground"
+            : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-foreground"
         }
       >
         {/* 工具调用状态行（AI 消息且有工具调用时显示） */}
@@ -172,7 +182,14 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             [{tc.phase === "start" ? "调用" : "完成"}] {tc.name}
           </p>
         ))}
-        <p className="whitespace-pre-wrap">{message.content}</p>
+        {isUser ? (
+          <p className="whitespace-pre-wrap">{message.content}</p>
+        ) : (
+          <MarkdownContent
+            content={message.content}
+            streaming={message.streaming}
+          />
+        )}
       </div>
     </div>
   )
