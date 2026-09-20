@@ -20,6 +20,7 @@ import { Route as LayoutKnowledgeBaseRouteImport } from './routes/_layout/knowle
 import { Route as LayoutMcpRouteImport } from './routes/_layout/mcp'
 import { Route as LayoutProvidersRouteImport } from './routes/_layout/providers'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
+import { Route as LayoutSkillsRouteImport } from './routes/_layout/skills'
 import { Route as LayoutKnowledgeBaseIndexRouteImport } from './routes/_layout/knowledge-base.index'
 import { Route as LayoutKnowledgeBaseKbIdRouteImport } from './routes/_layout/knowledge-base.$kbId'
 import { Route as LayoutKnowledgeBaseTrashRouteImport } from './routes/_layout/knowledge-base.trash'
@@ -78,6 +79,11 @@ const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutSkillsRoute = LayoutSkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutKnowledgeBaseIndexRoute =
   LayoutKnowledgeBaseIndexRouteImport.update({
     id: '/',
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof LayoutMcpRoute
   '/providers': typeof LayoutProvidersRoute
   '/settings': typeof LayoutSettingsRoute
+  '/skills': typeof LayoutSkillsRoute
   '/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
   '/knowledge-base/trash': typeof LayoutKnowledgeBaseTrashRoute
   '/knowledge-base/': typeof LayoutKnowledgeBaseIndexRoute
@@ -120,6 +127,7 @@ export interface FileRoutesByTo {
   '/mcp': typeof LayoutMcpRoute
   '/providers': typeof LayoutProvidersRoute
   '/settings': typeof LayoutSettingsRoute
+  '/skills': typeof LayoutSkillsRoute
   '/': typeof LayoutIndexRoute
   '/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
   '/knowledge-base/trash': typeof LayoutKnowledgeBaseTrashRoute
@@ -137,6 +145,7 @@ export interface FileRoutesById {
   '/_layout/mcp': typeof LayoutMcpRoute
   '/_layout/providers': typeof LayoutProvidersRoute
   '/_layout/settings': typeof LayoutSettingsRoute
+  '/_layout/skills': typeof LayoutSkillsRoute
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
   '/_layout/knowledge-base/trash': typeof LayoutKnowledgeBaseTrashRoute
@@ -155,6 +164,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/providers'
     | '/settings'
+    | '/skills'
     | '/knowledge-base/$kbId'
     | '/knowledge-base/trash'
     | '/knowledge-base/'
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/mcp'
     | '/providers'
     | '/settings'
+    | '/skills'
     | '/'
     | '/knowledge-base/$kbId'
     | '/knowledge-base/trash'
@@ -184,6 +195,7 @@ export interface FileRouteTypes {
     | '/_layout/mcp'
     | '/_layout/providers'
     | '/_layout/settings'
+    | '/_layout/skills'
     | '/_layout/'
     | '/_layout/knowledge-base/$kbId'
     | '/_layout/knowledge-base/trash'
@@ -276,6 +288,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutSettingsRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/skills': {
+      id: '/_layout/skills'
+      path: '/skills'
+      fullPath: '/skills'
+      preLoaderRoute: typeof LayoutSkillsRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/knowledge-base/': {
       id: '/_layout/knowledge-base/'
       path: '/'
@@ -322,6 +341,7 @@ interface LayoutRouteChildren {
   LayoutMcpRoute: typeof LayoutMcpRoute
   LayoutProvidersRoute: typeof LayoutProvidersRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
+  LayoutSkillsRoute: typeof LayoutSkillsRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
 }
 
@@ -332,6 +352,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutMcpRoute: LayoutMcpRoute,
   LayoutProvidersRoute: LayoutProvidersRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
+  LayoutSkillsRoute: LayoutSkillsRoute,
   LayoutIndexRoute: LayoutIndexRoute,
 }
 
