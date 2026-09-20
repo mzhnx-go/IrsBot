@@ -373,6 +373,11 @@ export type ProviderOut = {
     is_default: boolean;
     is_active: boolean;
     supports_vision?: (boolean | null);
+    timeout_seconds?: number;
+    proxy_url?: (string | null);
+    extra_headers?: {
+        [key: string]: (string);
+    };
 };
 
 /**
@@ -385,6 +390,11 @@ export type ProviderUpdate = {
     base_url?: (string | null);
     is_default?: (boolean | null);
     supports_vision?: (boolean | null);
+    timeout_seconds?: (number | null);
+    proxy_url?: (string | null);
+    extra_headers?: ({
+    [key: string]: (string);
+} | null);
 };
 
 /**

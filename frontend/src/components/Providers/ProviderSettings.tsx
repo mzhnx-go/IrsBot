@@ -478,8 +478,28 @@ const ProviderDetail = ({ provider }: ProviderDetailProps) => {
     "auto" | "yes" | "no"
   >(VISION_TO_FORM(provider.supports_vision))
 
+  // 高级配置（后端已支持，存 config JSON）：超时 / 代理 / 自定义请求头
+  const [timeoutSeconds, setTimeoutSeconds] = useState(
+    String(provider.timeout_seconds ?? 120),
+  )
+  const [proxyUrl, setProxyUrl] = useState(provider.proxy_url ?? "")
+  // 请求头编辑器：键值对数组（空键行保存时忽略）
+  const [headers, setHeaders] = useState<{ k: string; v: string }[]>(
+    Object.entries(provider.extra_headers ?? {}).map(([k, v]) => ({
+      k,
+      v: String(v),
+    })),
+  )
+  const [headersEditing, setHeadersEditing] = useState(false)
+
   const handleSave = () => {
     if (!name.trim() || !modelName.trim()) return
+    // 请求头：过滤空键行后组回对象
+    const headerDict = Object.fromEntries(
+      headers
+        .filter((h) => h.k.trim())
+        .map((h) => [h.k.trim(), h.v]),
+    )
     updateProvider.mutate({
       providerId: provider.id,
       body: {
@@ -488,6 +508,9 @@ const ProviderDetail = ({ provider }: ProviderDetailProps) => {
         base_url: baseUrl.trim() || undefined,
         is_default: isDefault,
         supports_vision: VISION_FROM_FORM(supportsVision),
+        timeout_seconds: Number(timeoutSeconds) || 120,
+        proxy_url: proxyUrl.trim(),
+        extra_headers: headerDict,
         // 留空不提交，避免把占位串当新 Key 覆盖掉密文
         ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
       },
@@ -600,44 +623,108 @@ const ProviderDetail = ({ provider }: ProviderDetailProps) => {
         </SettingRow>
       </div>
 
-      {/* 高级配置（前端占位，功能待实现）：
-          需要后端在 ProviderConfig 增加对应列并提供 PATCH 语义后才能启用，
-          参照 AstrBot：超时时间 / 代理地址 / 自定义请求头 */}
+      {/* 高级配置：随「保存配置」一并提交（后端存 config JSON） */}
       <h4 className="mt-6 flex items-center gap-2 text-base font-semibold">
         高级配置…
-        <Badge variant="outline" className="font-normal text-muted-foreground">
-          待实现
-        </Badge>
       </h4>
       <div>
-        <SettingRow label="超时时间" description="超时时间，单位为秒。">
-          <Input disabled placeholder="120" title="待实现" />
+        <SettingRow label="超时时间" description="超时时间，单位为秒（5–600）。">
+          <Input
+            type="number"
+            min={5}
+            max={600}
+            value={timeoutSeconds}
+            onChange={(e) => setTimeoutSeconds(e.target.value)}
+          />
         </SettingRow>
         <SettingRow
           label="代理地址"
-          description="HTTP/HTTPS 代理地址，仅对该提供商的 API 请求生效。"
+          description="HTTP/HTTPS 代理地址，仅对该提供商的 API 请求生效。留空为直连。"
         >
           <Input
-            disabled
+            value={proxyUrl}
+            onChange={(e) => setProxyUrl(e.target.value)}
             placeholder="http://127.0.0.1:7890"
-            title="待实现"
           />
         </SettingRow>
         <SettingRow
           label="自定义请求头"
           description="键值对将合并到该提供商的 HTTP 请求头中，值必须为字符串。"
         >
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm text-muted-foreground">暂无项目</span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              title="待实现"
-            >
-              修改
-            </Button>
-          </div>
+          {headersEditing ? (
+            <div className="flex flex-col gap-2">
+              {headers.map((h, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    className="flex-1"
+                    placeholder="键（如 X-Trace-Id）"
+                    value={h.k}
+                    onChange={(e) =>
+                      setHeaders((prev) =>
+                        prev.map((p, j) =>
+                          j === i ? { ...p, k: e.target.value } : p,
+                        ),
+                      )
+                    }
+                  />
+                  <Input
+                    className="flex-1"
+                    placeholder="值"
+                    value={h.v}
+                    onChange={(e) =>
+                      setHeaders((prev) =>
+                        prev.map((p, j) =>
+                          j === i ? { ...p, v: e.target.value } : p,
+                        ),
+                      )
+                    }
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+                    aria-label="移除请求头"
+                    onClick={() =>
+                      setHeaders((prev) => prev.filter((_, j) => j !== i))
+                    }
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setHeaders((prev) => [...prev, { k: "", v: "" }])}
+                >
+                  <Plus className="mr-1" />
+                  添加
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setHeadersEditing(false)}
+                >
+                  完成
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm text-muted-foreground">
+                {headers.length === 0
+                  ? "暂无项目"
+                  : `${headers.length} 个请求头：${headers.map((h) => h.k).join("、")}`}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setHeadersEditing(true)}
+              >
+                修改
+              </Button>
+            </div>
+          )}
         </SettingRow>
       </div>
 

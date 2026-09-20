@@ -1418,6 +1418,30 @@ export const ProviderOutSchema = {
                 }
             ],
             title: 'Supports Vision'
+        },
+        timeout_seconds: {
+            type: 'integer',
+            title: 'Timeout Seconds',
+            default: 120
+        },
+        proxy_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Proxy Url'
+        },
+        extra_headers: {
+            additionalProperties: {
+                type: 'string'
+            },
+            type: 'object',
+            title: 'Extra Headers',
+            default: {}
         }
     },
     type: 'object',
@@ -1493,6 +1517,44 @@ export const ProviderUpdateSchema = {
                 }
             ],
             title: 'Supports Vision'
+        },
+        timeout_seconds: {
+            anyOf: [
+                {
+                    type: 'integer',
+                    maximum: 600,
+                    minimum: 5
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Timeout Seconds'
+        },
+        proxy_url: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Proxy Url'
+        },
+        extra_headers: {
+            anyOf: [
+                {
+                    additionalProperties: {
+                        type: 'string'
+                    },
+                    type: 'object'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Extra Headers'
         }
     },
     type: 'object',
