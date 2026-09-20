@@ -6,6 +6,7 @@ import {
   OpenAPI,
 } from "@/client"
 import useCustomToast from "@/hooks/useCustomToast"
+import { closeChatConnection } from "@/hooks/useAgentChat"
 import { handleError } from "@/utils"
 
 /** 导出格式：直接取自 OpenAPI 生成的类型，前端不再手抄一份字符串联合 */
@@ -117,7 +118,9 @@ const useConversations = () => {
   const deleteConversation = useMutation({
     mutationFn: (conversationId: string) =>
       AgentService.deleteConversation({ conversationId }),
-    onSuccess: () => {
+    onSuccess: (_data, conversationId) => {
+      // 该会话的 WS 连接（可能在后台正生成）一并关闭，避免残留
+      closeChatConnection(conversationId)
       showSuccessToast("对话已删除")
     },
     onError: handleError.bind(showErrorToast),

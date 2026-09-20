@@ -2,6 +2,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router"
 import {
   Download,
   ListChecks,
+  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -42,6 +43,7 @@ import {
 import useConversations, {
   type ConversationExportFormat,
 } from "@/hooks/useConversations"
+import { useGeneratingConversationIds } from "@/hooks/useChatActivity"
 
 /** 导出格式下拉项。value 必须是后端 Literal 支持的取值，label 只负责展示 */
 const EXPORT_FORMATS: { value: ConversationExportFormat; label: string }[] = [
@@ -78,6 +80,9 @@ export function ConversationList() {
   const activeId = search.c
 
   const conversations = conversationsQuery.data ?? []
+
+  // 正在流式生成的会话（聊天页经 useChatActivity 登记）→ 行尾转圈指示
+  const generatingIds = useGeneratingConversationIds()
 
   // ── 各弹窗状态（互相独立，同一时刻最多开一个） ──
   // 待删除（单个）
@@ -190,6 +195,7 @@ export function ConversationList() {
               const isExporting =
                 exportConversation.isPending &&
                 exportConversation.variables?.conversationId === conv.id
+              const isGenerating = generatingIds.includes(conv.id)
 
               return (
                 <SidebarMenuItem key={conv.id}>
@@ -201,6 +207,18 @@ export function ConversationList() {
                   >
                     <span className="truncate">{conv.title}</span>
                   </SidebarMenuButton>
+
+                  {/* 生成中状态指示器：常驻显示，hover 时隐去给「…」菜单让位
+                      （两者都定位在行尾同一位置）。移动端「…」常显，指示器让位。 */}
+                  {isGenerating && (
+                    <span
+                      data-testid="conversation-generating"
+                      title="回复生成中…"
+                      className="pointer-events-none absolute top-1.5 right-1.5 hidden aspect-square w-5 items-center justify-center transition-opacity group-hover/menu-item:opacity-0 md:flex"
+                    >
+                      <Loader2 className="size-4 shrink-0 animate-spin text-emerald-500" />
+                    </span>
+                  )}
 
                   {/* 「…」菜单：hover 或选中时浮出（showOnHover 由 sidebar 组件内置） */}
                   <DropdownMenu>

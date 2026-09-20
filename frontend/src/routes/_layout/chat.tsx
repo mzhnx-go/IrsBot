@@ -69,7 +69,8 @@ function ChatPage() {
     )
   }
 
-  // key=conversationId：切换会话时整个聊天室（含 WS 连接）重建
+  // key=conversationId：切换会话时重建聊天室视图（输入框/附件等局部状态归零）。
+  // WS 连接不在组件树里（chatConnectionManager 持有），切走后旧会话继续在后台生成。
   return <ChatRoom key={conversationId} conversationId={conversationId} />
 }
 
@@ -116,12 +117,21 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
   }, [messages])
 
   // 一轮对话结束（done）→ 刷新侧边栏列表：
-  // 首条消息可能刚生成了新标题，且该会话的 updated_at 已变，应浮到最前
+  // 首条消息可能刚生成了新标题，且该会话的 updated_at 已变，应浮到最前。
+  // 可见会话由 isStreaming 复位覆盖；**后台并行会话**的收尾经
+  // window 事件（irsbot:turn-done，连接管理器派发）送达，这里一并刷新。
   useEffect(() => {
     if (!isStreaming) {
       queryClient.invalidateQueries({ queryKey: ["conversations"] })
     }
   }, [isStreaming, queryClient])
+
+  useEffect(() => {
+    const onTurnDone = () =>
+      queryClient.invalidateQueries({ queryKey: ["conversations"] })
+    window.addEventListener("irsbot:turn-done", onTurnDone)
+    return () => window.removeEventListener("irsbot:turn-done", onTurnDone)
+  }, [queryClient])
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()

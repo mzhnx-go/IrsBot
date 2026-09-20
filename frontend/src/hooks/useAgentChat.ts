@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useSyncExternalStore } from "react"
 import { toast } from "sonner"
 
 import { AgentService } from "@/client"
+import { setConversationGenerating } from "@/hooks/useChatActivity"
 
 export interface ToolCall {
   name: string
@@ -58,370 +59,484 @@ export type ConnectionState = "connecting" | "open" | "reconnecting" | "closed"
 // 重连退避：指数增长封顶，超过上限判定为彻底断开
 const MAX_RECONNECT = 6
 
-// 模块级：useCustomToast 每次渲染返回新函数，不能进 WS effect 的依赖
-// （否则 effect 反复重建 → 重连风暴）。全中文文案，不复用其英文标题。
+// 同时保留的会话连接数上限（超出淘汰最久不活跃的空闲连接）。
+// 每个连接常驻一份消息数组，10 个对内存毫无压力，又足够覆盖
+// 「同时开多个会话并行生成」的真实用法。
+const MAX_CONNECTIONS = 10
+
+// 模块级：useCustomToast 每次渲染返回新函数，不能进 WS 回调；
+// 全中文文案，不复用其英文标题。
 const errorToast = (description: string) => {
   toast.error(description)
 }
 
-export function useAgentChat(conversationId: string) {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [connState, setConnState] = useState<ConnectionState>("connecting")
-  const [isStreaming, setIsStreaming] = useState(false)
+export interface AgentChatState {
+  messages: ChatMessage[]
+  connState: ConnectionState
+  isStreaming: boolean
+  isConnected: boolean
+}
 
-  const wsRef = useRef<WebSocket | null>(null)
+/**
+ * 单个会话的聊天连接：WS 生命周期 + 消息流状态，**独立于 React 组件树**。
+ *
+ * 这是「多会话并行生成」的核心：以前 WS 挂在聊天页组件的 effect 里，
+ * 切走会话 → 组件卸载 → 连接关闭 → 后端收到断开**取消生成任务**。
+ * 现在连接常驻本管理器，切换会话只是换一个订阅对象，后台会话继续生成，
+ * 侧边栏的「生成中」指示器（useChatActivity）对后台会话同样生效。
+ */
+class ChatConnection {
+  readonly conversationId: string
+  private listeners = new Set<() => void>()
 
-  const isConnected = connState === "open"
+  private _messages: ChatMessage[] = []
+  private _connState: ConnectionState = "connecting"
+  private _isStreaming = false
 
-  useEffect(() => {
-    // 给"最后一条 assistant 消息"追加文字；没有就新建一条
-    const appendAssistantChunk = (chunk: string) => {
-      setMessages((prev) => {
+  /** 缓存的不可变快照：getSnapshot 必须返回同一引用（useSyncExternalStore 约定） */
+  private snapshot: AgentChatState
+
+  private ws: WebSocket | null = null
+  private closedIntentionally = false
+  private attempt = 0
+  private reconnectTimer: number | undefined
+  lastActive = Date.now()
+
+  constructor(conversationId: string) {
+    this.conversationId = conversationId
+    this.snapshot = {
+      messages: this._messages,
+      connState: this._connState,
+      isStreaming: this._isStreaming,
+      isConnected: false,
+    }
+    this.connect()
+  }
+
+  // ── 订阅（useSyncExternalStore） ─────────────────────────────
+
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener)
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+
+  getSnapshot = () => this.snapshot
+
+  private emit() {
+    this.snapshot = {
+      messages: this._messages,
+      connState: this._connState,
+      isStreaming: this._isStreaming,
+      isConnected: this._connState === "open",
+    }
+    for (const listener of this.listeners) listener()
+  }
+
+  private setMessages(update: (prev: ChatMessage[]) => ChatMessage[]) {
+    this._messages = update(this._messages)
+    this.emit()
+  }
+
+  private setConnState(state: ConnectionState) {
+    this._connState = state
+    this.emit()
+  }
+
+  private setStreaming(value: boolean) {
+    if (this._isStreaming === value) return
+    this._isStreaming = value
+    // 侧边栏「生成中」指示器的全局登记：后台会话也在跟踪范围内
+    setConversationGenerating(this.conversationId, value)
+    this.emit()
+  }
+
+  // ── WS 建连与消息处理 ────────────────────────────────────────
+
+  private connect() {
+    // WebSocket 地址必须**动态**从当前页面推导（同源 + ws/wss 自适应），
+    // 不能烤进构建产物；详见旧实现的推导注释。
+    const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:"
+    const wsUrl =
+      `${wsProtocol}//${location.host}` +
+      `/api/v1/agent/chat/ws/${this.conversationId}` +
+      `?token=${localStorage.getItem("access_token")}`
+
+    this.closedIntentionally = false
+    this.setConnState(this.attempt === 0 ? "connecting" : "reconnecting")
+    const ws = new WebSocket(wsUrl)
+    this.ws = ws
+
+    ws.onopen = () => {
+      if (this.ws !== ws) return
+      this.attempt = 0
+      this.setConnState("open")
+    }
+
+    ws.onmessage = (event) => {
+      if (this.ws !== ws) return
+      this.handleMessage(JSON.parse(event.data))
+    }
+
+    ws.onclose = (event) => {
+      if (this.ws !== ws || this.closedIntentionally) return
+      this.setStreaming(false)
+      // 4404 = 会话不存在/无权限：重连也没用，直接终态
+      if (event.code === 4404) {
+        this.setConnState("closed")
+        return
+      }
+      if (this.attempt >= MAX_RECONNECT) {
+        this.setConnState("closed")
+        errorToast("连接已断开，请刷新页面重试")
+        return
+      }
+      // 指数退避：1s / 2s / 4s …… 上限 ~13s
+      const delay =
+        Math.min(1000 * 2 ** this.attempt, 13000) + Math.random() * 400
+      this.attempt += 1
+      this.setConnState("reconnecting")
+      this.reconnectTimer = window.setTimeout(() => this.connect(), delay)
+    }
+  }
+
+  private handleMessage(msg: Record<string, unknown>) {
+    const type = msg.type
+    if (type === "history") {
+      // 建连后后端推送的历史消息，据此恢复已有对话（刷新不丢）
+      this._messages = (
+        (msg.messages ?? []) as Array<Record<string, unknown>>
+      ).map((h) => ({
+        id: (h.id as string) ?? crypto.randomUUID(),
+        dbId: h.id as string,
+        role: h.role as "user" | "assistant",
+        content: h.content as string,
+        toolCalls: h.tool_calls as ToolCall[],
+        citations: h.citations as Citation[],
+        attachments: h.attachments as MessageAttachment[],
+        stopped: h.stopped as boolean | undefined,
+        streaming: false,
+      }))
+      this.emit()
+    } else if (type === "text_chunk") {
+      // AI 回复流式生成中，往最后一条 assistant 消息追加文字
+      this.setMessages((prev) => {
         const last = prev[prev.length - 1]
         if (last?.role !== "assistant") {
-          // 新建一条 AI 消息
           return [
             ...prev,
             {
               id: crypto.randomUUID(),
               role: "assistant",
-              content: chunk,
+              content: msg.content as string,
               streaming: true,
             },
           ]
         }
-        // 在后面续字
         return [
           ...prev.slice(0, -1),
-          { ...last, content: last.content + chunk },
+          { ...last, content: last.content + (msg.content as string) },
         ]
       })
-    }
-
-    // ─── 建连 ───
-    // WebSocket 地址必须**动态**从当前页面推导，不能烤进构建产物：
-    //   ws  : 页面是 https 时用 wss（否则浏览器拦截混合内容），否则 ws
-    //   host: 直接用 location.host → 谁在托管页面就连谁（同源）
-    //
-    // ⚠️ 不要写成 import.meta.env.VITE_API_URL.replace(/^http/, "ws")：
-    //    VITE_API_URL 改为相对路径（如 "/api"）后，字符串里没有 "http"，
-    //    正则替换**静默失效** → 得到 "/api/api/v1/..." 这种非法 ws 地址，
-    //    表现为"WebSocket 连不上"但看不出原因。
-    const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:"
-    const wsUrl =
-      `${wsProtocol}//${location.host}` +
-      `/api/v1/agent/chat/ws/${conversationId}` +
-      `?token=${localStorage.getItem("access_token")}`
-
-    // 连接与自动重连：非主动关闭（切换会话/卸载）导致的断开，
-    // 按指数退避重连；后端重连后会重新推 history，前端据此对齐真实落库状态。
-    let closedIntentionally = false
-    let attempt = 0
-    let reconnectTimer: number | undefined
-    let ws: WebSocket
-
-    const connect = () => {
-      setConnState(attempt === 0 ? "connecting" : "reconnecting")
-      ws = new WebSocket(wsUrl)
-      wsRef.current = ws
-
-      // 只让"当前连接"更新状态。
-      // StrictMode 下 effect 会跑两次：旧连接 close 的 onclose 是异步触发的，
-      // 若不判断，会把新连接刚建立的 isConnected=true 覆盖成 false
-      ws.onopen = () => {
-        if (wsRef.current !== ws) return
-        attempt = 0
-        setConnState("open")
-      }
-
-      ws.onmessage = (event) => {
-        if (wsRef.current !== ws) return
-        const msg = JSON.parse(event.data)
-
-        if (msg.type === "history") {
-          // 建连后后端推送的历史消息，据此恢复已有对话（刷新不丢）
-          setMessages(
-            (
-              msg.messages as Array<{
-                id?: string
-                role: "user" | "assistant"
-                content: string
-                tool_calls?: ToolCall[]
-                citations?: Citation[]
-                attachments?: MessageAttachment[]
-                stopped?: boolean
-              }>
-            ).map((h) => ({
-              id: h.id ?? crypto.randomUUID(),
-              dbId: h.id,
-              role: h.role,
-              content: h.content,
-              toolCalls: h.tool_calls,
-              citations: h.citations,
-              attachments: h.attachments,
-              stopped: h.stopped,
-              streaming: false,
-            })),
-          )
-        } else if (msg.type === "text_chunk") {
-          // AI 回复流式生成中，往最后一条 assistant 消息追加文字
-          appendAssistantChunk(msg.content)
-        } else if (msg.type === "tool_call") {
-          // 与后端 merge_tool_trace 同口径：start 追加一条，
-          // end 回填到同名最近一条未完成的 start，面板只留一行。
-          // 注意：工具通常先于任何 text_chunk 触发，此时还没有 assistant
-          // 消息，要先建一条空占位，否则事件会被直接丢掉、面板不出现。
-          setMessages((prev) => {
-            const last = prev[prev.length - 1]
-            const hasAssistant = last?.role === "assistant"
-            const base = hasAssistant ? prev.slice(0, -1) : prev
-            const target: ChatMessage = hasAssistant
-              ? last
-              : {
-                  id: crypto.randomUUID(),
-                  role: "assistant",
-                  content: "",
-                  streaming: true,
-                }
-            const calls = [...(target.toolCalls ?? [])]
-            if (msg.phase === "start") {
-              calls.push({
-                name: msg.name,
-                phase: "start",
-                input: msg.input,
-              })
-            } else {
-              let idx = -1
-              for (let i = calls.length - 1; i >= 0; i--) {
-                if (calls[i].name === msg.name && calls[i].phase === "start") {
-                  idx = i
-                  break
-                }
-              }
-              if (idx >= 0)
-                calls[idx] = {
-                  ...calls[idx],
-                  phase: "end",
-                  output: msg.output,
-                }
-              else
-                calls.push({
-                  name: msg.name,
-                  phase: "end",
-                  output: msg.output,
-                })
-            }
-            return [...base, { ...target, toolCalls: calls }]
-          })
-        } else if (msg.type === "sources") {
-          // RAG 检索来源：挂到最后一条 assistant 消息
-          setMessages((prev) => {
-            const last = prev[prev.length - 1]
-            const hasAssistant = last?.role === "assistant"
-            const base = hasAssistant ? prev.slice(0, -1) : prev
-            const target: ChatMessage = hasAssistant
-              ? last
-              : {
-                  id: crypto.randomUUID(),
-                  role: "assistant",
-                  content: "",
-                  streaming: true,
-                }
-            return [...base, { ...target, citations: msg.citations }]
-          })
-        } else if (msg.type === "done") {
-          // 本轮回复结束；后端回传落库消息 ID，回填给本地乐观消息，
-          // 之后删除/编辑重发/重新生成才能按 ID 调 REST
-          setIsStreaming(false)
-          setMessages((prev) => {
-            let lastUser = -1
-            let lastAssistant = -1
-            prev.forEach((m, i) => {
-              if (m.role === "user") lastUser = i
-              if (m.role === "assistant") lastAssistant = i
-            })
-            return prev.map((m, i) => {
-              let next = m
-              if (m.streaming) next = { ...next, streaming: false }
-              if (i === lastUser && msg.user_message_id)
-                next = { ...next, dbId: msg.user_message_id }
-              if (i === lastAssistant && msg.assistant_message_id)
-                next = { ...next, dbId: msg.assistant_message_id }
-              if (i === lastAssistant && msg.interrupted)
-                next = { ...next, stopped: true }
-              return next
-            })
-          })
-        } else if (msg.type === "error") {
-          // 后端生成异常：中文化提示以红字气泡固定展示（不是一闪而过的 toast）
-          setMessages((prev) => [
-            ...prev,
-            {
+    } else if (type === "tool_call") {
+      // 与后端 merge_tool_trace 同口径：start 追加一条，
+      // end 回填到同名最近一条未完成的 start，面板只留一行。
+      // 注意：工具通常先于任何 text_chunk 触发，此时还没有 assistant
+      // 消息，要先建一条空占位，否则事件会被直接丢掉、面板不出现。
+      this.setMessages((prev) => {
+        const last = prev[prev.length - 1]
+        const hasAssistant = last?.role === "assistant"
+        const base = hasAssistant ? prev.slice(0, -1) : prev
+        const target: ChatMessage = hasAssistant
+          ? last
+          : {
               id: crypto.randomUUID(),
               role: "assistant",
-              content: msg.message || "回复生成失败，请稍后重试。",
-              error: true,
-            },
-          ])
+              content: "",
+              streaming: true,
+            }
+        const calls = [...(target.toolCalls ?? [])]
+        if (msg.phase === "start") {
+          calls.push({
+            name: msg.name as string,
+            phase: "start",
+            input: msg.input as string | undefined,
+          })
+        } else {
+          let idx = -1
+          for (let i = calls.length - 1; i >= 0; i--) {
+            if (calls[i].name === msg.name && calls[i].phase === "start") {
+              idx = i
+              break
+            }
+          }
+          if (idx >= 0)
+            calls[idx] = {
+              ...calls[idx],
+              phase: "end",
+              output: msg.output as string | undefined,
+            }
+          else
+            calls.push({
+              name: msg.name as string,
+              phase: "end",
+              output: msg.output as string | undefined,
+            })
         }
-      }
-
-      ws.onclose = (event) => {
-        if (wsRef.current !== ws || closedIntentionally) return
-        setIsStreaming(false)
-        // 4404 = 会话不存在/无权限：重连也没用，直接终态
-        if (event.code === 4404) {
-          setConnState("closed")
-          return
-        }
-        if (attempt >= MAX_RECONNECT) {
-          setConnState("closed")
-          errorToast("连接已断开，请刷新页面重试")
-          return
-        }
-        // 指数退避：1s / 2s / 4s …… 上限 ~13s
-        const delay = Math.min(1000 * 2 ** attempt, 13000) + Math.random() * 400
-        attempt += 1
-        setConnState("reconnecting")
-        reconnectTimer = window.setTimeout(connect, delay)
-      }
-    }
-
-    connect()
-
-    // ─── 清理：切换会话/卸载时关连接（不再自动重连） ───
-    return () => {
-      closedIntentionally = true
-      if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer)
-      wsRef.current?.close()
-      wsRef.current = null
-    }
-  }, [conversationId])
-
-  /**
-   * 发送一条消息。
-   *
-   * `attachments` 只传 att_id 列表——字节与元数据都由后端自己从磁盘取，
-   * 前端说什么都不算数（见 agent_ws.py 的 _resolve_attachments）。
-   */
-  const sendMessage = useCallback(
-    (content: string, attachments?: MessageAttachment[]) => {
-      const ws = wsRef.current
-      if (!ws || ws.readyState !== WebSocket.OPEN) return
-
-      setMessages((prev) => [
+        return [...base, { ...target, toolCalls: calls }]
+      })
+    } else if (type === "sources") {
+      // RAG 检索来源：挂到最后一条 assistant 消息
+      this.setMessages((prev) => {
+        const last = prev[prev.length - 1]
+        const hasAssistant = last?.role === "assistant"
+        const base = hasAssistant ? prev.slice(0, -1) : prev
+        const target: ChatMessage = hasAssistant
+          ? last
+          : {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: "",
+              streaming: true,
+            }
+        return [...base, { ...target, citations: msg.citations as Citation[] }]
+      })
+    } else if (type === "done") {
+      // 本轮回复结束；后端回传落库消息 ID，回填给本地乐观消息，
+      // 之后删除/编辑重发/重新生成才能按 ID 调 REST
+      this.setStreaming(false)
+      this.setMessages((prev) => {
+        let lastUser = -1
+        let lastAssistant = -1
+        prev.forEach((m, i) => {
+          if (m.role === "user") lastUser = i
+          if (m.role === "assistant") lastAssistant = i
+        })
+        return prev.map((m, i) => {
+          let next = m
+          if (m.streaming) next = { ...next, streaming: false }
+          if (i === lastUser && msg.user_message_id)
+            next = { ...next, dbId: msg.user_message_id as string }
+          if (i === lastAssistant && msg.assistant_message_id)
+            next = { ...next, dbId: msg.assistant_message_id as string }
+          if (i === lastAssistant && msg.interrupted)
+            next = { ...next, stopped: true }
+          return next
+        })
+      })
+      // 通知任意挂载的界面刷新会话列表（后台会话收尾时聊天页感知不到，
+      // 这里用 window 事件解耦：首条消息的新标题 / updated_at 排序都要刷新）
+      window.dispatchEvent(
+        new CustomEvent("irsbot:turn-done", {
+          detail: { conversationId: this.conversationId },
+        }),
+      )
+    } else if (type === "error") {
+      // 后端生成异常：中文化提示以红字气泡固定展示（不是一闪而过的 toast）
+      this.setMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
-          role: "user",
-          content,
-          attachments: attachments?.length ? attachments : undefined,
+          role: "assistant",
+          content: (msg.message as string) || "回复生成失败，请稍后重试。",
+          error: true,
         },
       ])
-      setIsStreaming(true)
+    }
+  }
 
-      ws.send(
-        JSON.stringify({
-          type: "message",
-          content,
-          ...(attachments?.length
-            ? { attachments: attachments.map((a) => ({ id: a.id })) }
-            : {}),
-        }),
-      )
-    },
-    [],
-  )
+  // ── 对外动作（hook 返回的 API） ──────────────────────────────
+
+  /**
+   * 发送一条消息。`attachments` 只传 att_id 列表——字节与元数据都由
+   * 后端自己从磁盘取（见 agent_ws.py 的 _resolve_attachments）。
+   */
+  sendMessage = (content: string, attachments?: MessageAttachment[]) => {
+    const ws = this.ws
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+
+    this.setMessages((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        role: "user",
+        content,
+        attachments: attachments?.length ? attachments : undefined,
+      },
+    ])
+    this.setStreaming(true)
+
+    ws.send(
+      JSON.stringify({
+        type: "message",
+        content,
+        ...(attachments?.length
+          ? { attachments: attachments.map((a) => ({ id: a.id })) }
+          : {}),
+      }),
+    )
+  }
 
   /** 中断当前生成：通知后端 cancel 本轮任务。
    *  真正的收尾（isStreaming 置假、部分回复落库）由后端随后的 done 事件驱动，
    *  这里不本地置状态，避免与 done 竞态导致半成品消息丢失 ID。 */
-  const interrupt = useCallback(() => {
-    const ws = wsRef.current
+  interrupt = () => {
+    const ws = this.ws
     if (!ws || ws.readyState !== WebSocket.OPEN) return
     ws.send(JSON.stringify({ type: "interrupt" }))
-  }, [])
+  }
 
   /** 截断本地状态：删掉 dbId 对应消息及其后的所有消息 */
-  const truncateLocal = useCallback((dbId: string, inclusive: boolean) => {
-    setMessages((prev) => {
+  private truncateLocal = (dbId: string, inclusive: boolean) => {
+    this.setMessages((prev) => {
       const idx = prev.findIndex((m) => m.dbId === dbId)
       if (idx < 0) return prev
       return idx === 0 && inclusive
         ? []
         : prev.slice(0, inclusive ? idx : idx + 1)
     })
-  }, [])
+  }
 
   /** 删除单条消息 */
-  const deleteMessage = useCallback(
-    async (dbId: string) => {
-      try {
-        await AgentService.deleteConversationMessage({
-          conversationId,
-          messageId: dbId,
-        })
-        setMessages((prev) => prev.filter((m) => m.dbId !== dbId))
-      } catch {
-        errorToast("删除消息失败，请重试")
-      }
-    },
-    [conversationId],
-  )
+  deleteMessage = async (dbId: string) => {
+    try {
+      await AgentService.deleteConversationMessage({
+        conversationId: this.conversationId,
+        messageId: dbId,
+      })
+      this.setMessages((prev) => prev.filter((m) => m.dbId !== dbId))
+    } catch {
+      errorToast("删除消息失败，请重试")
+    }
+  }
 
   /** 重新生成：截掉最后一条用户消息及其后回复，重新发送同一问题 */
-  const regenerate = useCallback(async () => {
+  regenerate = async () => {
+    if (this._isStreaming) return
     let target: ChatMessage | undefined
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user") {
-        target = messages[i]
+    for (let i = this._messages.length - 1; i >= 0; i--) {
+      if (this._messages[i].role === "user") {
+        target = this._messages[i]
         break
       }
     }
-    if (!target?.dbId || isStreaming) return
+    if (!target?.dbId) return
     try {
       await AgentService.truncateConversationMessages({
-        conversationId,
+        conversationId: this.conversationId,
         requestBody: { message_id: target.dbId, inclusive: true },
       })
-      truncateLocal(target.dbId, true)
+      this.truncateLocal(target.dbId, true)
       // 带上原附件一起重发：文档内容只在"发送那一刻"进上下文，
       // 不带的话重新生成就变成了"对空文档提问"
-      sendMessage(target.content, target.attachments)
+      this.sendMessage(target.content, target.attachments)
     } catch {
       errorToast("重新生成失败，请重试")
     }
-  }, [messages, isStreaming, conversationId, truncateLocal, sendMessage])
+  }
 
   /** 编辑重发：改用户消息内容并删掉其后的所有消息，重新发送 */
-  const editAndResend = useCallback(
-    async (dbId: string, newContent: string) => {
-      if (isStreaming) return
-      const target = messages.find((m) => m.dbId === dbId)
-      try {
-        await AgentService.truncateConversationMessages({
-          conversationId,
-          requestBody: { message_id: dbId, inclusive: true },
-        })
-        truncateLocal(dbId, true)
-        // 附件文件仍在会话目录里（截断消息不删文件），可以原样带上
-        sendMessage(newContent, target?.attachments)
-      } catch {
-        errorToast("编辑重发失败，请重试")
-      }
-    },
-    [isStreaming, messages, conversationId, truncateLocal, sendMessage],
+  editAndResend = async (dbId: string, newContent: string) => {
+    if (this._isStreaming) return
+    const target = this._messages.find((m) => m.dbId === dbId)
+    try {
+      await AgentService.truncateConversationMessages({
+        conversationId: this.conversationId,
+        requestBody: { message_id: dbId, inclusive: true },
+      })
+      this.truncateLocal(dbId, true)
+      // 附件文件仍在会话目录里（截断消息不删文件），可以原样带上
+      this.sendMessage(newContent, target?.attachments)
+    } catch {
+      errorToast("编辑重发失败，请重试")
+    }
+  }
+
+  /** 主动关闭（LRU 淘汰）：后台生成会被后端取消，仅对空闲连接使用 */
+  close() {
+    this.closedIntentionally = true
+    if (this.reconnectTimer !== undefined) {
+      window.clearTimeout(this.reconnectTimer)
+    }
+    this.setStreaming(false)
+    this.ws?.close()
+    this.ws = null
+    this.listeners.clear()
+  }
+}
+
+// ── 连接管理器（模块级单例） ────────────────────────────────────
+
+const connections = new Map<string, ChatConnection>()
+
+/** 会话删除后清理其连接（后台若有生成会被后端 4404/级联删除中止） */
+export function closeChatConnection(conversationId: string) {
+  connections.get(conversationId)?.close()
+  connections.delete(conversationId)
+}
+
+function evictIdleConnections(keepId: string) {
+  while (connections.size >= MAX_CONNECTIONS) {
+    // 找最久不活跃的空闲连接淘汰；全在流式中则允许暂时超限
+    let victim: ChatConnection | null = null
+    for (const c of connections.values()) {
+      if (c.conversationId === keepId || c.getSnapshot().isStreaming) continue
+      if (!victim || c.lastActive < victim.lastActive) victim = c
+    }
+    if (!victim) return
+    victim.close()
+    connections.delete(victim.conversationId)
+  }
+}
+
+/**
+ * 取（或创建）一个会话连接。允许在渲染期调用：
+ * Map 保证同一会话全应用只有一个连接实例（StrictMode 双渲染也幂等）。
+ */
+function getChatConnection(conversationId: string): ChatConnection {
+  let conn = connections.get(conversationId)
+  if (!conn) {
+    evictIdleConnections(conversationId)
+    conn = new ChatConnection(conversationId)
+    connections.set(conversationId, conn)
+  }
+  conn.lastActive = Date.now()
+  return conn
+}
+
+/**
+ * 聊天室的数据与动作入口（原 useAgentChat）。
+ *
+ * 连接由模块级管理器持有，本 hook 只是它的 React 视图：
+ * 切换会话 → 组件按新 conversationId 订阅另一个连接，
+ * 旧连接继续在后台收流。返回的动作为稳定引用（绑定在连接对象上）。
+ */
+export function useAgentChat(conversationId: string) {
+  const conn = getChatConnection(conversationId)
+  const state = useSyncExternalStore(
+    conn.subscribe,
+    conn.getSnapshot,
+    conn.getSnapshot,
   )
 
+  // 动作直接引用连接实例（连接按会话 ID 恒定，不存在过期闭包问题）
   return {
-    messages,
-    isConnected,
-    connState,
-    isStreaming,
-    sendMessage,
-    interrupt,
-    deleteMessage,
-    regenerate,
-    editAndResend,
+    messages: state.messages,
+    connState: state.connState,
+    isStreaming: state.isStreaming,
+    isConnected: state.isConnected,
+    sendMessage: conn.sendMessage,
+    interrupt: conn.interrupt,
+    deleteMessage: conn.deleteMessage,
+    regenerate: conn.regenerate,
+    editAndResend: conn.editAndResend,
   }
+}
+
+/** 会话删除时同时清理连接（ConversationList 的删除流程调用） */
+export function useCloseChatConnection() {
+  return useCallback((conversationId: string) => {
+    closeChatConnection(conversationId)
+  }, [])
 }
