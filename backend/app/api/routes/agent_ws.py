@@ -16,6 +16,7 @@
 """
 import asyncio
 import json
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
@@ -28,6 +29,8 @@ from app.core.pipeline import PipelineContext, run_entry_stages
 from app.core.pipeline.base import EventKey
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 # 新建会话时的默认标题。与 models.py 中 Conversation.title 的默认值保持一致：
 # 标题还等于它，说明用户从没手动改过名，此时才允许被首条消息覆盖。
@@ -52,6 +55,7 @@ class WSMessageType:
     TEXT_CHUNK = "text_chunk"
     TOOL_CALL = "tool_call"
     DONE = "done"
+    ERROR = "error"
 
 
 class WSMessageRole:
@@ -218,6 +222,41 @@ async def _run_turn(
     conversation_id: str,
     content: str,
 ) -> None:
+    """_run_turn_inner 的安全外壳：任何未捕获异常都要回 error + done，
+    否则前端会永远停在"生成中"。"""
+    try:
+        await _run_turn_inner(
+            ws,
+            session,
+            conv_manager,
+            conversation,
+            current_user,
+            conversation_id,
+            content,
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception("WS 轮次处理失败")
+        try:
+            await ws.send_json({
+                WSMsgKey.TYPE: WSMessageType.ERROR,
+                "message": "服务器处理出错，请稍后重试。",
+            })
+            await ws.send_json({WSMsgKey.TYPE: WSMessageType.DONE})
+        except Exception:
+            pass  # 连接已断开，前端走重连逻辑
+
+
+async def _run_turn_inner(
+    ws: WebSocket,
+    session: SessionDep,
+    conv_manager: ConversationManager,
+    conversation,
+    current_user: User,
+    conversation_id: str,
+    content: str,
+) -> None:
     """处理一轮用户消息：落库 → 前置 Stage → 流式生成 → 收尾 done。
 
     作为独立 asyncio.Task 运行，收到 interrupt 时被 cancel：
@@ -284,6 +323,7 @@ async def _run_turn(
     reply = ""
     tool_trace: list[dict] = []
     interrupted = False
+    error_message: str | None = None
 
     try:
         async for event in agent.stream(
@@ -298,6 +338,11 @@ async def _run_turn(
                     merge_tool_trace(tool_trace, msg)
     except asyncio.CancelledError:
         interrupted = True
+    except Exception:
+        # LLM 调用失败（网络 / 配额 / 上游 5xx 等）：给用户中文提示，
+        # 原始异常只进日志——细节（供应商名、堆栈）不该暴露到前端
+        logger.exception("Agent 流式生成失败")
+        error_message = "回复生成失败，请稍后重试。若持续失败，请检查模型源配置。"
 
     # 工具轨迹存进 content.tool_trace：tool_calls 列会被
     # get_context_messages 转成 LangChain AIMessage.tool_calls，
@@ -332,6 +377,10 @@ async def _run_turn(
     if interrupted:
         done[WSMsgKey.INTERRUPTED] = True
     try:
+        if error_message:
+            await ws.send_json(
+                {WSMsgKey.TYPE: WSMessageType.ERROR, "message": error_message}
+            )
         await ws.send_json(done)
     except Exception:
         # 客户端已断开（WebSocketDisconnect 路径取消本任务时可能发生）：

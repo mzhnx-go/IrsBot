@@ -187,3 +187,53 @@ def test_chat_ws_interrupt_stops_and_persists_partial(
         assistant = [m for m in history["messages"] if m["role"] == "assistant"][0]
         assert assistant["content"] == "前半段"
         assert assistant.get("stopped") is True
+
+
+async def fake_failing_stream(content, history=None):
+    """吐一个文字块后抛异常，模拟 LLM 中途失败"""
+    yield {
+        "event": "on_chat_model_stream",
+        "data": {"chunk": SimpleNamespace(content="开头")},
+    }
+    raise RuntimeError("upstream 502")
+
+
+def test_chat_ws_generation_error_sends_chinese_error_and_partial_persisted(
+    client, superuser_token_headers
+):
+    """生成中途异常：下发中文 error + done；已生成部分照常落库"""
+    token = superuser_token_headers["Authorization"].split(" ", 1)[1]
+    resp = client.post(
+        "/api/v1/agent/conversations",
+        json={"title": "ws-error-test"},
+        headers=superuser_token_headers,
+    )
+    conv_id = resp.json()["id"]
+
+    with patch("app.api.routes.agent_ws.Agent") as mock_agent:
+        mock_agent.return_value.stream = fake_failing_stream
+        with client.websocket_connect(
+            f"/api/v1/agent/chat/ws/{conv_id}?token={token}",
+        ) as ws:
+            ws.receive_json()  # history（空）
+            ws.send_json({"type": "message", "content": "hi"})
+
+            chunk = ws.receive_json()
+            assert chunk["type"] == "text_chunk"
+
+            err = ws.receive_json()
+            assert err["type"] == "error"
+            assert "生成失败" in err["message"]  # 中文提示
+            assert "502" not in err["message"]  # 原始异常不外泄
+
+            done = ws.receive_json()
+            assert done["type"] == "done"
+            assert done["assistant_message_id"]
+
+    # 重连：部分回复应从落库历史还原
+    with client.websocket_connect(
+        f"/api/v1/agent/chat/ws/{conv_id}?token={token}",
+    ) as ws:
+        history = ws.receive_json()
+        assistant = [m for m in history["messages"] if m["role"] == "assistant"][0]
+        assert assistant["content"] == "开头"

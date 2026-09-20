@@ -2,14 +2,15 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | 1.2 |
+| 版本 | 1.3 |
 | 端点 | `ws://<host>/agent/chat/ws/{conversation_id}` |
 | 后端实现 | `backend/app/api/routes/agent_ws.py` |
 | 前端实现 | `frontend/src/hooks/useAgentChat.ts` |
 
 数据格式为 JSON 文本帧，前端按下行事件的 `type` 字段分发处理。
 鉴权走 URL 查询参数 `?token=<JWT>`（浏览器 WS API 不支持自定义请求头）。
-心跳与错误事件尚未实现（计划：服务端 30s `ping`，错误 `{"type": "error", "message": "..."}`）。
+连接异常断开时前端按指数退避自动重连（上限 6 次，之后提示刷新）；重连成功后后端重推 `history`。
+心跳尚未实现（计划：服务端 30s `ping`）。
 
 ## 上行（前端 → 后端）
 
@@ -79,6 +80,16 @@
 | `user_message_id` / `assistant_message_id` | string | 本轮两条落库消息的真实 ID；前端把本地乐观消息的 `dbId` 回填后才能删除/编辑重发/重新生成。拦截路径（限流/错误）的 done 不带 ID；中断时若没有任何产出则不带 `assistant_message_id` |
 | `interrupted` | bool | 仅中断收尾时出现；前端给该条 assistant 消息打「已停止生成」标记 |
 
+**error** — 本轮生成/处理失败（已转成中文提示，总会在下一个 `done` 之前送达）
+
+```json
+{ "type": "error", "message": "回复生成失败，请稍后重试。若持续失败，请检查模型源配置。" }
+```
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `message` | string | 面向用户的中文提示；原始异常只进后端日志，不透出细节 |
+
 ## 时序示例
 
 ```
@@ -103,3 +114,4 @@
 | 2026-09-15 | 新增 history 下行事件：建连后推送会话历史，前端据此恢复对话 |
 | 2026-09-20 | 1.1：history 每条消息带真实 `id`；done 回传 `user_message_id`/`assistant_message_id`；tool_call 携带 `input`/`output`（截断 4000 字符）并随 assistant 消息落库（`content.tool_trace`） |
 | 2026-09-20 | 1.2：新增上行 `interrupt`（中断当前生成，部分回复落库并带 `content.stopped`）；done 增加 `interrupted` 标记；history 条目透传 `stopped` |
+| 2026-09-20 | 1.3：新增下行 `error`（`{"type":"error","message":"…"}`，中文，随后可收尾 done）；前端断线自动重连，重连后重推 history |

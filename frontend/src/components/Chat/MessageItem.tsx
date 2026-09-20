@@ -82,6 +82,7 @@ const MessageItem = ({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={Math.min(8, Math.max(2, draft.split("\n").length + 1))}
+            // biome-ignore lint/a11y/noAutofocus: 点击编辑后应立即进入可输入态
             autoFocus
             className="w-full resize-none bg-transparent text-sm leading-6 outline-none"
             onKeyDown={(e) => {
@@ -126,14 +127,16 @@ const MessageItem = ({
         className={
           isUser
             ? "max-w-[80%] rounded-2xl rounded-br-sm bg-[var(--chat-accent)] px-4 py-2.5 text-sm leading-6 text-white"
-            : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-foreground"
+            : message.error
+              ? "max-w-[85%] rounded-2xl rounded-bl-sm border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm leading-6 text-destructive"
+              : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-foreground"
         }
       >
         {/* 工具调用折叠面板（AI 消息且有工具调用时显示） */}
         {message.toolCalls && message.toolCalls.length > 0 && (
           <ToolCalls calls={message.toolCalls} />
         )}
-        {isUser ? (
+        {isUser || message.error ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
           <MarkdownContent

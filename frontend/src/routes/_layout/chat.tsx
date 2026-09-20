@@ -73,6 +73,7 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
   const {
     messages,
     isConnected,
+    connState,
     isStreaming,
     sendMessage,
     interrupt,
@@ -96,6 +97,7 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
     const nearBottom =
       el.scrollHeight - window.scrollY - window.innerHeight < 160
     if (nearBottom) bottomRef.current?.scrollIntoView({ block: "end" })
+    // biome-ignore lint/correctness/useExhaustiveDependencies: messages 仅作"有新内容"触发器，读取的是 DOM 滚动几何
   }, [messages])
 
   // 一轮对话结束（done）→ 刷新侧边栏列表：
@@ -117,11 +119,48 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
   return (
     <div className="flex min-h-[calc(100svh-4rem)] flex-col">
       <div className="mx-auto w-full max-w-3xl flex-1">
+        {/* 连接状态横幅：重连过程与终态都要让用户看得见（中文化） */}
+        {messages.length > 0 &&
+          connState !== "open" &&
+          connState !== "connecting" && (
+            <div
+              role="status"
+              className={`sticky top-3 z-10 mx-auto mt-4 flex w-fit items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs shadow-sm backdrop-blur ${
+                connState === "closed"
+                  ? "border-destructive/30 bg-destructive/10 text-destructive"
+                  : "border-border bg-background/90 text-muted-foreground"
+              }`}
+            >
+              {connState === "reconnecting" ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" />
+                  连接已断开，正在自动重连…
+                </>
+              ) : (
+                <>
+                  连接已断开，发送已暂停
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="rounded-full border border-current px-2 py-0.5 transition-opacity duration-100 hover:opacity-70"
+                  >
+                    刷新重试
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         {messages.length === 0 ? (
           <div className="py-40 text-center">
             <h1 className="text-2xl font-semibold">有什么可以帮你？</h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              {isConnected ? "连接就绪，输入消息开始对话" : "正在连接服务器…"}
+              {connState === "open"
+                ? "连接就绪，输入消息开始对话"
+                : connState === "reconnecting"
+                  ? "连接已断开，正在自动重连…"
+                  : connState === "closed"
+                    ? "连接已断开，请刷新页面重试"
+                    : "正在连接服务器…"}
             </p>
           </div>
         ) : (
@@ -152,7 +191,15 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={isStreaming ? "AI 回复中…" : "输入消息…"}
+            placeholder={
+              isStreaming
+                ? "AI 回复中…"
+                : connState === "reconnecting"
+                  ? "正在重连，请稍候…"
+                  : connState === "closed"
+                    ? "连接已断开，请刷新页面重试"
+                    : "输入消息…"
+            }
             rows={1}
             disabled={!isConnected}
             onKeyDown={(e) => {
