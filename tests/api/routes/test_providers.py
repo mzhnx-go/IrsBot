@@ -261,3 +261,137 @@ def test_default_unique_index_enforced_at_db_level(db: Session) -> None:
     with pytest.raises(IntegrityError):
         db.flush()
     db.rollback()
+
+
+# ── GET /providers/{id}/balance ──────────────────────────────
+
+
+def test_balance_unsupported_vendor_returns_reason(
+    client: TestClient, superuser_token_headers: dict
+) -> None:
+    """阿里云百炼无余额接口 → 200 + supported=False + 具体指引。
+
+    这是本机默认源的实际情况（DashScope），必须是可读提示而非 500。
+    """
+    created = _create_provider(
+        client,
+        superuser_token_headers,
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    )
+    res = client.get(
+        f"{settings.API_V1_STR}/providers/{created['id']}/balance",
+        headers=superuser_token_headers,
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["supported"] is False
+    assert "阿里云" in body["detail"]
+
+
+def test_balance_without_base_url_returns_reason(
+    client: TestClient, superuser_token_headers: dict
+) -> None:
+    created = _create_provider(client, superuser_token_headers, base_url=None)
+    res = client.get(
+        f"{settings.API_V1_STR}/providers/{created['id']}/balance",
+        headers=superuser_token_headers,
+    )
+    assert res.status_code == 200
+    assert res.json()["supported"] is False
+
+
+def test_balance_not_found_404(
+    client: TestClient, superuser_token_headers: dict
+) -> None:
+    res = client.get(
+        f"{settings.API_V1_STR}/providers/{uuid.uuid4()}/balance",
+        headers=superuser_token_headers,
+    )
+    assert res.status_code == 404
+
+
+def test_balance_other_users_provider_404(
+    client: TestClient,
+    superuser_token_headers: dict,
+    normal_user_token_headers: dict,
+) -> None:
+    """多租户隔离：不能借查余额读取他人模型源的存在性（IDOR 防护）。"""
+    created = _create_provider(client, superuser_token_headers)
+    res = client.get(
+        f"{settings.API_V1_STR}/providers/{created['id']}/balance",
+        headers=normal_user_token_headers,
+    )
+    assert res.status_code == 404
+
+
+def test_balance_requires_auth(client: TestClient) -> None:
+    res = client.get(f"{settings.API_V1_STR}/providers/{uuid.uuid4()}/balance")
+    assert res.status_code == 401
+
+
+def test_balance_uses_stored_key_and_parses_upstream(
+    client: TestClient, superuser_token_headers: dict, monkeypatch
+) -> None:
+    """端到端（假上游）：解密落库的 key 发给服务商，并把响应归一化。"""
+    import httpx
+
+    from app.core.agent import provider_balance
+
+    captured: dict = {}
+
+    class FakeResponse:
+        status_code = 200
+        request = httpx.Request("GET", "https://api.deepseek.com")
+
+        def json(self):
+            return {
+                "is_available": True,
+                "balance_infos": [
+                    {
+                        "currency": "CNY",
+                        "total_balance": "42.50",
+                        "granted_balance": "2.50",
+                        "topped_up_balance": "40.00",
+                    }
+                ],
+            }
+
+        def raise_for_status(self):
+            return None
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def get(self, url, headers=None, **kwargs):
+            captured["url"] = url
+            captured["headers"] = headers or {}
+            return FakeResponse()
+
+    monkeypatch.setattr(provider_balance.httpx, "AsyncClient", FakeClient)
+
+    created = _create_provider(
+        client,
+        superuser_token_headers,
+        api_key="sk-plain-balance-key",
+        base_url="https://api.deepseek.com/v1",
+    )
+    res = client.get(
+        f"{settings.API_V1_STR}/providers/{created['id']}/balance",
+        headers=superuser_token_headers,
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["supported"] is True
+    assert body["provider"] == "deepseek"
+    assert body["remaining"] == 42.5
+    assert body["detail"] is not None and "赠金 ¥2.50" in body["detail"]
+    # 落库的是密文，但发给上游的必须是解密后的明文 key
+    assert captured["headers"]["Authorization"] == "Bearer sk-plain-balance-key"
+    assert captured["url"] == "https://api.deepseek.com/user/balance"

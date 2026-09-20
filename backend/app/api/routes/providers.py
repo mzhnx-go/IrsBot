@@ -13,8 +13,10 @@ from sqlmodel import select
 
 from app.api.deps import SessionDep, get_current_user
 from app.core.agent.provider import ProviderManager
+from app.core.agent.provider_balance import ProviderBalanceOut, query_balance
 from app.core.db.models import ProviderConfig
 from app.core.db.sqlmodel_models import User
+from app.utils.crypto import decrypt_api_key
 
 router = APIRouter(tags=["providers"])
 
@@ -78,6 +80,30 @@ def create_provider(
     )
     return obj
 
+
+
+@router.get("/providers/{provider_id}/balance", response_model=ProviderBalanceOut)
+async def get_provider_balance(
+    provider_id: UUID,
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+):
+    """查询该模型源的账户余额（用其自身 API Key 调服务商余额接口）。
+
+    越权与不存在同返 404，不泄露其他用户是否配过该 provider。
+    上游不可用/服务商无接口时仍返回 200，由 `supported` / `error` 字段表达结果。
+    """
+    stmt = select(ProviderConfig).where(
+        ProviderConfig.id == provider_id,
+        ProviderConfig.user_id == current_user.id,
+    )
+    pc = session.exec(stmt).one_or_none()
+    if pc is None:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    return await query_balance(
+        base_url=pc.base_url, api_key=decrypt_api_key(pc.api_key)
+    )
 
 
 @router.patch("/providers/{provider_id}", response_model=ProviderOut)
