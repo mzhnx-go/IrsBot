@@ -30,6 +30,29 @@ class MCPClient:
         self._connected = False
         self._security = MCPSecurity()
 
+    async def _open_session(self, transport_cm):
+        """进入 transport + ClientSession 上下文并完成 initialize。
+
+        ClientSession 必须作为 async context 进入：它的 __aenter__ 启动
+        消息泵任务，裸调 initialize() 会因无人派发响应而永久挂起。
+        返回 (exit_stack, session)；失败时清理干净再抛出。
+        """
+        from contextlib import AsyncExitStack
+
+        from mcp import ClientSession
+
+        stack = AsyncExitStack()
+        try:
+            streams = await stack.enter_async_context(transport_cm)
+            session = await stack.enter_async_context(
+                ClientSession(streams[0], streams[1])
+            )
+            await session.initialize()
+        except BaseException:
+            await stack.aclose()
+            raise
+        return stack, session
+
     async def connect_sse(self, url: str | None = None) -> bool:
         """Connect via SSE transport."""
         target_url = url or self.url
@@ -39,13 +62,11 @@ class MCPClient:
         retries = 0
         while retries <= self.max_retries:
             try:
-                from mcp import ClientSession
                 from mcp.client.sse import sse_client
 
-                self._sse_context = sse_client(target_url)
-                self._sse_transport = await self._sse_context.__aenter__()
-                self._session = ClientSession(*self._sse_transport)
-                await self._session.initialize()
+                self._sse_stack, self._session = await self._open_session(
+                    sse_client(target_url)
+                )
                 self._connected = True
                 return True
             except Exception:
@@ -75,14 +96,18 @@ class MCPClient:
         retries = 0
         while retries <= self.max_retries:
             try:
-                from mcp import ClientSession
+                from mcp import StdioServerParameters
                 from mcp.client.stdio import stdio_client
 
-                env_dict = cmd_env.copy() if cmd_env else None
-                self._stdio_context = stdio_client(cmd, cmd_args, env=env_dict)
-                self._stdio_transport = await self._stdio_context.__aenter__()
-                self._session = ClientSession(*self._stdio_transport)
-                await self._session.initialize()
+                # stdio_client 需要 StdioServerParameters，而不是裸命令参数
+                params = StdioServerParameters(
+                    command=cmd,
+                    args=list(cmd_args or []),
+                    env=cmd_env or None,
+                )
+                self._stdio_stack, self._session = await self._open_session(
+                    stdio_client(params)
+                )
                 self._connected = True
                 return True
             except Exception:
@@ -100,13 +125,12 @@ class MCPClient:
         retries = 0
         while retries <= self.max_retries:
             try:
-                from mcp import ClientSession
                 from mcp.client.streamable_http import streamable_http_client
 
-                self._http_context = streamable_http_client(target_url)
-                self._http_transport = await self._http_context.__aenter__()
-                self._session = ClientSession(*self._http_transport)
-                await self._session.initialize()
+                (
+                    self._http_stack,
+                    self._session,
+                ) = await self._open_session(streamable_http_client(target_url))
                 self._connected = True
                 return True
             except Exception:
@@ -167,14 +191,15 @@ class MCPClient:
             self._session = None
         self._connected = False
 
-        # Close transport contexts
-        for attr in ("_sse_context", "_stdio_context", "_http_context"):
-            ctx = getattr(self, attr, None)
-            if ctx is not None:
+        # Close transport contexts（AsyncExitStack，见 connect_* 系列）
+        for attr in ("_sse_stack", "_stdio_stack", "_http_stack"):
+            stack = getattr(self, attr, None)
+            if stack is not None:
                 try:
-                    await ctx.__aexit__(None, None, None)
+                    await stack.aclose()
                 except Exception:
                     pass
+                setattr(self, attr, None)
 
     @property
     def is_connected(self) -> bool:
