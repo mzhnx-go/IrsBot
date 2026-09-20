@@ -138,6 +138,50 @@ class ConversationStatusUpdate(SQLModel):
     is_enabled: bool
 
 
+# ── 统计（Phase 15.2e / 14.3）──────────────────────────────────
+
+class StatsDailyPoint(SQLModel):
+    """单日聚合点（UTC 日期）"""
+    date: str
+    runs: int
+    completed: int
+    failed: int
+    interrupted: int
+    tokens: int
+    tool_calls: int
+    avg_duration_ms: float | None
+
+
+class StatsSummary(SQLModel):
+    """区间总计"""
+    runs: int
+    completed: int
+    failed: int
+    interrupted: int
+    tokens: int
+    tool_calls: int
+    avg_duration_ms: float | None
+
+
+class StatsOverviewResponse(SQLModel):
+    """统计概览：总计 + 按天序列"""
+    days: int
+    summary: StatsSummary
+    daily: list[StatsDailyPoint]
+
+
+class AgentRunPublic(SQLModel):
+    """最近运行记录行"""
+    id: uuid.UUID
+    status: str
+    input_text: str
+    tool_calls_made: int
+    tokens_used: int
+    duration_ms: int | None
+    error_message: str | None
+    created_at: datetime | None
+
+
 class ChatResponse(SQLModel):
     """聊天响应"""
     reply: str

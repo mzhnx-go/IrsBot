@@ -42,5 +42,6 @@ from app.core.crud.agent import (  # noqa: F401
     create_agent_run,
     get_agent_run,
     list_agent_runs,
+    agent_run_stats,
     update_agent_run,
 )

@@ -17,6 +17,7 @@
 import asyncio
 import json
 import logging
+import time
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
@@ -25,6 +26,7 @@ from app.api.deps import SessionDep, get_current_user_ws
 from app.core.agent.agent import Agent
 from app.core.agent.builtins.kb_query import begin_kb_citations
 from app.core.agent.conversation import ConversationManager
+from app.core.db.models import AgentRun
 from app.core.db.sqlmodel_models import User
 from app.core.pipeline import PipelineContext, run_entry_stages
 from app.core.pipeline.base import EventKey
@@ -279,6 +281,50 @@ async def _run_turn(
             pass  # 连接已断开，前端走重连逻辑
 
 
+def _record_agent_run(
+    session,
+    user_id,
+    conversation,
+    *,
+    input_text: str,
+    output_text: str,
+    interrupted: bool,
+    error_message: str | None,
+    tool_calls: int,
+    tokens_used: int,
+    duration_ms: int,
+) -> None:
+    """统计采集（Phase 14.3）：把一轮运行写入 agent_runs。
+
+    记录失败绝不能影响聊天本身，整段吞异常仅留日志。
+    """
+    try:
+        status = (
+            "interrupted" if interrupted
+            else "failed" if error_message
+            else "completed"
+        )
+        session.add(AgentRun(
+            user_id=user_id,
+            conversation_id=conversation.id,
+            persona_id=conversation.persona_id,
+            status=status,
+            input_text=input_text,
+            output_text=output_text or None,
+            tool_calls_made=tool_calls,
+            tokens_used=tokens_used,
+            duration_ms=duration_ms,
+            error_message=error_message,
+        ))
+        session.commit()
+    except Exception:
+        logger.exception("AgentRun 统计写入失败")
+        try:
+            session.rollback()
+        except Exception:
+            pass
+
+
 async def _run_turn_inner(
     ws: WebSocket,
     session: SessionDep,
@@ -355,6 +401,10 @@ async def _run_turn_inner(
     tool_trace: list[dict] = []
     interrupted = False
     error_message: str | None = None
+    # 统计采集（Phase 14.3）：token 用量从 on_chat_model_end 事件的
+    # usage_metadata 累加；耗时从进入生成到收尾
+    tokens_used = 0
+    turn_started = time.monotonic()
     # 本轮 RAG 检索引用收集器：knowledge_base_query 工具在子任务里
     # 往同一个 list 追加（contextvar 传引用），流结束后读取下发 sources
     citations = begin_kb_citations()
@@ -363,6 +413,12 @@ async def _run_turn_inner(
         async for event in agent.stream(
             context.event_data[EventKey.USER_MESSAGE], history
         ):
+            if event.get("event") == "on_chat_model_end":
+                usage = getattr(
+                    event.get("data", {}).get("output"), "usage_metadata", None
+                )
+                if isinstance(usage, dict):
+                    tokens_used += int(usage.get("total_tokens") or 0)
             msg = to_frontend_event(event)
             if msg is not None:
                 await ws.send_json(msg)
@@ -429,6 +485,19 @@ async def _run_turn_inner(
         # 客户端已断开（WebSocketDisconnect 路径取消本任务时可能发生）：
         # 部分回复已落库，刷新页面即可看到，发不出去就算了
         pass
+
+    _record_agent_run(
+        session,
+        current_user.id,
+        conversation,
+        input_text=content,
+        output_text=reply,
+        interrupted=interrupted,
+        error_message=error_message,
+        tool_calls=len(tool_trace),
+        tokens_used=tokens_used,
+        duration_ms=int((time.monotonic() - turn_started) * 1000),
+    )
 
 
 @router.websocket("/agent/chat/ws/{conversation_id}")

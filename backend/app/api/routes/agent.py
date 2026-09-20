@@ -2,6 +2,7 @@
 import shutil
 import uuid
 import zipfile
+from datetime import timedelta
 from pathlib import Path
 from typing import Literal
 from urllib.parse import quote
@@ -18,6 +19,7 @@ from app.core.agent.conversation import ConversationManager
 from app.core.agent.export import render_export
 from app.core.db.models import Conversation
 from app.core.db.sqlmodel_models import (
+    AgentRunPublic,
     ChatRequest,
     ChatResponse,
     ConversationCreate,
@@ -34,6 +36,8 @@ from app.core.db.sqlmodel_models import (
     PersonaCreate,
     PersonaResponse,
     PersonaUpdate,
+    StatsOverviewResponse,
+    get_datetime_utc,
 )
 from app.core.mcp.bridge import MCPToolBridge
 from app.core.mcp.client import MCPClient
@@ -840,6 +844,55 @@ async def install_skill(
         # 8. 确保临时文件一定被清理
         if tmp_path.exists():
             tmp_path.unlink()
+
+
+# ── 统计（Phase 15.2e）─────────────────────────────────────────
+
+
+@router.get("/stats/overview", response_model=StatsOverviewResponse)
+def stats_overview(
+    session: SessionDep,
+    current_user: CurrentUser,
+    days: int = Query(
+        default=14, ge=1, le=90, description="统计窗口（自然日，UTC）"
+    ),
+):
+    """token 用量 / 耗时 / 工具调用的总计与按天序列（数据源 agent_runs）"""
+    since = get_datetime_utc() - timedelta(days=days - 1)
+    since = since.replace(hour=0, minute=0, second=0, microsecond=0)
+    data = crud.agent_run_stats(
+        session, user_id=current_user.id, since=since
+    )
+    return StatsOverviewResponse(days=days, **data)
+
+
+@router.get("/stats/runs", response_model=list[AgentRunPublic])
+def stats_recent_runs(
+    session: SessionDep,
+    current_user: CurrentUser,
+    skip: int = 0,
+    limit: int = 20,
+):
+    """最近的 Agent 运行记录（时间倒序）"""
+    runs = crud.list_agent_runs(
+        session,
+        user_id=current_user.id,
+        skip=skip,
+        limit=min(limit, 100),
+    )
+    return [
+        AgentRunPublic(
+            id=r.id,
+            status=r.status,
+            input_text=r.input_text,
+            tool_calls_made=r.tool_calls_made,
+            tokens_used=r.tokens_used,
+            duration_ms=r.duration_ms,
+            error_message=r.error_message,
+            created_at=r.created_at,
+        )
+        for r in runs
+    ]
 
 
 

@@ -14,6 +14,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
+import { Route as LayoutStatsRouteImport } from './routes/_layout/stats'
 import { Route as LayoutSkillsRouteImport } from './routes/_layout/skills'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutProvidersRouteImport } from './routes/_layout/providers'
@@ -49,6 +50,11 @@ const LayoutRoute = LayoutRouteImport.update({
 const LayoutIndexRoute = LayoutIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutStatsRoute = LayoutStatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutSkillsRoute = LayoutSkillsRouteImport.update({
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/providers': typeof LayoutProvidersRoute
   '/settings': typeof LayoutSettingsRoute
   '/skills': typeof LayoutSkillsRoute
+  '/stats': typeof LayoutStatsRoute
   '/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
   '/knowledge-base/trash': typeof LayoutKnowledgeBaseTrashRoute
   '/knowledge-base/': typeof LayoutKnowledgeBaseIndexRoute
@@ -144,6 +151,7 @@ export interface FileRoutesByTo {
   '/providers': typeof LayoutProvidersRoute
   '/settings': typeof LayoutSettingsRoute
   '/skills': typeof LayoutSkillsRoute
+  '/stats': typeof LayoutStatsRoute
   '/': typeof LayoutIndexRoute
   '/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
   '/knowledge-base/trash': typeof LayoutKnowledgeBaseTrashRoute
@@ -164,6 +172,7 @@ export interface FileRoutesById {
   '/_layout/providers': typeof LayoutProvidersRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/skills': typeof LayoutSkillsRoute
+  '/_layout/stats': typeof LayoutStatsRoute
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
   '/_layout/knowledge-base/trash': typeof LayoutKnowledgeBaseTrashRoute
@@ -185,6 +194,7 @@ export interface FileRouteTypes {
     | '/providers'
     | '/settings'
     | '/skills'
+    | '/stats'
     | '/knowledge-base/$kbId'
     | '/knowledge-base/trash'
     | '/knowledge-base/'
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
     | '/providers'
     | '/settings'
     | '/skills'
+    | '/stats'
     | '/'
     | '/knowledge-base/$kbId'
     | '/knowledge-base/trash'
@@ -220,6 +231,7 @@ export interface FileRouteTypes {
     | '/_layout/providers'
     | '/_layout/settings'
     | '/_layout/skills'
+    | '/_layout/stats'
     | '/_layout/'
     | '/_layout/knowledge-base/$kbId'
     | '/_layout/knowledge-base/trash'
@@ -268,6 +280,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof LayoutIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/stats': {
+      id: '/_layout/stats'
+      path: '/stats'
+      fullPath: '/stats'
+      preLoaderRoute: typeof LayoutStatsRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/skills': {
@@ -382,6 +401,7 @@ interface LayoutRouteChildren {
   LayoutProvidersRoute: typeof LayoutProvidersRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutSkillsRoute: typeof LayoutSkillsRoute
+  LayoutStatsRoute: typeof LayoutStatsRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
 }
 
@@ -395,6 +415,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutProvidersRoute: LayoutProvidersRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutSkillsRoute: LayoutSkillsRoute,
+  LayoutStatsRoute: LayoutStatsRoute,
   LayoutIndexRoute: LayoutIndexRoute,
 }
 

@@ -7,6 +7,7 @@ for multi-tenant isolation.
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 
 from sqlmodel import Session, col, func, select
 
@@ -471,3 +472,69 @@ def update_agent_run(
         session.commit()
         session.refresh(obj)
     return obj
+
+
+def agent_run_stats(
+    session: Session, *, user_id: uuid.UUID, since: datetime
+) -> dict:
+    """按天聚合 [since, now] 的运行统计（时间口径为 UTC）。
+
+    返回 {summary: {...}, daily: [{date, runs, completed, failed,
+    interrupted, tokens, tool_calls, avg_duration_ms}, ...]}；
+    只统计 created_at >= since 且属于该用户的 agent_runs。
+    """
+    from sqlalchemy import Date, case
+
+    day = func.date_trunc("day", AgentRun.created_at).cast(Date).label("day")
+    status_sum = lambda s: func.sum(case((AgentRun.status == s, 1), else_=0))  # noqa: E731
+    stmt = (
+        select(
+            day,
+            func.count().label("runs"),
+            status_sum("completed").label("completed"),
+            status_sum("failed").label("failed"),
+            status_sum("interrupted").label("interrupted"),
+            func.coalesce(func.sum(AgentRun.tokens_used), 0).label("tokens"),
+            func.coalesce(func.sum(AgentRun.tool_calls_made), 0).label(
+                "tool_calls"
+            ),
+            func.avg(AgentRun.duration_ms).label("avg_ms"),
+        )
+        .where(AgentRun.user_id == user_id, AgentRun.created_at >= since)
+        .group_by(day)
+        .order_by(day)
+    )
+    rows = session.exec(stmt).all()
+
+    daily = [
+        {
+            "date": r.day.isoformat(),
+            "runs": int(r.runs),
+            "completed": int(r.completed or 0),
+            "failed": int(r.failed or 0),
+            "interrupted": int(r.interrupted or 0),
+            "tokens": int(r.tokens or 0),
+            "tool_calls": int(r.tool_calls or 0),
+            "avg_duration_ms": round(float(r.avg_ms), 1) if r.avg_ms else None,
+        }
+        for r in rows
+    ]
+    # 全局平均耗时 = 各日均值按当日 runs 加权（近似，够用）
+    weighted = [
+        (d["runs"], d["avg_duration_ms"]) for d in daily if d["avg_duration_ms"]
+    ]
+    weight_total = sum(r for r, _ in weighted)
+    summary = {
+        "runs": sum(d["runs"] for d in daily),
+        "completed": sum(d["completed"] for d in daily),
+        "failed": sum(d["failed"] for d in daily),
+        "interrupted": sum(d["interrupted"] for d in daily),
+        "tokens": sum(d["tokens"] for d in daily),
+        "tool_calls": sum(d["tool_calls"] for d in daily),
+        "avg_duration_ms": (
+            round(sum(r * a for r, a in weighted) / weight_total, 1)
+            if weight_total
+            else None
+        ),
+    }
+    return {"summary": summary, "daily": daily}

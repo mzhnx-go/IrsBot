@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   BookOpen,
   Drama,
   Home,
@@ -37,6 +38,7 @@ const baseItems: Item[] = [
   { icon: BookOpen, title: "技能", path: "/skills" },
   { icon: Drama, title: "人设", path: "/personas" },
   { icon: MessagesSquare, title: "会话管理", path: "/conversations" },
+  { icon: BarChart3, title: "统计", path: "/stats" },
   { icon: Settings, title: "设置", path: "/settings" },
 ]
 
