@@ -44,6 +44,10 @@ IMAGE_MIME_TYPES: frozenset[str] = frozenset({
 #: 形状不对直接拒绝，不给任何拼路径的机会
 _ATT_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 
+#: 单条消息最多携带的附件数：一次塞几十个文件既非真实场景，
+#: 也会让送模型前逐个读盘解析变成拒绝服务入口。
+MAX_PER_MESSAGE = 10
+
 
 class AttachmentError(Exception):
     """附件处理失败（消息可直接展示给用户，属于预期内错误）。"""
@@ -151,6 +155,36 @@ def resolve(
 def read_bytes(path: Path) -> bytes:
     """读取附件字节（送模型时用）。"""
     return path.read_bytes()
+
+
+def describe(
+    *,
+    user_id: uuid.UUID | str,
+    conversation_id: uuid.UUID | str,
+    att_id: str,
+) -> dict | None:
+    """按 att_id 还原附件元数据（服务端权威，不信客户端任何声明）。
+
+    WS 上行只带 att_id，kind/filename/size 一律从磁盘上的真实文件反推：
+    客户端就算把 att_id 报成别的类型，也只会得到这里算出的真相。
+
+    Returns:
+        元数据 dict；att_id 无法定位时返回 None。
+    """
+    path = resolve(
+        user_id=user_id, conversation_id=conversation_id, att_id=att_id
+    )
+    if path is None:
+        return None
+    # 落盘名是 `{att_id}_{safe_name}`，剥掉前缀即回原始展示名
+    stored = path.name
+    filename = stored[len(att_id) + 1 :] if stored.startswith(f"{att_id}_") else stored
+    return {
+        "id": att_id,
+        "kind": KIND_DOCUMENT if is_allowed_document(filename) else KIND_IMAGE,
+        "filename": filename,
+        "size": path.stat().st_size,
+    }
 
 
 def extension_of(filename: str | None) -> str:

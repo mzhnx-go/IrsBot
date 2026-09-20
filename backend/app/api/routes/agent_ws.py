@@ -4,13 +4,17 @@
 
 上行：
     {"type": "message", "content": "用户消息"}
+    {"type": "message", "content": "看看这份文档", "attachments": [{"id": "<32位hex>"}]}
     {"type": "interrupt"}                      # 中断当前生成
 
 下行：
-    {"type": "history", "messages": [{"id", "role", "content", "tool_calls"?}...]}
+    {"type": "history", "messages": [{"id", "role", "content", "tool_calls"?, "attachments"?}...]}
     {"type": "text_chunk", "content": "文字块"}
     {"type": "tool_call", "name": "工具名", "phase": "start" | "end"}
     {"type": "done", "user_message_id"?: "...", "assistant_message_id"?: "...", "interrupted"?: true}
+
+附件上行只带 att_id，不带字节也不带元数据：字节由后端自己从磁盘读，
+kind/filename/size 由服务端按真实文件反推，客户端没有伪造的机会。
 
 协议细节见 docs/protocols/chat-ws-protocol.md
 """
@@ -23,6 +27,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.api.deps import SessionDep, get_current_user_ws
+from app.core.agent import attachments
 from app.core.agent.agent import Agent
 from app.core.agent.builtins.kb_query import begin_kb_citations
 from app.core.agent.conversation import ConversationManager
@@ -87,6 +92,7 @@ class WSMsgKey:
     INTERRUPTED = "interrupted"
     STOPPED = "stopped"
     CITATIONS = "citations"
+    ATTACHMENTS = "attachments"
 
 
 class WSToolPhase:
@@ -136,6 +142,13 @@ def build_history_payload(msgs) -> dict:
             WSMsgKey.ROLE: m.role,
             WSMsgKey.CONTENT: text,
         }
+        # 用户消息的附件元数据回放给前端（刷新后 chip / 缩略图还在）。
+        # 只回元数据，不回正文——文档正文可能上万字，回放进上下文纯属浪费，
+        # 这也与「附件仅本轮有效」的决策一致。
+        if m.role == WSMessageRole.USER and isinstance(content, dict):
+            atts = content.get(WSMsgKey.ATTACHMENTS)
+            if atts:
+                item[WSMsgKey.ATTACHMENTS] = atts
         # assistant 若带工具调用轨迹，一并下发便于前端还原折叠面板。
         # 展示用轨迹存在 content.tool_trace（tool_calls 列留给 LangChain
         # 规范格式的真实调用，二者不能混用）；兼容直接写在列上的旧数据。
@@ -246,6 +259,39 @@ def _dedupe_citations(citations: list[dict]) -> list[dict]:
     return out
 
 
+def _resolve_attachments(
+    user_id, conversation_id: str, raw: object
+) -> tuple[list[dict], str | None]:
+    """把上行 `attachments` 解析为服务端权威的元数据列表。
+
+    客户端只被允许传 `att_id`——文件名、大小、类型全部由磁盘上的真实
+    文件反推（`attachments.describe`）。这样"用户说这是图片"永远不会被当真。
+
+    Returns:
+        (元数据列表, 错误信息)。错误信息非空时本轮应中止。
+    """
+    if raw in (None, []):
+        return [], None
+    if not isinstance(raw, list):
+        return [], "附件参数格式不正确"
+    if len(raw) > attachments.MAX_PER_MESSAGE:
+        return [], f"单条消息最多携带 {attachments.MAX_PER_MESSAGE} 个附件"
+
+    resolved: list[dict] = []
+    for item in raw:
+        att_id = item.get(WSMsgKey.ID) if isinstance(item, dict) else None
+        meta = attachments.describe(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            att_id=str(att_id) if att_id is not None else "",
+        )
+        if meta is None:
+            # 不区分"格式非法"与"不是我上传的"：避免把"这个 id 存在"泄露出去
+            return [], "附件不存在或已失效，请重新上传"
+        resolved.append(meta)
+    return resolved, None
+
+
 async def _run_turn(
     ws: WebSocket,
     session: SessionDep,
@@ -254,6 +300,7 @@ async def _run_turn(
     current_user: User,
     conversation_id: str,
     content: str,
+    attachment_ids: object,
 ) -> None:
     """_run_turn_inner 的安全外壳：任何未捕获异常都要回 error + done，
     否则前端会永远停在"生成中"。"""
@@ -266,6 +313,7 @@ async def _run_turn(
             current_user,
             conversation_id,
             content,
+            attachment_ids,
         )
     except asyncio.CancelledError:
         raise
@@ -333,6 +381,7 @@ async def _run_turn_inner(
     current_user: User,
     conversation_id: str,
     content: str,
+    attachment_ids: object,
 ) -> None:
     """处理一轮用户消息：落库 → 前置 Stage → 流式生成 → 收尾 done。
 
@@ -340,10 +389,26 @@ async def _run_turn_inner(
     CancelledError 会打断 agent.stream（LLM 请求随之终止），
     本函数捕获后把已生成的部分落库并照常发 done（带 interrupted 标记）。
     """
+    att_meta, att_error = _resolve_attachments(
+        current_user.id, conversation_id, attachment_ids
+    )
+    if att_error:
+        await ws.send_json({
+            WSMsgKey.TYPE: WSMessageType.TEXT_CHUNK,
+            WSMsgKey.CONTENT: att_error,
+        })
+        await ws.send_json({WSMsgKey.TYPE: WSMessageType.DONE})
+        return
+
+    # 落库：正文与附件元数据同存 content，历史回放时一次取齐
+    if att_meta:
+        user_content: object = {"text": content, WSMsgKey.ATTACHMENTS: att_meta}
+    else:
+        user_content = content
     user_msg = conv_manager.add_message(
         conv_id=conversation.id,
         role=WSMessageRole.USER,
-        content=content,
+        content=user_content,
     )
     # 首条消息自动成标题：让侧边栏不再是一堆「新对话」。
     # 两个条件缺一不可：
@@ -353,8 +418,10 @@ async def _run_turn_inner(
         conversation.title == DEFAULT_CONVERSATION_TITLE
         and conv_manager.count_messages(conversation.id) == 1
     ):
-        # 多行输入压成一行、去掉首尾空白，再截断到 20 字
-        title = str(content).strip().replace("\n", " ")[:AUTO_TITLE_MAX_LEN]
+        # 多行输入压成一行、去掉首尾空白，再截断到 20 字；
+        # 只发附件不发字时退回用首个附件名当标题，否则会一直挂着「新对话」
+        title_source = content or (att_meta[0]["filename"] if att_meta else "")
+        title = str(title_source).strip().replace("\n", " ")[:AUTO_TITLE_MAX_LEN]
         if title:
             # ORM 脏跟踪：改了属性，commit 即落库（updated_at 自动刷新）
             conversation.title = title
@@ -509,7 +576,7 @@ async def chat_ws(
 ):
 
     await ws.accept()
-   
+
 
     conv_manager = ConversationManager(session)
     conversation = conv_manager.get_conversation(UUID(conversation_id), current_user.id)
@@ -547,7 +614,8 @@ async def chat_ws(
                         conversation,
                         current_user,
                         conversation_id,
-                        str(data[WSMsgKey.CONTENT]),
+                        str(data.get(WSMsgKey.CONTENT) or ""),
+                        data.get(WSMsgKey.ATTACHMENTS),
                     )
                 )
     except WebSocketDisconnect:

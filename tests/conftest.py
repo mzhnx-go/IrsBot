@@ -113,6 +113,21 @@ def client() -> Generator[TestClient, None, None]:
         yield c
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limit() -> None:
+    """每个用例开始前清空限流窗口。
+
+    限流 Stage 是进程级共享单例，窗口按 time.monotonic() 累计：整个测试会话里
+    同一用户累计发言超过 RATE_LIMIT_REQUESTS（默认 20）就会开始拦截，
+    于是测试结果取决于「跑得多快」——套件全量跑必红，单文件跑才绿。
+    这不是被测行为（限流本身的测试各自构造实例或临时改 max_requests），
+    所以这里按用例复位，让结果只反映代码而不是墙钟。
+    """
+    from app.core.pipeline.stages.rate_limit import get_rate_limit_stage
+
+    get_rate_limit_stage()._requests.clear()
+
+
 @pytest.fixture(scope="module")
 def superuser_token_headers(client: TestClient) -> dict[str, str]:
     return get_superuser_token_headers(client)

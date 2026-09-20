@@ -15,6 +15,23 @@ from app.core.db.models import Conversation, Message
 from app.core.db.sqlmodel_models import get_datetime_utc
 
 
+def _text_of(content: Any) -> str:
+    """从 Message.content 里取出纯文本正文。
+
+    content 可能是字符串，也可能是 {"text": ..., "attachments": [...]} 这类 dict。
+    dict 分支只认 text，退而求其次只认字符串值——**带附件但没打字的用户消息**
+    其 content["attachments"] 是列表，绝不能被当成正文喂给模型。
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, dict):
+        text = content.get("text")
+        if isinstance(text, str):
+            return text
+        return next((v for v in content.values() if isinstance(v, str)), "")
+    return json.dumps(content)
+
+
 class ConversationManager:
     """管理 Conversation / Message 的增删改查以及 LangChain 集成。"""
 
@@ -304,17 +321,7 @@ class ConversationManager:
             if cls is None:
                 continue
 
-            content = row.content
-            if isinstance(content, str):
-                text = content
-            elif isinstance(content, dict):
-                text = (
-                    content.get("text") or next(iter(content.values()), "")
-                    if content
-                    else ""
-                )
-            else:
-                text = json.dumps(content)
+            text = _text_of(row.content)
 
             if row.role == "tool" and row.tool_call_id:
                 msg = cls(content=text, tool_call_id=row.tool_call_id)
@@ -427,17 +434,7 @@ class ConversationManager:
             if cls is None:
                 continue
 
-            content = row.content
-            if isinstance(content, str):
-                text = content
-            elif isinstance(content, dict):
-                text = (
-                    content.get("text") or next(iter(content.values()), "")
-                    if content
-                    else ""
-                )
-            else:
-                text = json.dumps(content)
+            text = _text_of(row.content)
 
             if row.role == "tool" and row.tool_call_id:
                 msg = cls(content=text, tool_call_id=row.tool_call_id)
