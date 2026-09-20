@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { ArrowUp } from "lucide-react"
+import { ArrowUp, Loader2, Square } from "lucide-react"
 import { type FormEvent, useEffect, useRef, useState } from "react"
 import { AgentService } from "@/client"
 import MessageItem from "@/components/Chat/MessageItem"
@@ -75,13 +75,20 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
     isConnected,
     isStreaming,
     sendMessage,
+    interrupt,
     deleteMessage,
     regenerate,
     editAndResend,
   } = useAgentChat(conversationId)
   const [input, setInput] = useState("")
+  // 已点停止、等待后端收尾 done（done 到达后 isStreaming 置假自动复位）
+  const [stopping, setStopping] = useState(false)
   const queryClient = useQueryClient()
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isStreaming) setStopping(false)
+  }, [isStreaming])
 
   // 新消息/流式增量时贴底；用户已上滑阅读历史时不打断
   useEffect(() => {
@@ -157,21 +164,41 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
             }}
             className="max-h-40 min-h-6 w-full resize-none bg-transparent py-1.5 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
           />
-          <button
-            type="submit"
-            aria-label="发送"
-            disabled={!input.trim() || isStreaming || !isConnected}
-            className="flex size-8 shrink-0 items-center justify-center self-end rounded-full text-white transition-all duration-[150ms] ease-out hover:scale-[1.05] active:scale-90 motion-reduce:transform-none disabled:pointer-events-none disabled:scale-100 disabled:bg-muted disabled:text-muted-foreground"
-            style={{
-              // 可发送时用概念图强调蓝（token）；否则交给 disabled 灰态
-              background:
-                input.trim() && !isStreaming && isConnected
-                  ? "var(--chat-accent)"
-                  : undefined,
-            }}
-          >
-            <ArrowUp className="size-4" />
-          </button>
+          {isStreaming ? (
+            /* 流式中：发送按钮变身为停止按钮；点击发 interrupt，
+               等后端收尾 done 后 isStreaming 自动置假复位 */
+            <button
+              type="button"
+              aria-label="停止生成"
+              onClick={() => {
+                setStopping(true)
+                interrupt()
+              }}
+              className="flex size-8 shrink-0 items-center justify-center self-end rounded-full bg-[var(--chat-accent)] text-white transition-transform duration-[150ms] ease-out hover:scale-[1.05] active:scale-90 motion-reduce:transform-none"
+            >
+              {stopping ? (
+                <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
+              ) : (
+                <Square className="size-3 fill-current" />
+              )}
+            </button>
+          ) : (
+            <button
+              type="submit"
+              aria-label="发送"
+              disabled={!input.trim() || !isConnected}
+              className="flex size-8 shrink-0 items-center justify-center self-end rounded-full text-white transition-all duration-[150ms] ease-out hover:scale-[1.05] active:scale-90 motion-reduce:transform-none disabled:pointer-events-none disabled:scale-100 disabled:bg-muted disabled:text-muted-foreground"
+              style={{
+                // 可发送时用概念图强调蓝（token）；否则交给 disabled 灰态
+                background:
+                  input.trim() && isConnected
+                    ? "var(--chat-accent)"
+                    : undefined,
+              }}
+            >
+              <ArrowUp className="size-4" />
+            </button>
+          )}
         </div>
       </form>
     </div>

@@ -4,15 +4,17 @@
 
 上行：
     {"type": "message", "content": "用户消息"}
+    {"type": "interrupt"}                      # 中断当前生成
 
 下行：
     {"type": "history", "messages": [{"id", "role", "content", "tool_calls"?}...]}
     {"type": "text_chunk", "content": "文字块"}
     {"type": "tool_call", "name": "工具名", "phase": "start" | "end"}
-    {"type": "done", "user_message_id"?: "...", "assistant_message_id"?: "..."}
+    {"type": "done", "user_message_id"?: "...", "assistant_message_id"?: "...", "interrupted"?: true}
 
 协议细节见 docs/protocols/chat-ws-protocol.md
 """
+import asyncio
 import json
 from uuid import UUID
 
@@ -43,6 +45,7 @@ class WSMessageType:
 
     # 上行：前端 → 后端
     USER_MESSAGE = "message"
+    INTERRUPT = "interrupt"
 
     # 下行：后端 → 前端
     HISTORY = "history"
@@ -73,6 +76,8 @@ class WSMsgKey:
     ASSISTANT_MESSAGE_ID = "assistant_message_id"
     INPUT = "input"
     OUTPUT = "output"
+    INTERRUPTED = "interrupted"
+    STOPPED = "stopped"
 
 
 class WSToolPhase:
@@ -131,6 +136,9 @@ def build_history_payload(msgs) -> dict:
                 item[WSMsgKey.TOOL_CALLS] = trace
             elif m.tool_calls:
                 item[WSMsgKey.TOOL_CALLS] = m.tool_calls
+            if isinstance(content, dict) and content.get("stopped"):
+                # 被中断的半成品回复：刷新后仍标注"已停止生成"
+                item[WSMsgKey.STOPPED] = True
         items.append(item)
     return {
         WSMsgKey.TYPE: WSMessageType.HISTORY,
@@ -201,6 +209,136 @@ def merge_tool_trace(trace: list[dict], event: dict) -> None:
         WSMsgKey.OUTPUT: event.get(WSMsgKey.OUTPUT, ""),
     })
 
+async def _run_turn(
+    ws: WebSocket,
+    session: SessionDep,
+    conv_manager: ConversationManager,
+    conversation,
+    current_user: User,
+    conversation_id: str,
+    content: str,
+) -> None:
+    """处理一轮用户消息：落库 → 前置 Stage → 流式生成 → 收尾 done。
+
+    作为独立 asyncio.Task 运行，收到 interrupt 时被 cancel：
+    CancelledError 会打断 agent.stream（LLM 请求随之终止），
+    本函数捕获后把已生成的部分落库并照常发 done（带 interrupted 标记）。
+    """
+    user_msg = conv_manager.add_message(
+        conv_id=conversation.id,
+        role=WSMessageRole.USER,
+        content=content,
+    )
+    # 首条消息自动成标题：让侧边栏不再是一堆「新对话」。
+    # 两个条件缺一不可：
+    #   1) 标题仍是默认值 —— 用户（或后续重命名功能）设过标题就不覆盖；
+    #   2) 这是会话的第一条消息 —— add_message 刚写完，故 count == 1。
+    if (
+        conversation.title == DEFAULT_CONVERSATION_TITLE
+        and conv_manager.count_messages(conversation.id) == 1
+    ):
+        # 多行输入压成一行、去掉首尾空白，再截断到 20 字
+        title = str(content).strip().replace("\n", " ")[:AUTO_TITLE_MAX_LEN]
+        if title:
+            # ORM 脏跟踪：改了属性，commit 即落库（updated_at 自动刷新）
+            conversation.title = title
+            session.commit()
+    history = conv_manager.get_context_messages(conversation.id)
+
+    # ── 前置 Stage（限流/会话开关/预处理）与 REST 共用同一实现 ──
+    # WS 无法改 HTTP 状态码，命中拦截时以 text_chunk 说明原因
+    # 再发 done，前端协议（history/text_chunk/tool_call/done）保持不变。
+    context = await run_entry_stages(
+        PipelineContext(
+            user_id=current_user.id,
+            session_id=conversation_id,
+            conversation_id=conversation.id,
+            event_data={
+                EventKey.SESSION: session,
+                EventKey.CONVERSATION: conversation,
+                EventKey.USER_MESSAGE: content,
+                EventKey.HISTORY: history,
+            },
+        )
+    )
+    if context.event_data.get(EventKey.RATE_LIMITED):
+        await ws.send_json({
+            WSMsgKey.TYPE: WSMessageType.TEXT_CHUNK,
+            WSMsgKey.CONTENT: "请求过于频繁，请稍后再试。",
+        })
+        await ws.send_json({WSMsgKey.TYPE: WSMessageType.DONE})
+        return
+    if EventKey.ERROR in context.event_data:
+        await ws.send_json({
+            WSMsgKey.TYPE: WSMessageType.TEXT_CHUNK,
+            WSMsgKey.CONTENT: context.event_data[EventKey.ERROR],
+        })
+        await ws.send_json({WSMsgKey.TYPE: WSMessageType.DONE})
+        return
+
+    agent = Agent(
+        session=session,
+        conversation_id=conversation_id,
+        user_id=str(current_user.id),
+    )
+    reply = ""
+    tool_trace: list[dict] = []
+    interrupted = False
+
+    try:
+        async for event in agent.stream(
+            context.event_data[EventKey.USER_MESSAGE], history
+        ):
+            msg = to_frontend_event(event)
+            if msg is not None:
+                await ws.send_json(msg)
+                if msg[WSMsgKey.TYPE] == WSMessageType.TEXT_CHUNK:
+                    reply += msg[WSMsgKey.CONTENT]
+                elif msg[WSMsgKey.TYPE] == WSMessageType.TOOL_CALL:
+                    merge_tool_trace(tool_trace, msg)
+    except asyncio.CancelledError:
+        interrupted = True
+
+    # 工具轨迹存进 content.tool_trace：tool_calls 列会被
+    # get_context_messages 转成 LangChain AIMessage.tool_calls，
+    # 展示用轨迹格式不同，混写会污染发给模型的上下文
+    assistant_id = None
+    if reply or tool_trace:
+        if tool_trace or interrupted:
+            payload: dict = {"text": reply}
+            if tool_trace:
+                payload["tool_trace"] = tool_trace
+            if interrupted:
+                payload["stopped"] = True
+            content_val: object = payload
+        else:
+            content_val = reply
+        assistant_msg = conv_manager.add_message(
+            conv_id=conversation.id,
+            role=WSMessageRole.ASSISTANT,
+            content=content_val,
+        )
+        assistant_id = str(assistant_msg.id)
+    # done 回传落库消息的真实 ID：
+    # 前端消息操作（删除/编辑重发/重新生成）按 ID 调 REST，
+    # 没有 ID 就只能整表重拉。被打断时没有 assistant ID，
+    # 前端据 interrupted 标记展示"已停止"状态。
+    done: dict = {
+        WSMsgKey.TYPE: WSMessageType.DONE,
+        WSMsgKey.USER_MESSAGE_ID: str(user_msg.id),
+    }
+    if assistant_id:
+        done[WSMsgKey.ASSISTANT_MESSAGE_ID] = assistant_id
+    if interrupted:
+        done[WSMsgKey.INTERRUPTED] = True
+    try:
+        await ws.send_json(done)
+    except Exception:
+        # 客户端已断开（WebSocketDisconnect 路径取消本任务时可能发生）：
+        # 部分回复已落库，刷新页面即可看到，发不出去就算了
+        pass
+
+
 @router.websocket("/agent/chat/ws/{conversation_id}")
 async def chat_ws(
     ws: WebSocket,
@@ -222,103 +360,35 @@ async def chat_ws(
     history_rows = conv_manager.get_messages(conversation.id)
     await ws.send_json(build_history_payload(history_rows))
 
+    # 当前轮次跑在独立 Task 里，主循环才能继续收消息——
+    # 否则 agent.stream 生成期间阻塞在 await，interrupt 永远收不到。
+    turn_task: asyncio.Task | None = None
     try:
         while True:
             data = await ws.receive_json()
-            if data[WSMsgKey.TYPE] == WSMessageType.USER_MESSAGE:
-                user_msg = conv_manager.add_message(
-                    conv_id=conversation.id,
-                    role=WSMessageRole.USER,
-                    content=data[WSMsgKey.CONTENT],
-                )
-                # 首条消息自动成标题：让侧边栏不再是一堆「新对话」。
-                # 两个条件缺一不可：
-                #   1) 标题仍是默认值 —— 用户（或后续重命名功能）设过标题就不覆盖；
-                #   2) 这是会话的第一条消息 —— add_message 刚写完，故 count == 1。
-                if (
-                    conversation.title == DEFAULT_CONVERSATION_TITLE
-                    and conv_manager.count_messages(conversation.id) == 1
-                ):
-                    # 多行输入压成一行、去掉首尾空白，再截断到 20 字
-                    title = (
-                        str(data[WSMsgKey.CONTENT]).strip().replace("\n", " ")
-                    )[:AUTO_TITLE_MAX_LEN]
-                    if title:
-                        # ORM 脏跟踪：改了属性，commit 即落库（updated_at 自动刷新）
-                        conversation.title = title
-                        session.commit()
-                history = conv_manager.get_context_messages(conversation.id)
+            msg_type = data[WSMsgKey.TYPE]
 
-                # ── 前置 Stage（限流/会话开关/预处理）与 REST 共用同一实现 ──
-                # WS 无法改 HTTP 状态码，命中拦截时以 text_chunk 说明原因
-                # 再发 done，前端协议（history/text_chunk/tool_call/done）保持不变。
-                context = await run_entry_stages(
-                    PipelineContext(
-                        user_id=current_user.id,
-                        session_id=conversation_id,
-                        conversation_id=conversation.id,
-                        event_data={
-                            EventKey.SESSION: session,
-                            EventKey.CONVERSATION: conversation,
-                            EventKey.USER_MESSAGE: data[WSMsgKey.CONTENT],
-                            EventKey.HISTORY: history,
-                        },
+            if msg_type == WSMessageType.INTERRUPT:
+                if turn_task and not turn_task.done():
+                    turn_task.cancel()
+                continue
+
+            if msg_type == WSMessageType.USER_MESSAGE:
+                # 上一轮还没收尾（如刚被打断、正在落库发 done）时忽略；
+                # 前端在 done 之前禁用发送，正常不会走到这里
+                if turn_task and not turn_task.done():
+                    continue
+                turn_task = asyncio.create_task(
+                    _run_turn(
+                        ws,
+                        session,
+                        conv_manager,
+                        conversation,
+                        current_user,
+                        conversation_id,
+                        str(data[WSMsgKey.CONTENT]),
                     )
                 )
-                if context.event_data.get(EventKey.RATE_LIMITED):
-                    await ws.send_json({
-                        WSMsgKey.TYPE: WSMessageType.TEXT_CHUNK,
-                        WSMsgKey.CONTENT: "请求过于频繁，请稍后再试。",
-                    })
-                    await ws.send_json({WSMsgKey.TYPE: WSMessageType.DONE})
-                    continue
-                if EventKey.ERROR in context.event_data:
-                    await ws.send_json({
-                        WSMsgKey.TYPE: WSMessageType.TEXT_CHUNK,
-                        WSMsgKey.CONTENT: context.event_data[EventKey.ERROR],
-                    })
-                    await ws.send_json({WSMsgKey.TYPE: WSMessageType.DONE})
-                    continue
-
-                agent = Agent(
-                    session=session,
-                    conversation_id=conversation_id,
-                    user_id=str(current_user.id),
-                )
-                reply = ""
-                tool_trace: list[dict] = []
-
-
-                async for event in agent.stream(
-                    context.event_data[EventKey.USER_MESSAGE], history
-                ):
-                    msg = to_frontend_event(event)
-                    if msg is not None:
-                        await ws.send_json(msg)
-                        if msg[WSMsgKey.TYPE] == WSMessageType.TEXT_CHUNK:
-                            reply += msg[WSMsgKey.CONTENT]
-                        elif msg[WSMsgKey.TYPE] == WSMessageType.TOOL_CALL:
-                            merge_tool_trace(tool_trace, msg)
-
-                # 工具轨迹存进 content.tool_trace：tool_calls 列会被
-                # get_context_messages 转成 LangChain AIMessage.tool_calls，
-                # 展示用轨迹格式不同，混写会污染发给模型的上下文
-                assistant_msg = conv_manager.add_message(
-                    conv_id=conversation.id,
-                    role=WSMessageRole.ASSISTANT,
-                    content=(
-                        {"text": reply, "tool_trace": tool_trace}
-                        if tool_trace
-                        else reply
-                    ),
-                )
-                # done 回传两条落库消息的真实 ID：
-                # 前端消息操作（删除/编辑重发/重新生成）按 ID 调 REST，
-                # 没有 ID 就只能整表重拉。
-                await ws.send_json({
-                    WSMsgKey.TYPE: WSMessageType.DONE,
-                    WSMsgKey.USER_MESSAGE_ID: str(user_msg.id),
-                    WSMsgKey.ASSISTANT_MESSAGE_ID: str(assistant_msg.id),
-                })
     except WebSocketDisconnect:
-        pass
+        if turn_task and not turn_task.done():
+            turn_task.cancel()

@@ -20,6 +20,8 @@ export interface ChatMessage {
   content: string
   toolCalls?: ToolCall[]
   streaming?: boolean
+  /** 本轮被用户中断，回复是半成品 */
+  stopped?: boolean
 }
 
 export function useAgentChat(conversationId: string) {
@@ -92,6 +94,7 @@ export function useAgentChat(conversationId: string) {
               role: "user" | "assistant"
               content: string
               tool_calls?: ToolCall[]
+              stopped?: boolean
             }>
           ).map((h) => ({
             id: h.id ?? crypto.randomUUID(),
@@ -99,6 +102,7 @@ export function useAgentChat(conversationId: string) {
             role: h.role,
             content: h.content,
             toolCalls: h.tool_calls,
+            stopped: h.stopped,
             streaming: false,
           })),
         )
@@ -170,6 +174,8 @@ export function useAgentChat(conversationId: string) {
               next = { ...next, dbId: msg.user_message_id }
             if (i === lastAssistant && msg.assistant_message_id)
               next = { ...next, dbId: msg.assistant_message_id }
+            if (i === lastAssistant && msg.interrupted)
+              next = { ...next, stopped: true }
             return next
           })
         })
@@ -197,6 +203,15 @@ export function useAgentChat(conversationId: string) {
     setIsStreaming(true)
 
     ws.send(JSON.stringify({ type: "message", content }))
+  }, [])
+
+  /** 中断当前生成：通知后端 cancel 本轮任务。
+   *  真正的收尾（isStreaming 置假、部分回复落库）由后端随后的 done 事件驱动，
+   *  这里不本地置状态，避免与 done 竞态导致半成品消息丢失 ID。 */
+  const interrupt = useCallback(() => {
+    const ws = wsRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+    ws.send(JSON.stringify({ type: "interrupt" }))
   }, [])
 
   /** 截断本地状态：删掉 dbId 对应消息及其后的所有消息 */
@@ -278,6 +293,7 @@ export function useAgentChat(conversationId: string) {
     isConnected,
     isStreaming,
     sendMessage,
+    interrupt,
     deleteMessage,
     regenerate,
     editAndResend,

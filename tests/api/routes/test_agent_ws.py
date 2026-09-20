@@ -9,6 +9,22 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 
+async def fake_slow_stream(content, history=None):
+    """吐一个文字块后卡在长睡眠里，等着被 interrupt 取消。
+
+    总时长有上限（600 × 50ms = 30s），即使取消逻辑失效测试也会结束，
+    届时 done 不带 interrupted 标记 → 断言失败而不是永久挂死。
+    """
+    import asyncio
+
+    yield {
+        "event": "on_chat_model_stream",
+        "data": {"chunk": SimpleNamespace(content="前半段")},
+    }
+    for _ in range(600):
+        await asyncio.sleep(0.05)
+
+
 async def fake_stream(content, history=None):
     """模拟 agent.stream：按编排吐出原始 LangGraph 事件
 
@@ -124,3 +140,50 @@ def test_chat_ws_tool_events_carry_io_and_persist(
         assert trace[0]["name"] == "kb_search"
         assert trace[0]["phase"] == "end"
         assert trace[0]["output"] == "命中 2 条"
+
+
+def test_chat_ws_interrupt_stops_and_persists_partial(
+    client, superuser_token_headers
+):
+    """interrupt 应取消生成长流、落库已生成部分并回带 interrupted 标记的 done"""
+    token = superuser_token_headers["Authorization"].split(" ", 1)[1]
+    resp = client.post(
+        "/api/v1/agent/conversations",
+        json={"title": "ws-interrupt-test"},
+        headers=superuser_token_headers,
+    )
+    conv_id = resp.json()["id"]
+
+    import time
+
+    with patch("app.api.routes.agent_ws.Agent") as mock_agent:
+        mock_agent.return_value.stream = fake_slow_stream
+        with client.websocket_connect(
+            f"/api/v1/agent/chat/ws/{conv_id}?token={token}",
+        ) as ws:
+            ws.receive_json()  # history（空）
+            ws.send_json({"type": "message", "content": "讲个超长的故事"})
+
+            chunk = ws.receive_json()
+            assert chunk == {"type": "text_chunk", "content": "前半段"}
+
+            # 流还卡在后面（fake_slow_stream 会睡 30s），此时发中断
+            t0 = time.monotonic()
+            ws.send_json({"type": "interrupt"})
+
+            done = ws.receive_json()
+            assert done["type"] == "done"
+            assert done.get("interrupted") is True
+            assert done["user_message_id"]
+            assert done["assistant_message_id"]
+            # 中断应近乎立即生效，而不是等满 30s 自然结束
+            assert time.monotonic() - t0 < 5.0
+
+    # 重连：被中断的部分回复应带 stopped 标记还原
+    with client.websocket_connect(
+        f"/api/v1/agent/chat/ws/{conv_id}?token={token}",
+    ) as ws:
+        history = ws.receive_json()
+        assistant = [m for m in history["messages"] if m["role"] == "assistant"][0]
+        assert assistant["content"] == "前半段"
+        assert assistant.get("stopped") is True

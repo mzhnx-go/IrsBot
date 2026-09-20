@@ -143,6 +143,11 @@ const MessageItem = ({
         )}
       </div>
 
+      {/* 被中断的半成品回复：明确标注，避免误以为回复完整 */}
+      {!isUser && message.stopped && (
+        <p className="mt-1 text-xs text-muted-foreground">已停止生成</p>
+      )}
+
       {/* 悬停操作条：触屏无 hover，常驻显示 */}
       <div
         className={`mt-1 flex gap-0.5 transition-opacity duration-150 ${
