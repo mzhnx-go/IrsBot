@@ -9,16 +9,19 @@ from urllib.parse import quote
 # ── 第三方库 ──
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
+from sqlmodel import select
 
 # ── 项目内部 ──
 from app.api.deps import CurrentUser, SessionDep
 from app.core import crud
 from app.core.agent.conversation import ConversationManager
 from app.core.agent.export import render_export
+from app.core.db.models import Conversation
 from app.core.db.sqlmodel_models import (
     ChatRequest,
     ChatResponse,
     ConversationCreate,
+    ConversationPersonaUpdate,
     ConversationRename,
     ConversationResponse,
     MCPServerConnectResponse,
@@ -27,6 +30,9 @@ from app.core.db.sqlmodel_models import (
     MCPServerUpdate,
     MessageOut,
     MessageTruncateRequest,
+    PersonaCreate,
+    PersonaResponse,
+    PersonaUpdate,
 )
 from app.core.mcp.bridge import MCPToolBridge
 from app.core.mcp.client import MCPClient
@@ -74,6 +80,17 @@ def _content_disposition(filename: str) -> str:
     )
 
 
+def _conversation_response(c: Conversation) -> ConversationResponse:
+    return ConversationResponse(
+        id=c.id,
+        title=c.title,
+        session_id=c.session_id,
+        persona_id=c.persona_id,
+        created_at=c.created_at,
+        updated_at=c.updated_at,
+    )
+
+
 @router.post("/conversations", response_model=ConversationResponse)
 def create_conversation(
     conversation_in: ConversationCreate,
@@ -85,14 +102,9 @@ def create_conversation(
         session,
         title=conversation_in.title,
         user_id=current_user.id,
+        persona_id=conversation_in.persona_id,
     )
-    return ConversationResponse(
-        id=conversation.id,
-        title=conversation.title,
-        session_id=conversation.session_id,
-        created_at=conversation.created_at,
-        updated_at=conversation.updated_at,
-    )
+    return _conversation_response(conversation)
 
 @router.get("/conversations", response_model=list[ConversationResponse])
 def list_conversations(
@@ -108,16 +120,7 @@ def list_conversations(
         skip=skip,
         limit=limit,
     )
-    return [
-        ConversationResponse(
-            id=c.id,
-            title=c.title,
-            session_id=c.session_id,
-            created_at=c.created_at,
-            updated_at=c.updated_at,
-        )
-        for c in conversations
-    ]
+    return [_conversation_response(c) for c in conversations]
 
 
 @router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
@@ -138,13 +141,7 @@ def rename_conversation(
     conversation.title = body.title
     session.commit()
     session.refresh(conversation)
-    return ConversationResponse(
-        id=conversation.id,
-        title=conversation.title,
-        session_id=conversation.session_id,
-        created_at=conversation.created_at,
-        updated_at=conversation.updated_at,
-    )
+    return _conversation_response(conversation)
 
 
 @router.delete("/conversations/{conversation_id}")
@@ -555,6 +552,135 @@ async def connect_mcp_server(
 
     finally:
         await client.close()
+
+# ═══════════════ Persona 管理 ═══════════════
+
+
+def _persona_response(p) -> PersonaResponse:
+    return PersonaResponse(
+        id=p.id,
+        name=p.name,
+        prompt=p.prompt,
+        avatar=p.avatar,
+        default_provider_id=p.default_provider_id,
+        tools=p.tools or [],
+        is_active=p.is_active,
+        created_at=p.created_at,
+    )
+
+
+@router.post("/personas", response_model=PersonaResponse, status_code=201)
+def create_persona_route(
+    persona_in: PersonaCreate,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """创建人设"""
+    persona = crud.create_persona(
+        session,
+        name=persona_in.name,
+        prompt=persona_in.prompt,
+        user_id=current_user.id,
+        avatar=persona_in.avatar,
+        default_provider_id=persona_in.default_provider_id,
+        tools=persona_in.tools,
+        is_active=persona_in.is_active,
+    )
+    return _persona_response(persona)
+
+
+@router.get("/personas", response_model=list[PersonaResponse])
+def list_personas_route(
+    session: SessionDep,
+    current_user: CurrentUser,
+    skip: int = 0,
+    limit: int = 100,
+):
+    """获取当前用户的人设列表"""
+    return [
+        _persona_response(p)
+        for p in crud.list_personas(session, user_id=current_user.id, skip=skip, limit=limit)
+    ]
+
+
+@router.get("/personas/{persona_id}", response_model=PersonaResponse)
+def get_persona_route(
+    persona_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """获取单个人设详情"""
+    persona = crud.get_persona(session, persona_id=persona_id, user_id=current_user.id)
+    if not persona:
+        raise HTTPException(status_code=404, detail="人设不存在")
+    return _persona_response(persona)
+
+
+@router.patch("/personas/{persona_id}", response_model=PersonaResponse)
+def update_persona_route(
+    persona_id: uuid.UUID,
+    persona_in: PersonaUpdate,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """更新人设（只更新提供的字段）"""
+    persona = crud.get_persona(session, persona_id=persona_id, user_id=current_user.id)
+    if not persona:
+        raise HTTPException(status_code=404, detail="人设不存在")
+    for key, value in persona_in.model_dump(exclude_unset=True).items():
+        setattr(persona, key, value)
+    session.commit()
+    session.refresh(persona)
+    return _persona_response(persona)
+
+
+@router.delete("/personas/{persona_id}")
+def delete_persona_route(
+    persona_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """删除人设（会话上的人设绑定随之解绑）"""
+    persona = crud.get_persona(session, persona_id=persona_id, user_id=current_user.id)
+    if not persona:
+        raise HTTPException(status_code=404, detail="人设不存在")
+    # 先解绑引用该人设的会话，避免运行期查到已删除的人设
+    for conv in session.exec(
+        select(Conversation).where(
+            Conversation.persona_id == persona_id,
+            Conversation.user_id == current_user.id,
+        )
+    ).all():
+        conv.persona_id = None
+    session.delete(persona)
+    session.commit()
+    return {"message": "人设已删除"}
+
+
+@router.patch("/conversations/{conversation_id}/persona", response_model=ConversationResponse)
+def bind_conversation_persona(
+    conversation_id: uuid.UUID,
+    body: ConversationPersonaUpdate,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """会话绑定/解绑人设（persona_id 为 null 即解绑，回落用户默认提示词）"""
+    conv = crud.get_conversation(
+        session, conv_id=conversation_id, user_id=current_user.id
+    )
+    if not conv:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    if body.persona_id is not None:
+        persona = crud.get_persona(
+            session, persona_id=body.persona_id, user_id=current_user.id
+        )
+        if not persona:
+            raise HTTPException(status_code=404, detail="人设不存在")
+    conv.persona_id = body.persona_id
+    session.commit()
+    session.refresh(conv)
+    return _conversation_response(conv)
+
 
 # ═══════════════ Skill 管理 ═══════════════
 SKILLS_DIR = Path("skills")

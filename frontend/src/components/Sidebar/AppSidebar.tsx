@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  Drama,
   Home,
   Library,
   MessageSquare,
@@ -33,6 +34,7 @@ const baseItems: Item[] = [
   { icon: Sparkles, title: "模型源", path: "/providers" },
   { icon: Plug, title: "MCP 服务", path: "/mcp" },
   { icon: BookOpen, title: "技能", path: "/skills" },
+  { icon: Drama, title: "人设", path: "/personas" },
   { icon: Settings, title: "设置", path: "/settings" },
 ]
 

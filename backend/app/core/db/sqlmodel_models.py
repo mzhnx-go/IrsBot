@@ -99,6 +99,8 @@ class NewPassword(SQLModel):
 class ConversationCreate(SQLModel):
     """创建对话请求"""
     title: str = "新对话"
+    # 可选绑定人设：创建时即指定，省去二次 PATCH
+    persona_id: uuid.UUID | None = None
 
 
 class ConversationRename(SQLModel):
@@ -125,6 +127,7 @@ class ConversationResponse(SQLModel):
     id: uuid.UUID
     title: str
     session_id: str
+    persona_id: uuid.UUID | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -197,6 +200,44 @@ class MCPServerConnectResponse(SQLModel):
     success: bool
     message: str 
     tools: list[dict] = Field(default_factory=list)
+
+
+#-- Persona（智能体人设）相关模型
+class PersonaCreate(SQLModel):
+    """创建人设请求"""
+    name: str = Field(min_length=1, max_length=100)
+    prompt: str = Field(min_length=1)
+    avatar: str | None = Field(default=None, max_length=500)
+    default_provider_id: uuid.UUID | None = None
+    tools: list[str] = Field(default_factory=list)
+    is_active: bool = True
+
+
+class PersonaUpdate(SQLModel):
+    """更新人设请求（只更新提供的字段）"""
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    prompt: str | None = Field(default=None, min_length=1)
+    avatar: str | None = Field(default=None, max_length=500)
+    default_provider_id: uuid.UUID | None = None
+    tools: list[str] | None = None
+    is_active: bool | None = None
+
+
+class PersonaResponse(SQLModel):
+    """人设响应"""
+    id: uuid.UUID
+    name: str
+    prompt: str
+    avatar: str | None = None
+    default_provider_id: uuid.UUID | None = None
+    tools: list[str] = Field(default_factory=list)
+    is_active: bool
+    created_at: datetime | None = None
+
+
+class ConversationPersonaUpdate(SQLModel):
+    """会话绑定人设请求（null 表示解绑，回到用户默认提示词）"""
+    persona_id: uuid.UUID | None = None
 
 
 #--系统提示词相关模型

@@ -88,12 +88,19 @@ def delete_provider_config(
 
 
 def create_conversation(
-    session: Session, *, title: str, user_id: uuid.UUID, session_id: str | None = None
+    session: Session,
+    *,
+    title: str,
+    user_id: uuid.UUID,
+    session_id: str | None = None,
+    persona_id: uuid.UUID | None = None,
 ) -> Conversation:
     import uuid as _uuid
     if session_id is None:
         session_id = str(_uuid.uuid4())
-    obj = Conversation(title=title, user_id=user_id, session_id=session_id)
+    obj = Conversation(
+        title=title, user_id=user_id, session_id=session_id, persona_id=persona_id
+    )
     session.add(obj)
     session.commit()
     session.refresh(obj)

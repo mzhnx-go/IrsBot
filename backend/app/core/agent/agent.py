@@ -16,11 +16,12 @@ from sqlalchemy.orm import Session
 import app.core.agent.builtins  # noqa: F401
 from app.core.agent.builtins.kb_query import set_kb_user
 from app.core.agent.graph import create_compiled_agent_graph
-from app.core.agent.prompts import resolve_system_prompt
+from app.core.agent.prompts import apply_persona, resolve_system_prompt
 from app.core.agent.provider import ProviderManager
 from app.core.agent.state import AgentState
 from app.core.agent.tools import ToolRegistry
 from app.core.config import settings
+from app.core.db.models import Conversation, Persona
 from app.core.db.sqlmodel_models import User
 from app.core.pipeline.hooks import hook_bus
 
@@ -88,6 +89,26 @@ class Agent:
             except SQLAlchemyError:
                 # 查询失败：退回默认提示词，不阻断会话
                 self.system_prompt = None
+
+        # 会话绑定了人设（Persona）时，把人设指令叠加到系统提示词之上；
+        # 人设只影响"怎么说话"，平台护栏（身份约定等）保留不被覆盖
+        try:
+            conv_uuid = uuid.UUID(self.conversation_id)
+        except ValueError:
+            conv_uuid = None
+        if conv_uuid is not None and user_uuid is not None:
+            try:
+                conv = session.get(Conversation, conv_uuid)
+                if conv is not None and conv.user_id == user_uuid and conv.persona_id:
+                    persona = session.get(Persona, conv.persona_id)
+                    if persona is not None and persona.is_active:
+                        self.system_prompt = apply_persona(
+                            resolve_system_prompt(self.system_prompt),
+                            persona.prompt,
+                        )
+            except SQLAlchemyError:
+                # 人设查询失败：退回无 persona 行为，不阻断会话
+                pass
 
         # 创建 LLM 模型实例。
         # ⚠️ 必须传 user_id：Provider 解析按归属过滤，否则会取到别人的默认源。

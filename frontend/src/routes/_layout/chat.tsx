@@ -4,6 +4,7 @@ import { ArrowUp, Loader2, Square } from "lucide-react"
 import { type FormEvent, useEffect, useRef, useState } from "react"
 import { AgentService } from "@/client"
 import MessageItem from "@/components/Chat/MessageItem"
+import PersonaPicker from "@/components/Chat/PersonaPicker"
 import { useAgentChat } from "@/hooks/useAgentChat"
 
 export const Route = createFileRoute("/_layout/chat")({
@@ -119,6 +120,10 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
   return (
     <div className="flex min-h-[calc(100svh-4rem)] flex-col">
       <div className="mx-auto w-full max-w-3xl flex-1">
+        {/* 会话人设选择器：右上角小控件，切换即绑定/解绑 */}
+        <div className="flex justify-end pt-2">
+          <PersonaPicker conversationId={conversationId} />
+        </div>
         {/* 连接状态横幅：重连过程与终态都要让用户看得见（中文化） */}
         {messages.length > 0 &&
           connState !== "open" &&

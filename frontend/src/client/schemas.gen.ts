@@ -143,11 +143,43 @@ export const ConversationCreateSchema = {
             type: 'string',
             title: 'Title',
             default: '新对话'
+        },
+        persona_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Persona Id'
         }
     },
     type: 'object',
     title: 'ConversationCreate',
     description: '创建对话请求'
+} as const;
+
+export const ConversationPersonaUpdateSchema = {
+    properties: {
+        persona_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Persona Id'
+        }
+    },
+    type: 'object',
+    title: 'ConversationPersonaUpdate',
+    description: '会话绑定人设请求（null 表示解绑，回到用户默认提示词）'
 } as const;
 
 export const ConversationRenameSchema = {
@@ -179,6 +211,18 @@ export const ConversationResponseSchema = {
         session_id: {
             type: 'string',
             title: 'Session Id'
+        },
+        persona_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Persona Id'
         },
         created_at: {
             anyOf: [
@@ -748,6 +792,212 @@ export const NewPasswordSchema = {
     type: 'object',
     required: ['token', 'new_password'],
     title: 'NewPassword'
+} as const;
+
+export const PersonaCreateSchema = {
+    properties: {
+        name: {
+            type: 'string',
+            maxLength: 100,
+            minLength: 1,
+            title: 'Name'
+        },
+        prompt: {
+            type: 'string',
+            minLength: 1,
+            title: 'Prompt'
+        },
+        avatar: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar'
+        },
+        default_provider_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Default Provider Id'
+        },
+        tools: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tools'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active',
+            default: true
+        }
+    },
+    type: 'object',
+    required: ['name', 'prompt'],
+    title: 'PersonaCreate',
+    description: '创建人设请求'
+} as const;
+
+export const PersonaResponseSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        name: {
+            type: 'string',
+            title: 'Name'
+        },
+        prompt: {
+            type: 'string',
+            title: 'Prompt'
+        },
+        avatar: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar'
+        },
+        default_provider_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Default Provider Id'
+        },
+        tools: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            title: 'Tools'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'name', 'prompt', 'is_active'],
+    title: 'PersonaResponse',
+    description: '人设响应'
+} as const;
+
+export const PersonaUpdateSchema = {
+    properties: {
+        name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 100,
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Name'
+        },
+        prompt: {
+            anyOf: [
+                {
+                    type: 'string',
+                    minLength: 1
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Prompt'
+        },
+        avatar: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 500
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Avatar'
+        },
+        default_provider_id: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'uuid'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Default Provider Id'
+        },
+        tools: {
+            anyOf: [
+                {
+                    items: {
+                        type: 'string'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tools'
+        },
+        is_active: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Is Active'
+        }
+    },
+    type: 'object',
+    title: 'PersonaUpdate',
+    description: '更新人设请求（只更新提供的字段）'
 } as const;
 
 export const PrivateUserCreateSchema = {

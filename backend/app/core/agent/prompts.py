@@ -28,3 +28,12 @@ def resolve_system_prompt(custom: str | None) -> str:
     if custom and custom.strip():
         return custom
     return DEFAULT_SYSTEM_PROMPT
+
+
+def apply_persona(base: str, persona_prompt: str) -> str:
+    """把人设指令叠加到基础提示词之上。
+
+    人设只定义「怎么说话」，不覆盖平台护栏（默认提示词里的身份约定），
+    因此始终作为追加段落出现。
+    """
+    return f"{base}\n\n【当前人设】{persona_prompt.strip()}"

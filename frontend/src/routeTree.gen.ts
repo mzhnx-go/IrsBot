@@ -9,29 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LayoutRouteImport } from './routes/_layout'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
-import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
-import { Route as LayoutChatRouteImport } from './routes/_layout/chat'
-import { Route as LayoutKnowledgeBaseRouteImport } from './routes/_layout/knowledge-base'
-import { Route as LayoutMcpRouteImport } from './routes/_layout/mcp'
-import { Route as LayoutProvidersRouteImport } from './routes/_layout/providers'
-import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutSkillsRouteImport } from './routes/_layout/skills'
+import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
+import { Route as LayoutProvidersRouteImport } from './routes/_layout/providers'
+import { Route as LayoutPersonasRouteImport } from './routes/_layout/personas'
+import { Route as LayoutMcpRouteImport } from './routes/_layout/mcp'
+import { Route as LayoutKnowledgeBaseRouteImport } from './routes/_layout/knowledge-base'
+import { Route as LayoutChatRouteImport } from './routes/_layout/chat'
+import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutKnowledgeBaseIndexRouteImport } from './routes/_layout/knowledge-base.index'
-import { Route as LayoutKnowledgeBaseKbIdRouteImport } from './routes/_layout/knowledge-base.$kbId'
 import { Route as LayoutKnowledgeBaseTrashRouteImport } from './routes/_layout/knowledge-base.trash'
+import { Route as LayoutKnowledgeBaseKbIdRouteImport } from './routes/_layout/knowledge-base.$kbId'
 
-const LayoutRoute = LayoutRouteImport.update({
-  id: '/_layout',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -39,9 +36,13 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LayoutRoute = LayoutRouteImport.update({
+  id: '/_layout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LayoutIndexRoute = LayoutIndexRouteImport.update({
@@ -49,29 +50,9 @@ const LayoutIndexRoute = LayoutIndexRouteImport.update({
   path: '/',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutAdminRoute = LayoutAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutChatRoute = LayoutChatRouteImport.update({
-  id: '/chat',
-  path: '/chat',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutKnowledgeBaseRoute = LayoutKnowledgeBaseRouteImport.update({
-  id: '/knowledge-base',
-  path: '/knowledge-base',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutMcpRoute = LayoutMcpRouteImport.update({
-  id: '/mcp',
-  path: '/mcp',
-  getParentRoute: () => LayoutRoute,
-} as any)
-const LayoutProvidersRoute = LayoutProvidersRouteImport.update({
-  id: '/providers',
-  path: '/providers',
+const LayoutSkillsRoute = LayoutSkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
@@ -79,9 +60,34 @@ const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => LayoutRoute,
 } as any)
-const LayoutSkillsRoute = LayoutSkillsRouteImport.update({
-  id: '/skills',
-  path: '/skills',
+const LayoutProvidersRoute = LayoutProvidersRouteImport.update({
+  id: '/providers',
+  path: '/providers',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutPersonasRoute = LayoutPersonasRouteImport.update({
+  id: '/personas',
+  path: '/personas',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutMcpRoute = LayoutMcpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutKnowledgeBaseRoute = LayoutKnowledgeBaseRouteImport.update({
+  id: '/knowledge-base',
+  path: '/knowledge-base',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutChatRoute = LayoutChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutAdminRoute = LayoutAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutKnowledgeBaseIndexRoute =
@@ -90,17 +96,17 @@ const LayoutKnowledgeBaseIndexRoute =
     path: '/',
     getParentRoute: () => LayoutKnowledgeBaseRoute,
   } as any)
-const LayoutKnowledgeBaseKbIdRoute = LayoutKnowledgeBaseKbIdRouteImport.update({
-  id: '/$kbId',
-  path: '/$kbId',
-  getParentRoute: () => LayoutKnowledgeBaseRoute,
-} as any)
 const LayoutKnowledgeBaseTrashRoute =
   LayoutKnowledgeBaseTrashRouteImport.update({
     id: '/trash',
     path: '/trash',
     getParentRoute: () => LayoutKnowledgeBaseRoute,
   } as any)
+const LayoutKnowledgeBaseKbIdRoute = LayoutKnowledgeBaseKbIdRouteImport.update({
+  id: '/$kbId',
+  path: '/$kbId',
+  getParentRoute: () => LayoutKnowledgeBaseRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof LayoutChatRoute
   '/knowledge-base': typeof LayoutKnowledgeBaseRouteWithChildren
   '/mcp': typeof LayoutMcpRoute
+  '/personas': typeof LayoutPersonasRoute
   '/providers': typeof LayoutProvidersRoute
   '/settings': typeof LayoutSettingsRoute
   '/skills': typeof LayoutSkillsRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/admin': typeof LayoutAdminRoute
   '/chat': typeof LayoutChatRoute
   '/mcp': typeof LayoutMcpRoute
+  '/personas': typeof LayoutPersonasRoute
   '/providers': typeof LayoutProvidersRoute
   '/settings': typeof LayoutSettingsRoute
   '/skills': typeof LayoutSkillsRoute
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/_layout/chat': typeof LayoutChatRoute
   '/_layout/knowledge-base': typeof LayoutKnowledgeBaseRouteWithChildren
   '/_layout/mcp': typeof LayoutMcpRoute
+  '/_layout/personas': typeof LayoutPersonasRoute
   '/_layout/providers': typeof LayoutProvidersRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/skills': typeof LayoutSkillsRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/knowledge-base'
     | '/mcp'
+    | '/personas'
     | '/providers'
     | '/settings'
     | '/skills'
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/chat'
     | '/mcp'
+    | '/personas'
     | '/providers'
     | '/settings'
     | '/skills'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/_layout/chat'
     | '/_layout/knowledge-base'
     | '/_layout/mcp'
+    | '/_layout/personas'
     | '/_layout/providers'
     | '/_layout/settings'
     | '/_layout/skills'
@@ -211,18 +223,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_layout': {
-      id: '/_layout'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof LayoutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -232,11 +237,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_layout': {
+      id: '/_layout'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof LayoutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_layout/': {
@@ -246,39 +258,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutIndexRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/admin': {
-      id: '/_layout/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof LayoutAdminRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/chat': {
-      id: '/_layout/chat'
-      path: '/chat'
-      fullPath: '/chat'
-      preLoaderRoute: typeof LayoutChatRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/knowledge-base': {
-      id: '/_layout/knowledge-base'
-      path: '/knowledge-base'
-      fullPath: '/knowledge-base'
-      preLoaderRoute: typeof LayoutKnowledgeBaseRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/mcp': {
-      id: '/_layout/mcp'
-      path: '/mcp'
-      fullPath: '/mcp'
-      preLoaderRoute: typeof LayoutMcpRouteImport
-      parentRoute: typeof LayoutRoute
-    }
-    '/_layout/providers': {
-      id: '/_layout/providers'
-      path: '/providers'
-      fullPath: '/providers'
-      preLoaderRoute: typeof LayoutProvidersRouteImport
+    '/_layout/skills': {
+      id: '/_layout/skills'
+      path: '/skills'
+      fullPath: '/skills'
+      preLoaderRoute: typeof LayoutSkillsRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/settings': {
@@ -288,11 +272,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutSettingsRouteImport
       parentRoute: typeof LayoutRoute
     }
-    '/_layout/skills': {
-      id: '/_layout/skills'
-      path: '/skills'
-      fullPath: '/skills'
-      preLoaderRoute: typeof LayoutSkillsRouteImport
+    '/_layout/providers': {
+      id: '/_layout/providers'
+      path: '/providers'
+      fullPath: '/providers'
+      preLoaderRoute: typeof LayoutProvidersRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/personas': {
+      id: '/_layout/personas'
+      path: '/personas'
+      fullPath: '/personas'
+      preLoaderRoute: typeof LayoutPersonasRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/mcp': {
+      id: '/_layout/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof LayoutMcpRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/knowledge-base': {
+      id: '/_layout/knowledge-base'
+      path: '/knowledge-base'
+      fullPath: '/knowledge-base'
+      preLoaderRoute: typeof LayoutKnowledgeBaseRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/chat': {
+      id: '/_layout/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof LayoutChatRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/admin': {
+      id: '/_layout/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof LayoutAdminRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/knowledge-base/': {
@@ -302,18 +321,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutKnowledgeBaseIndexRouteImport
       parentRoute: typeof LayoutKnowledgeBaseRoute
     }
-    '/_layout/knowledge-base/$kbId': {
-      id: '/_layout/knowledge-base/$kbId'
-      path: '/$kbId'
-      fullPath: '/knowledge-base/$kbId'
-      preLoaderRoute: typeof LayoutKnowledgeBaseKbIdRouteImport
-      parentRoute: typeof LayoutKnowledgeBaseRoute
-    }
     '/_layout/knowledge-base/trash': {
       id: '/_layout/knowledge-base/trash'
       path: '/trash'
       fullPath: '/knowledge-base/trash'
       preLoaderRoute: typeof LayoutKnowledgeBaseTrashRouteImport
+      parentRoute: typeof LayoutKnowledgeBaseRoute
+    }
+    '/_layout/knowledge-base/$kbId': {
+      id: '/_layout/knowledge-base/$kbId'
+      path: '/$kbId'
+      fullPath: '/knowledge-base/$kbId'
+      preLoaderRoute: typeof LayoutKnowledgeBaseKbIdRouteImport
       parentRoute: typeof LayoutKnowledgeBaseRoute
     }
   }
@@ -339,6 +358,7 @@ interface LayoutRouteChildren {
   LayoutChatRoute: typeof LayoutChatRoute
   LayoutKnowledgeBaseRoute: typeof LayoutKnowledgeBaseRouteWithChildren
   LayoutMcpRoute: typeof LayoutMcpRoute
+  LayoutPersonasRoute: typeof LayoutPersonasRoute
   LayoutProvidersRoute: typeof LayoutProvidersRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutSkillsRoute: typeof LayoutSkillsRoute
@@ -350,6 +370,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutChatRoute: LayoutChatRoute,
   LayoutKnowledgeBaseRoute: LayoutKnowledgeBaseRouteWithChildren,
   LayoutMcpRoute: LayoutMcpRoute,
+  LayoutPersonasRoute: LayoutPersonasRoute,
   LayoutProvidersRoute: LayoutProvidersRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutSkillsRoute: LayoutSkillsRoute,

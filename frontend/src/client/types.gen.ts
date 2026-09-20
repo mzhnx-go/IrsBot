@@ -42,6 +42,14 @@ export type ChunkOut = {
  */
 export type ConversationCreate = {
     title?: string;
+    persona_id?: (string | null);
+};
+
+/**
+ * 会话绑定人设请求（null 表示解绑，回到用户默认提示词）
+ */
+export type ConversationPersonaUpdate = {
+    persona_id?: (string | null);
 };
 
 /**
@@ -58,6 +66,7 @@ export type ConversationResponse = {
     id: string;
     title: string;
     session_id: string;
+    persona_id?: (string | null);
     created_at?: (string | null);
     updated_at?: (string | null);
 };
@@ -224,6 +233,44 @@ export type MessageTruncateRequest = {
 export type NewPassword = {
     token: string;
     new_password: string;
+};
+
+/**
+ * 创建人设请求
+ */
+export type PersonaCreate = {
+    name: string;
+    prompt: string;
+    avatar?: (string | null);
+    default_provider_id?: (string | null);
+    tools?: Array<(string)>;
+    is_active?: boolean;
+};
+
+/**
+ * 人设响应
+ */
+export type PersonaResponse = {
+    id: string;
+    name: string;
+    prompt: string;
+    avatar?: (string | null);
+    default_provider_id?: (string | null);
+    tools?: Array<(string)>;
+    is_active: boolean;
+    created_at?: (string | null);
+};
+
+/**
+ * 更新人设请求（只更新提供的字段）
+ */
+export type PersonaUpdate = {
+    name?: (string | null);
+    prompt?: (string | null);
+    avatar?: (string | null);
+    default_provider_id?: (string | null);
+    tools?: (Array<(string)> | null);
+    is_active?: (boolean | null);
 };
 
 export type PrivateUserCreate = {
@@ -479,6 +526,45 @@ export type AgentConnectMcpServerData = {
 };
 
 export type AgentConnectMcpServerResponse = (MCPServerConnectResponse);
+
+export type AgentCreatePersonaRouteData = {
+    requestBody: PersonaCreate;
+};
+
+export type AgentCreatePersonaRouteResponse = (PersonaResponse);
+
+export type AgentListPersonasRouteData = {
+    limit?: number;
+    skip?: number;
+};
+
+export type AgentListPersonasRouteResponse = (Array<PersonaResponse>);
+
+export type AgentGetPersonaRouteData = {
+    personaId: string;
+};
+
+export type AgentGetPersonaRouteResponse = (PersonaResponse);
+
+export type AgentUpdatePersonaRouteData = {
+    personaId: string;
+    requestBody: PersonaUpdate;
+};
+
+export type AgentUpdatePersonaRouteResponse = (PersonaResponse);
+
+export type AgentDeletePersonaRouteData = {
+    personaId: string;
+};
+
+export type AgentDeletePersonaRouteResponse = (unknown);
+
+export type AgentBindConversationPersonaData = {
+    conversationId: string;
+    requestBody: ConversationPersonaUpdate;
+};
+
+export type AgentBindConversationPersonaResponse = (ConversationResponse);
 
 export type AgentListSkillsResponse = (Array<{
     [key: string]: unknown;
