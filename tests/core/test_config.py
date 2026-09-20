@@ -16,7 +16,7 @@ def test_settings_defaults():
     assert s.GEMINI_API_KEY == ""
     assert s.FALLBACK_PROVIDERS == "[]"
     # Agent
-    assert s.MAX_AGENT_STEPS == 15
+    assert s.MAX_AGENT_STEPS == 30
     assert s.CONTEXT_MAX_TURNS == 20
     assert s.CONTEXT_MAX_TOKENS == 120000
     assert s.AGENT_TIMEOUT == 120.0

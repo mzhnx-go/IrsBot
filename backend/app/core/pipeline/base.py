@@ -13,6 +13,7 @@ class EventKey:
     USER_MESSAGE = "user_message"
     HISTORY = "history"
     SESSION = "session"
+    CONVERSATION = "conversation"
     AGENT_RESULT = "agent_result"
     RATE_LIMITED = "rate_limited"
     ERROR = "error"
@@ -40,6 +41,7 @@ class PipelineContext(BaseModel):
         """停止流水线继续传播."""
         self.stopped = True
 
+
 class Stage(ABC):
     """流水线中的一个处理环节.
 
@@ -51,8 +53,10 @@ class Stage(ABC):
         """处理上下文，返回上下文或 None（终止）."""
         raise NotImplementedError
 
+
 class PipelineScheduler:
     """按顺序执行所有 Stage 的调度器."""
+
     def __init__(self, stages: list[Stage]):
         self.stages = stages
 
@@ -66,5 +70,3 @@ class PipelineScheduler:
                 context.stop_propagation()
                 break
         return context
-
-    

@@ -28,13 +28,11 @@ from app.core.db.sqlmodel_models import (
 )
 from app.core.mcp.bridge import MCPToolBridge
 from app.core.mcp.client import MCPClient
-from app.core.pipeline import PipelineContext, PipelineScheduler
+from app.core.pipeline import PipelineContext, PipelineScheduler, run_entry_stages
 from app.core.pipeline.base import EventKey
 from app.core.pipeline.stages import (
     PostProcessStage,
-    PreProcessStage,
     ProcessStage,
-    RateLimitStage,
 )
 from app.core.skills.manager import SkillManager
 from app.core.skills.security import (
@@ -236,14 +234,21 @@ async def chat(
         conversation_id=conversation.id,
         event_data={
             EventKey.SESSION: session,
+            EventKey.CONVERSATION: conversation,
             EventKey.USER_MESSAGE: chat_request.message,
             EventKey.HISTORY: history,
         },
     )
 
+    # 前置 Stage（限流/会话开关/预处理）与 WS 通道共用同一实现，保证行为一致
+    context = await run_entry_stages(context)
+
+    if context.event_data.get(EventKey.RATE_LIMITED):
+        raise HTTPException(status_code=429, detail="请求过于频繁，请稍后再试")
+    if EventKey.ERROR in context.event_data:
+        raise HTTPException(status_code=400, detail=context.event_data[EventKey.ERROR])
+
     scheduler = PipelineScheduler([
-        RateLimitStage(),
-        PreProcessStage(),
         ProcessStage(),
         PostProcessStage(),
     ])

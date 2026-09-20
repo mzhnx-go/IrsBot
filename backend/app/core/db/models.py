@@ -19,7 +19,16 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Column, DateTime, Index, String, Text, text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Index,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlmodel import Field, Relationship, SQLModel
 
@@ -127,6 +136,10 @@ class Conversation(SQLModel, table=True):
     session_id: str = Field(sa_type=String(255), max_length=255, index=True)
     user_id: uuid.UUID = Field(foreign_key="user.id", ondelete="CASCADE", index=True)
     title: str = Field(default="新对话", sa_type=String(255), max_length=255)
+    # 会话级开关：False 时管线 SessionStatus 阶段直接拦截消息（Phase 12.1）
+    is_enabled: bool = Field(
+        default=True, sa_type=Boolean, sa_column_kwargs={"server_default": text("true")}
+    )
     persona_id: uuid.UUID | None = Field(default=None, sa_type=UUID(as_uuid=True))
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
@@ -242,9 +255,7 @@ class KnowledgeBase(SQLModel, table=True):
         ),
     )
 
-    documents: list["Document"] = Relationship(
-        back_populates="kb", cascade_delete=True
-    )
+    documents: list["Document"] = Relationship(back_populates="kb", cascade_delete=True)
 
 
 # ── 5. Document ────────────────────────────────────────────────

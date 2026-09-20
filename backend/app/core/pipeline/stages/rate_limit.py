@@ -1,10 +1,10 @@
 """频率限制 Stage — 滑动窗口限制单用户请求频率."""
+
 import time
 from collections import defaultdict, deque
 
-from app.core.pipeline.base import EventKey
 from app.core.config import settings
-from app.core.pipeline.base import PipelineContext, Stage
+from app.core.pipeline.base import EventKey, PipelineContext, Stage
 
 
 class RateLimitStage(Stage):
@@ -39,3 +39,16 @@ class RateLimitStage(Stage):
 
         window.append(now)
         return context
+
+
+# 共享单例：限流计数必须跨请求累计才有意义。
+# 若每次请求 new 一个实例（REST 路由旧做法），窗口永远是空的，限流形同虚设。
+_shared_rate_limit_stage: RateLimitStage | None = None
+
+
+def get_rate_limit_stage() -> RateLimitStage:
+    """返回进程级共享的 RateLimitStage 实例（WS 与 REST 共用同一份计数）."""
+    global _shared_rate_limit_stage
+    if _shared_rate_limit_stage is None:
+        _shared_rate_limit_stage = RateLimitStage()
+    return _shared_rate_limit_stage

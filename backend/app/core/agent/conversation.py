@@ -65,12 +65,9 @@ class ConversationManager:
         返回:
             匹配的 Conversation 对象；不存在时返回 None。
         """
-        stmt = (
-            select(Conversation)
-            .where(
-                Conversation.id == conv_id,
-                Conversation.user_id == user_id,
-            )
+        stmt = select(Conversation).where(
+            Conversation.id == conv_id,
+            Conversation.user_id == user_id,
         )
         return self.session.exec(stmt).one_or_none()
 
@@ -259,7 +256,11 @@ class ConversationManager:
             if isinstance(content, str):
                 text = content
             elif isinstance(content, dict):
-                text = content.get("text") or next(iter(content.values()), "") if content else ""
+                text = (
+                    content.get("text") or next(iter(content.values()), "")
+                    if content
+                    else ""
+                )
             else:
                 text = json.dumps(content)
 
@@ -294,15 +295,11 @@ class ConversationManager:
         返回:
             截断后的 LangChain Message 列表（时间正序）。
         """
-        from langchain_core.messages import SystemMessage
 
         # 单独取出 system 消息（始终包含）
-        stmt_system = (
-            select(Message)
-            .where(
-                Message.conversation_id == conv_id,
-                Message.role == "system",
-            )
+        stmt_system = select(Message).where(
+            Message.conversation_id == conv_id,
+            Message.role == "system",
         )
         system_msgs = list(self.session.exec(stmt_system).all())
 
@@ -328,7 +325,11 @@ class ConversationManager:
         for msg in all_messages:
             # 粗略的 token 估算
             if hasattr(msg, "content"):
-                content_str = msg.content if isinstance(msg.content, str) else json.dumps(msg.content)
+                content_str = (
+                    msg.content
+                    if isinstance(msg.content, str)
+                    else json.dumps(msg.content)
+                )
                 est_tokens = max(1, len(content_str) // 4)
             else:
                 est_tokens = 10
@@ -339,7 +340,11 @@ class ConversationManager:
             total_tokens += est_tokens
             truncated.append(msg)
 
-        return truncated
+        # 配对兜底：截断可能把 assistant(tool_calls) 与 tool 拆开，
+        # 直接发给 OpenAI 会被 400 拒绝（Phase 12.5）
+        from app.core.agent.context_manager import fix_messages
+
+        return fix_messages(truncated)
 
     def _messages_to_langchain(self, msgs: list[Message]) -> list[Any]:
         """把一批 Message 行转换为 LangChain 消息对象。
@@ -374,7 +379,11 @@ class ConversationManager:
             if isinstance(content, str):
                 text = content
             elif isinstance(content, dict):
-                text = content.get("text") or next(iter(content.values()), "") if content else ""
+                text = (
+                    content.get("text") or next(iter(content.values()), "")
+                    if content
+                    else ""
+                )
             else:
                 text = json.dumps(content)
 

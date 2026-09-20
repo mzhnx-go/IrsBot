@@ -3,6 +3,7 @@
 from app.core.db.models import AgentRun
 from app.core.pipeline.base import EventKey, PipelineContext, Stage
 
+
 class PostProcessStage(Stage):
     """记录 AgentRun：把一次运行持久化到 agent_runs 表."""
 
@@ -22,4 +23,3 @@ class PostProcessStage(Stage):
         session.add(run)
         session.commit()
         return context
-        

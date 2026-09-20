@@ -6,7 +6,6 @@
 
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from sqlalchemy.exc import SQLAlchemyError
@@ -23,6 +22,7 @@ from app.core.agent.state import AgentState
 from app.core.agent.tools import ToolRegistry
 from app.core.config import settings
 from app.core.db.sqlmodel_models import User
+from app.core.pipeline.hooks import hook_bus
 
 
 class Agent:
@@ -141,16 +141,23 @@ class Agent:
         set_kb_user(self.user_uuid)
 
         # 组装消息列表：系统提示词（最前）+ 历史消息 + 新用户消息
-        messages: list = [SystemMessage(content=resolve_system_prompt(self.system_prompt))]
+        messages: list = [
+            SystemMessage(content=resolve_system_prompt(self.system_prompt))
+        ]
         messages.extend(history or [])
         messages.append(HumanMessage(content=user_message))
 
         # 组装初始状态
         initial_state = self._build_initial_state(messages)
 
+        # 内部钩子：LLM 调用前（Phase 12.4）
+        await hook_bus.emit("on_llm_request", messages=messages)
+
         # 调用图，获取最终状态
         result = await self.graph.ainvoke(initial_state)
 
+        await hook_bus.emit("on_llm_response", response=result)
+        await hook_bus.emit("on_agent_done", result=result)
         return result
 
     async def stream(
@@ -179,6 +186,12 @@ class Agent:
 
         initial_state = self._build_initial_state(messages)
 
+        # 内部钩子：LLM 调用前（Phase 12.4）
+        await hook_bus.emit("on_llm_request", messages=messages)
+
         # 流式调用图
         async for event in self.graph.astream_events(initial_state, version="v2"):
             yield event
+
+        # 流式没有一次性 result，只在结束点发 on_agent_done
+        await hook_bus.emit("on_agent_done", result=None)

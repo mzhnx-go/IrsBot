@@ -3,10 +3,18 @@
 LangGraph 按照图的定义， 自动在节点之间驱动执行。
 """
 
-from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
+from langchain_core.messages import SystemMessage, ToolMessage
+from tenacity import (
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.core.agent.state import AgentState
 from app.core.agent.tools import ToolExecutor
+from app.core.config import settings
+
 
 async def inject_knowledge_node(state: AgentState) -> dict:
     """注入知识库检索结果到messages"""
@@ -18,6 +26,7 @@ async def inject_knowledge_node(state: AgentState) -> dict:
     #     return {"messages": [SystemMessage(content=f"[知识库上下文]\n{context}")]}
     return {}
 
+
 async def inject_skills_node(state: AgentState) -> dict:
     """注入 Skill 清单提示词到 messages（渐进式披露第 1 步）
 
@@ -25,17 +34,19 @@ async def inject_skills_node(state: AgentState) -> dict:
     作为 SystemMessage 注入，让 LLM 知道有哪些技能可用。
     """
     from app.core.skills.manager import SkillManager
+
     prompt = SkillManager.instance().build_skills_prompt()
     if prompt:
         return {"messages": [SystemMessage(content=prompt)]}
     return {}
+
 
 async def invoke_llm_node(state: AgentState) -> dict:
     """调用 LLM 进行推理
     流程：
     1. 从 state中获取 LLM 实例和工具列表
     2.如果有工具,给LLM绑定工具(让LLM知道它可以调用哪些工具)
-    3.调用LLM, 获取响应
+    3.调用LLM, 获取响应（空输出自动重试，指数退避最多 3 次）
     4.将响应追加到messages, 同时更新步数计数
     """
     llm = state["llm"]
@@ -46,17 +57,46 @@ async def invoke_llm_node(state: AgentState) -> dict:
         llm_with_tools = llm
 
     messages = state["messages"]
-    response = await llm_with_tools.ainvoke(messages)
+    response = await _invoke_with_retry(llm_with_tools, messages)
 
     return {
-         "messages": [response],
-         "step_count": state.get("step_count", 0),
-
+        "messages": [response],
+        "step_count": state.get("step_count", 0),
     }
+
+
+def _is_empty_response(response) -> bool:
+    """判定响应是否为「空输出」：无文本也无工具调用."""
+    return not getattr(response, "content", "") and not getattr(
+        response, "tool_calls", None
+    )
+
+
+class _EmptyOutputError(Exception):
+    """LLM 空输出信号，仅供 tenacity 识别重试."""
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    return isinstance(exc, _EmptyOutputError)
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=0.5, min=0.5, max=4),
+    retry=retry_if_exception(_is_retryable),
+    reraise=True,
+)
+async def _invoke_with_retry(llm_with_tools, messages):
+    """调用 LLM；空输出视为可重试异常，指数退避最多 3 次（Phase 12.5）."""
+    response = await llm_with_tools.ainvoke(messages)
+    if _is_empty_response(response):
+        raise _EmptyOutputError("LLM 返回空输出（无文本且无工具调用）")
+    return response
+
 
 def should_continue(state: AgentState) -> str:
     """判断 Agent是否应该继续调用工具，还是结束
-    
+
     返回值:
     "tools": LLM 请求了工具调用， 继续执行 call_tools 节点
     "end": LLM没有请求工具调用，对话结束
@@ -67,11 +107,12 @@ def should_continue(state: AgentState) -> str:
 
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
         step_count = state.get("step_count", 0)
-        max_steps = state.get("max_steps", 15)
+        max_steps = state.get("max_steps", 30)
         if step_count >= max_steps:
             return "end"
         return "tools"
     return "end"
+
 
 async def call_tools_node(state: AgentState) -> dict:
     """执行 LLM请求的工具调用
@@ -95,16 +136,21 @@ async def call_tools_node(state: AgentState) -> dict:
         tool_id = tool_call["id"]
         tool_obj = tools_by_name.get(tool_name)
         if tool_obj is None:
-            result_messages.append(ToolMessage(
-                content=f"错误：工具 '{tool_name}'不存在",
-                tool_call_id=tool_id, 
+            result_messages.append(
+                ToolMessage(
+                    content=f"错误：工具 '{tool_name}'不存在",
+                    tool_call_id=tool_id,
                 )
             )
         else:
-            tool_result = await executor.execute(tool_obj, tool_args)
-            result_messages.append(ToolMessage(
-                content=str(tool_result),
-                tool_call_id=tool_id,
+            # 超时统一走 settings.TOOL_CALL_TIMEOUT（Phase 12.5）
+            tool_result = await executor.execute(
+                tool_obj, tool_args, timeout=settings.TOOL_CALL_TIMEOUT
+            )
+            result_messages.append(
+                ToolMessage(
+                    content=str(tool_result),
+                    tool_call_id=tool_id,
                 )
             )
     new_step_count = state.get("step_count", 0) + 1

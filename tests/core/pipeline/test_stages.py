@@ -1,15 +1,17 @@
-"""Pipeline Stages 单元测试 — RateLimit / PreProcess / Process / PostProcess."""
+"""Pipeline Stages 单元测试 — RateLimit / SessionStatus / PreProcess / Process / PostProcess."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from app.core.db.models import AgentRun
+from app.core.pipeline import run_entry_stages
 from app.core.pipeline.base import EventKey, PipelineContext
 from app.core.pipeline.stages.post_process import PostProcessStage
 from app.core.pipeline.stages.pre_process import PreProcessStage
 from app.core.pipeline.stages.process import ProcessStage
-from app.core.pipeline.stages.rate_limit import RateLimitStage
+from app.core.pipeline.stages.rate_limit import RateLimitStage, get_rate_limit_stage
+from app.core.pipeline.stages.session_status import SessionStatusStage
 
 
 def make_context(user_id=None) -> PipelineContext:
@@ -166,10 +168,14 @@ async def test_post_process_stores_correct_fields():
     assert run.tool_calls_made == 2
     assert run.status == "completed"
 
+
 @pytest.mark.asyncio
 async def test_process_uses_history_default_empty():
     fake_agent = AsyncMock()
-    fake_agent.run.return_value = {"messages": [MagicMock(content="hi")], "step_count": 1}
+    fake_agent.run.return_value = {
+        "messages": [MagicMock(content="hi")],
+        "step_count": 1,
+    }
 
     ctx = make_context()
     ctx.event_data[EventKey.SESSION] = MagicMock()
@@ -179,9 +185,76 @@ async def test_process_uses_history_default_empty():
         await stage.process(ctx)
 
     assert fake_agent.run.call_args.kwargs["history"] == []
-    
-
-    
 
 
+# ─── SessionStatusStage ───────────────────────────────────────
 
+
+@pytest.mark.asyncio
+async def test_session_status_blocks_disabled_conversation():
+    stage = SessionStatusStage()
+    ctx = make_context()
+    conversation = MagicMock(is_enabled=False)
+    ctx.event_data[EventKey.CONVERSATION] = conversation
+
+    result = await stage.process(ctx)
+
+    assert result.stopped is True
+    assert EventKey.ERROR in result.event_data
+
+
+@pytest.mark.asyncio
+async def test_session_status_allows_enabled_conversation():
+    stage = SessionStatusStage()
+    ctx = make_context()
+    ctx.event_data[EventKey.CONVERSATION] = MagicMock(is_enabled=True)
+
+    result = await stage.process(ctx)
+
+    assert result.stopped is False
+    assert EventKey.ERROR not in result.event_data
+
+
+@pytest.mark.asyncio
+async def test_session_status_passes_when_no_conversation():
+    stage = SessionStatusStage()
+    result = await stage.process(make_context())
+    assert result.stopped is False
+
+
+# ─── run_entry_stages（WS/REST 共用前置 Stage） ────────────────
+
+
+@pytest.mark.asyncio
+async def test_run_entry_stages_rate_limited():
+    ctx = make_context()
+    ctx.event_data[EventKey.CONVERSATION] = MagicMock(is_enabled=True)
+    # 预置一个刚满的窗口：直接操纵共享实例计数
+    stage = get_rate_limit_stage()
+    original_max = stage.max_requests
+    stage.max_requests = 0  # type: ignore[misc]
+
+    try:
+        result = await run_entry_stages(ctx)
+        assert result.event_data.get(EventKey.RATE_LIMITED) is True
+        assert result.stopped is True
+    finally:
+        stage.max_requests = original_max  # 还原默认，避免污染其它测试
+
+
+@pytest.mark.asyncio
+async def test_run_entry_stages_clean_pass():
+    ctx = make_context()
+    ctx.event_data[EventKey.CONVERSATION] = MagicMock(is_enabled=True)
+
+    result = await run_entry_stages(ctx)
+
+    assert result.stopped is False
+    assert EventKey.RATE_LIMITED not in result.event_data
+    assert EventKey.ERROR not in result.event_data
+    assert result.event_data[EventKey.USER_MESSAGE] == "你好"
+
+
+@pytest.mark.asyncio
+async def test_get_rate_limit_stage_returns_singleton():
+    assert get_rate_limit_stage() is get_rate_limit_stage()

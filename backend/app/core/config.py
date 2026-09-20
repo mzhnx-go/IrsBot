@@ -1,6 +1,6 @@
 import secrets
 import warnings
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
     AnyUrl,
@@ -12,7 +12,6 @@ from pydantic import (
     model_validator,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing_extensions import Self
 
 
 def parse_cors(v: Any) -> list[str] | str:
@@ -119,7 +118,7 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = ""
     ANTHROPIC_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
-    
+
     DEFAULT_LLM_PROVIDER: str = "openai"  # "openai" | "anthropic" | "gemini"
     DEFAULT_LLM_MODEL: str = "gpt-4o"
     EMBEDDING_API_KEY: str = ""  # SiliconFlow API Key
@@ -128,7 +127,7 @@ class Settings(BaseSettings):
     FALLBACK_PROVIDERS: str = "[]"  # JSON 数组字符串
 
     # ── Agent 配置 ─────────────────────────────────────────────
-    MAX_AGENT_STEPS: int = 15  # 最大工具调用步数
+    MAX_AGENT_STEPS: int = 30  # 最大工具调用轮数（与 AstrBot 对齐，15 → 30）
     CONTEXT_MAX_TURNS: int = 20  # 最大对话轮次
     CONTEXT_MAX_TOKENS: int = 120000  # 最大 token 数
     AGENT_TIMEOUT: float = 120.0  # Agent 超时 (秒)
@@ -184,7 +183,8 @@ class Settings(BaseSettings):
     # ── 频率限制 ──────────────────────────────────────────────
     RATE_LIMIT_REQUESTS: int = 20  # 每分钟最大请求数
     RATE_LIMIT_WINDOW: int = 60  # 窗口 (秒)
-    MAX_USER_MESSAGE_LENGTH: int = 4096 #用户发送消息的最大长度
+    MAX_USER_MESSAGE_LENGTH: int = 4096  # 用户发送消息的最大长度
+    TOOL_CALL_TIMEOUT: int = 120  # 单次工具调用超时（秒），Phase 12.5 统一切点
 
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":

@@ -21,6 +21,8 @@ from app.api.deps import SessionDep, get_current_user_ws
 from app.core.agent.agent import Agent
 from app.core.agent.conversation import ConversationManager
 from app.core.db.sqlmodel_models import User
+from app.core.pipeline import PipelineContext, run_entry_stages
+from app.core.pipeline.base import EventKey
 
 router = APIRouter()
 
@@ -181,6 +183,37 @@ async def chat_ws(
                         session.commit()
                 history = conv_manager.get_context_messages(conversation.id)
 
+                # ── 前置 Stage（限流/会话开关/预处理）与 REST 共用同一实现 ──
+                # WS 无法改 HTTP 状态码，命中拦截时以 text_chunk 说明原因
+                # 再发 done，前端协议（history/text_chunk/tool_call/done）保持不变。
+                context = await run_entry_stages(
+                    PipelineContext(
+                        user_id=current_user.id,
+                        session_id=conversation_id,
+                        conversation_id=conversation.id,
+                        event_data={
+                            EventKey.SESSION: session,
+                            EventKey.CONVERSATION: conversation,
+                            EventKey.USER_MESSAGE: data[WSMsgKey.CONTENT],
+                            EventKey.HISTORY: history,
+                        },
+                    )
+                )
+                if context.event_data.get(EventKey.RATE_LIMITED):
+                    await ws.send_json({
+                        WSMsgKey.TYPE: WSMessageType.TEXT_CHUNK,
+                        WSMsgKey.CONTENT: "请求过于频繁，请稍后再试。",
+                    })
+                    await ws.send_json({WSMsgKey.TYPE: WSMessageType.DONE})
+                    continue
+                if EventKey.ERROR in context.event_data:
+                    await ws.send_json({
+                        WSMsgKey.TYPE: WSMessageType.TEXT_CHUNK,
+                        WSMsgKey.CONTENT: context.event_data[EventKey.ERROR],
+                    })
+                    await ws.send_json({WSMsgKey.TYPE: WSMessageType.DONE})
+                    continue
+
                 agent = Agent(
                     session=session,
                     conversation_id=conversation_id,
@@ -189,7 +222,9 @@ async def chat_ws(
                 reply = ""
 
 
-                async for event in agent.stream(data[WSMsgKey.CONTENT], history):
+                async for event in agent.stream(
+                    context.event_data[EventKey.USER_MESSAGE], history
+                ):
                     msg = to_frontend_event(event)
                     if msg is not None:
                         await ws.send_json(msg)
