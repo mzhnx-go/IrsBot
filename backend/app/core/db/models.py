@@ -27,6 +27,7 @@ from sqlalchemy import (
     Index,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -35,6 +36,43 @@ from sqlmodel import Field, Relationship, SQLModel
 from app.core.db.sqlmodel_models import get_datetime_utc
 
 # ── 1. ProviderConfig ──────────────────────────────────────────
+
+
+class ProviderModel(SQLModel, table=True):
+    """供应商可用模型清单。
+
+    「获取模型列表」从上游 /models 拉取后 upsert；「自定义模型」手填。
+    (provider_id, model_id) 唯一，重复拉取幂等。
+
+    Attributes:
+        id: 主键，UUID 自动生成。
+        provider_id: 所属供应商，级联删除。
+        model_id: 上游模型标识（如 gpt-4o）。
+        display_name: 展示名（可选，默认用 model_id）。
+        created_at: 创建时间（UTC）。
+    """
+
+    __tablename__ = "provider_models"
+    __table_args__ = (
+        UniqueConstraint("provider_id", "model_id", name="uq_provider_models_pair"),
+    )
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=UUID(as_uuid=True),
+    )
+    provider_id: uuid.UUID = Field(
+        foreign_key="provider_configs.id", ondelete="CASCADE", index=True
+    )
+    model_id: str = Field(sa_type=String(200), max_length=200)
+    display_name: str | None = Field(default=None, sa_type=String(200), max_length=200)
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True), default=get_datetime_utc, nullable=False
+        ),
+    )
 
 
 class ProviderConfig(SQLModel, table=True):

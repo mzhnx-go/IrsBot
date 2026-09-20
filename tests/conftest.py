@@ -84,6 +84,7 @@ def db() -> Generator[Session, None, None]:
             Message,
             Persona,
             ProviderConfig,
+            ProviderModel,
             Skill,
         )
 
@@ -95,6 +96,7 @@ def db() -> Generator[Session, None, None]:
             KnowledgeBase,
             MCPServer,
             Persona,
+            ProviderModel,
             ProviderConfig,
             Skill,
             User,

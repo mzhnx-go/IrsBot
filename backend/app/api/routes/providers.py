@@ -8,14 +8,16 @@
 import logging
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlmodel import select
+from sqlmodel import Session, select
 
 from app.api.deps import SessionDep, get_current_user
 from app.core.agent.provider import ProviderManager
 from app.core.agent.provider_balance import ProviderBalanceOut, query_balance
-from app.core.db.models import ProviderConfig
+from app.core.agent.provider_models import fetch_upstream_models
+from app.core.db.models import ProviderConfig, ProviderModel
 from app.core.db.sqlmodel_models import User
 from app.utils.crypto import decrypt_api_key
 
@@ -66,6 +68,23 @@ class ProviderOut(BaseModel):
     timeout_seconds: int = 120
     proxy_url: str | None = None
     extra_headers: dict[str, str] = {}
+
+
+class ProviderModelOut(BaseModel):
+    id: UUID
+    model_id: str
+    display_name: str | None = None
+
+
+class ProviderModelsOut(BaseModel):
+    items: list[ProviderModelOut]
+    count: int
+
+
+class ProviderModelCreate(BaseModel):
+    """「自定义模型」请求体"""
+    model_id: str = Field(min_length=1, max_length=200)
+    display_name: str | None = Field(default=None, max_length=200)
 
 
 
@@ -186,6 +205,146 @@ def update_provider(
             extra_headers=body.extra_headers,
         )
     return mgr.update_provider(provider_id, **fields)
+
+
+# ── 模型清单（「获取模型列表」/「自定义模型」）─────────────────
+
+
+def _get_owned_provider(
+    provider_id: UUID, session: Session, current_user: User
+) -> ProviderConfig:
+    """归属校验：不存在或不是自己的都 404（零副作用，与余额端点同款）。"""
+    stmt = select(ProviderConfig).where(
+        ProviderConfig.id == provider_id,
+        ProviderConfig.user_id == current_user.id,
+    )
+    pc = session.exec(stmt).one_or_none()
+    if pc is None:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    return pc
+
+
+def _list_models(session: Session, provider_id: UUID) -> list[ProviderModelOut]:
+    rows = session.exec(
+        select(ProviderModel)
+        .where(ProviderModel.provider_id == provider_id)
+        .order_by(ProviderModel.model_id)
+    ).all()
+    return [
+        ProviderModelOut(id=r.id, model_id=r.model_id, display_name=r.display_name)
+        for r in rows
+    ]
+
+
+@router.get("/providers/{provider_id}/models", response_model=ProviderModelsOut)
+def list_provider_models(
+    provider_id: UUID,
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+):
+    """列出该供应商的模型清单。"""
+    pc = _get_owned_provider(provider_id, session, current_user)
+    items = _list_models(session, pc.id)
+    return ProviderModelsOut(items=items, count=len(items))
+
+
+@router.post("/providers/{provider_id}/models/fetch", response_model=ProviderModelsOut)
+async def fetch_provider_models(
+    provider_id: UUID,
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+):
+    """从上游拉取模型列表并 upsert 落库（**显式动作**，不自动触发）。
+
+    上游失败翻译为中文 502/504：Key 无效 / 不可达 / 超时，便于用户排障。
+    """
+    pc = _get_owned_provider(provider_id, session, current_user)
+    try:
+        models = await fetch_upstream_models(
+            provider_type=pc.provider_type,
+            base_url=pc.base_url,
+            api_key=decrypt_api_key(pc.api_key),
+            timeout_seconds=pc.timeout_seconds,
+            proxy_url=pc.proxy_url,
+            extra_headers=pc.extra_headers or None,
+        )
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="拉取超时，请稍后再试或调大超时时间")
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        if status in (401, 403):
+            raise HTTPException(status_code=502, detail="API Key 无效或无权限获取模型列表")
+        raise HTTPException(
+            status_code=502, detail=f"服务商返回错误（HTTP {status}）"
+        )
+    except httpx.HTTPError:
+        raise HTTPException(
+            status_code=502, detail="无法连接到服务商，请检查网络与 API 地址"
+        )
+
+    if not models:
+        raise HTTPException(status_code=502, detail="服务商返回了空的模型列表")
+
+    # upsert：幂等，重复拉取不产生重复行
+    existing = {
+        r.model_id
+        for r in session.exec(
+            select(ProviderModel).where(ProviderModel.provider_id == pc.id)
+        ).all()
+    }
+    for model_id in models:
+        if model_id not in existing:
+            session.add(ProviderModel(provider_id=pc.id, model_id=model_id))
+    session.commit()
+
+    items = _list_models(session, pc.id)
+    logger.info("模型列表已更新：provider=%s 新增 %d 个", pc.name, len(models) - len(existing))
+    return ProviderModelsOut(items=items, count=len(items))
+
+
+@router.post("/providers/{provider_id}/models", response_model=ProviderModelOut)
+def add_provider_model(
+    provider_id: UUID,
+    body: ProviderModelCreate,
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+):
+    """「自定义模型」：手填一个上游清单里没有的模型 ID。"""
+    pc = _get_owned_provider(provider_id, session, current_user)
+    dup = session.exec(
+        select(ProviderModel).where(
+            ProviderModel.provider_id == pc.id,
+            ProviderModel.model_id == body.model_id.strip(),
+        )
+    ).one_or_none()
+    if dup is not None:
+        raise HTTPException(status_code=409, detail="该模型已在列表中")
+    row = ProviderModel(
+        provider_id=pc.id,
+        model_id=body.model_id.strip(),
+        display_name=body.display_name,
+    )
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return ProviderModelOut(id=row.id, model_id=row.model_id, display_name=row.display_name)
+
+
+@router.delete("/providers/{provider_id}/models/{model_id}")
+def delete_provider_model(
+    provider_id: UUID,
+    model_id: UUID,
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+):
+    """从清单移除一个模型（404 = 不存在或不是自己的）。"""
+    pc = _get_owned_provider(provider_id, session, current_user)
+    row = session.get(ProviderModel, model_id)
+    if row is None or row.provider_id != pc.id:
+        raise HTTPException(status_code=404, detail="模型不存在")
+    session.delete(row)
+    session.commit()
+    return {"message": "模型已移除"}
 
 
 @router.delete("/providers/{provider_id}")
