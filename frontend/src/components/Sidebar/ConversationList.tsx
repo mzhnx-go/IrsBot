@@ -1,47 +1,47 @@
+import { useNavigate, useRouterState } from "@tanstack/react-router"
+import {
+  Download,
+  ListChecks,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog"
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuSub,
-    DropdownMenuSubContent,
-    DropdownMenuSubTrigger,
-    DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import {
-    SidebarGroup,
-    SidebarGroupContent,
-    SidebarGroupLabel,
-    SidebarMenu,
-    SidebarMenuAction,
-    SidebarMenuButton,
-    SidebarMenuItem,
-    useSidebar,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import useConversations, {
-    type ConversationExportFormat,
+  type ConversationExportFormat,
 } from "@/hooks/useConversations"
-import { useNavigate, useRouterState } from "@tanstack/react-router"
-import {
-    Download,
-    ListChecks,
-    MoreHorizontal,
-    Pencil,
-    Plus,
-    Trash2,
-} from "lucide-react"
-import { useState } from "react"
 
 /** 导出格式下拉项。value 必须是后端 Literal 支持的取值，label 只负责展示 */
 const EXPORT_FORMATS: { value: ConversationExportFormat; label: string }[] = [
@@ -157,20 +157,25 @@ export function ConversationList() {
 
   return (
     <SidebarGroup>
+      {/* 「新对话」放在「最近对话」标签之上：它是进聊天的第一落点，
+          位置比"历史列表"更该靠上（且侧边栏已无独立的「聊天」入口） */}
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            onClick={handleNewChat}
+            tooltip="新对话"
+            data-testid="new-chat-button"
+          >
+            <Plus />
+            <span>新对话</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+
       <SidebarGroupLabel>最近对话</SidebarGroupLabel>
       <SidebarGroupContent>
-        {/* 新对话按钮 */}
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleNewChat} tooltip="新对话">
-              <Plus />
-              <span>新对话</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-
         {/* 会话列表 */}
-        <SidebarMenu className="mt-1">
+        <SidebarMenu>
           {conversationsQuery.isPending ? null : conversations.length === 0 ? (
             <p className="px-2 py-4 text-xs text-muted-foreground">
               暂无历史对话

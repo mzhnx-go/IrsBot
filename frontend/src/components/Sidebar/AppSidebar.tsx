@@ -4,7 +4,6 @@ import {
   Drama,
   Home,
   Library,
-  MessageSquare,
   MessagesSquare,
   PanelLeftClose,
   Plug,
@@ -29,12 +28,13 @@ import { User } from "./User"
 
 // 信息架构重组（Phase 15.3a）：按「工作台 / 资源 / 系统」三段分组，
 // 使用频率高的对话类入口放最上，资源管理居中，低频的系统配置垫底。
+// 「聊天」入口已移除：下方 ConversationList 的「新对话」+「最近对话」才是
+// 进聊天的真实路径，一个 /chat 不需要三个入口。
 const navGroups: ItemGroup[] = [
   {
     label: "工作台",
     items: [
       { icon: Home, title: "Dashboard", path: "/" },
-      { icon: MessageSquare, title: "聊天", path: "/chat" },
       { icon: MessagesSquare, title: "会话管理", path: "/conversations" },
     ],
   },

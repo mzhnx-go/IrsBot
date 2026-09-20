@@ -40,16 +40,29 @@ test("/stats 指标卡渲染", async ({ page }) => {
   }
 })
 
-test("/providers 查余额按钮：不支持的服务商给出明确提示", async ({ page }) => {
+test("/providers 每张卡片都有查余额按钮", async ({ page }) => {
   await page.goto("/providers")
-  const button = page.getByTestId("provider-balance-button").first()
-  await expect(button).toBeVisible()
-  await button.click()
-  // 种子 default 源指向 dashscope（.env 的 OPENAI_BASE_URL），该厂商无余额接口：
-  // 后端走本地提示分支、不发上游请求，因此本用例离线可稳定复现
-  await expect(
-    page.getByTestId("provider-balance-result").first(),
-  ).toContainText("阿里云")
+  const rows = page.getByTestId("provider-row")
+  await expect(rows.first()).toBeVisible()
+  // 卡片数与按钮数必须一一对应：漏渲染的卡片会让用户以为"这条不支持"
+  await expect(page.getByTestId("provider-balance-button")).toHaveCount(
+    await rows.count(),
+  )
+})
+
+test("/providers 查余额：不支持的厂商给出明确提示", async ({ page }) => {
+  await page.goto("/providers")
+  // 按行定位、不靠顺序：用户随时会加自己的模型源，第一条不一定是种子源。
+  // 种子的 default 源指向 dashscope（.env 的 OPENAI_BASE_URL），该厂商无余额
+  // 接口 → 后端走本地提示分支、不发上游请求，因此本用例离线可稳定复现。
+  const row = page
+    .getByTestId("provider-row")
+    .filter({ hasText: "dashscope.aliyuncs.com" })
+  await expect(row).toHaveCount(1)
+  await row.getByTestId("provider-balance-button").click()
+  await expect(row.getByTestId("provider-balance-result")).toContainText(
+    "阿里云",
+  )
 })
 
 test("/settings 工具权限标签（超管可见且开关渲染）", async ({ page }) => {
@@ -68,4 +81,27 @@ test("侧边栏信息架构：三个分组标签齐全", async ({ page }) => {
     await expect(sidebar.getByText(label, { exact: true })).toBeVisible()
   }
   await expect(sidebar.getByText("Admin", { exact: true })).toBeVisible()
+})
+
+test("侧边栏：「聊天」入口已移除，「新对话」在「最近对话」之上", async ({
+  page,
+}) => {
+  await page.goto("/")
+  const sidebar = page.locator('[data-sidebar="sidebar"]').first()
+
+  // 进聊天的真实路径是「新对话」+「最近对话」，不再保留独立的「聊天」入口
+  await expect(sidebar.getByText("聊天", { exact: true })).toHaveCount(0)
+
+  // 用归属关系（DOM 纵向位置）而非文案顺序断言：
+  // 种子库里存在标题就叫「新对话」的会话，纯文案定位会撞上
+  const newChat = sidebar.getByTestId("new-chat-button")
+  const label = sidebar.getByText("最近对话", { exact: true })
+  await expect(newChat).toBeVisible()
+  await expect(label).toBeVisible()
+
+  const newChatBox = await newChat.boundingBox()
+  const labelBox = await label.boundingBox()
+  expect(newChatBox).not.toBeNull()
+  expect(labelBox).not.toBeNull()
+  expect(newChatBox!.y).toBeLessThan(labelBox!.y)
 })
