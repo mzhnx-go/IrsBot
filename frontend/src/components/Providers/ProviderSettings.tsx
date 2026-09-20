@@ -55,8 +55,12 @@ const TYPE_LABELS: Record<string, string> = {
   gemini: "Gemini",
 }
 
-const AddProviderDialog = () => {
-  const [isOpen, setIsOpen] = useState(false)
+const AddProviderDialog = ({
+  initialOpen = false,
+}: {
+  initialOpen?: boolean
+}) => {
+  const [isOpen, setIsOpen] = useState(initialOpen)
   const { createProvider } = useProviders()
 
   const form = useForm<FormData>({
@@ -313,7 +317,11 @@ const ProviderRow = ({
   )
 }
 
-const ProviderSettings = () => {
+const ProviderSettings = ({
+  autoOpenNew = false,
+}: {
+  autoOpenNew?: boolean
+}) => {
   const { providersQuery, updateProvider, deleteProvider } = useProviders()
 
   if (providersQuery.isPending) {
@@ -331,7 +339,7 @@ const ProviderSettings = () => {
             管理多套模型 API 配置，AI 对话使用标记为「默认」的模型源。
           </p>
         </div>
-        <AddProviderDialog />
+        <AddProviderDialog initialOpen={autoOpenNew} />
       </div>
 
       {providers.length === 0 ? (

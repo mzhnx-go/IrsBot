@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { ArrowUp, Loader2, Square } from "lucide-react"
 import { type FormEvent, useEffect, useRef, useState } from "react"
 import { AgentService } from "@/client"
+import ChatOnboarding from "@/components/Chat/ChatOnboarding"
 import MessageItem from "@/components/Chat/MessageItem"
 import PersonaPicker from "@/components/Chat/PersonaPicker"
 import { useAgentChat } from "@/hooks/useAgentChat"
@@ -156,19 +157,23 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
             </div>
           )}
         {messages.length === 0 ? (
-          <div className="px-4 py-32 text-center md:py-40">
-            <h1 className="text-xl font-semibold md:text-2xl">
-              有什么可以帮你？
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {connState === "open"
-                ? "连接就绪，输入消息开始对话"
-                : connState === "reconnecting"
-                  ? "连接已断开，正在自动重连…"
-                  : connState === "closed"
-                    ? "连接已断开，请刷新页面重试"
-                    : "正在连接服务器…"}
-            </p>
+          <div className="flex flex-col gap-6 px-4 py-24 text-center md:py-32">
+            {/* 没有任何模型源时先指路（配置闭环），有则隐藏 */}
+            <ChatOnboarding />
+            <div>
+              <h1 className="text-xl font-semibold md:text-2xl">
+                有什么可以帮你？
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {connState === "open"
+                  ? "连接就绪，输入消息开始对话"
+                  : connState === "reconnecting"
+                    ? "连接已断开，正在自动重连…"
+                    : connState === "closed"
+                      ? "连接已断开，请刷新页面重试"
+                      : "正在连接服务器…"}
+              </p>
+            </div>
           </div>
         ) : (
           <div className="space-y-4 py-8">
