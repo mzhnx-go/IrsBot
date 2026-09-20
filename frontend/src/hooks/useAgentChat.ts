@@ -23,6 +23,18 @@ export interface Citation {
   score?: number
 }
 
+/** 已落库的附件元数据（后端按磁盘真实文件反推，前端只做展示） */
+export interface MessageAttachment {
+  id: string
+  kind: string
+  filename: string
+  size: number
+  /** 文档解析出的字符数（图片没有） */
+  extracted_chars?: number | null
+  /** 文档是否因超长被截断 */
+  truncated?: boolean
+}
+
 export interface ChatMessage {
   id: string
   /** 数据库消息 ID（history 恢复或 done 事件回填；本地乐观新增时为空） */
@@ -32,6 +44,8 @@ export interface ChatMessage {
   toolCalls?: ToolCall[]
   /** RAG 检索来源（sources 事件 / history 还原） */
   citations?: Citation[]
+  /** 用户消息携带的附件（history 回放 / 本地乐观新增） */
+  attachments?: MessageAttachment[]
   streaming?: boolean
   /** 本轮被用户中断，回复是半成品 */
   stopped?: boolean
@@ -134,6 +148,7 @@ export function useAgentChat(conversationId: string) {
                 content: string
                 tool_calls?: ToolCall[]
                 citations?: Citation[]
+                attachments?: MessageAttachment[]
                 stopped?: boolean
               }>
             ).map((h) => ({
@@ -143,6 +158,7 @@ export function useAgentChat(conversationId: string) {
               content: h.content,
               toolCalls: h.tool_calls,
               citations: h.citations,
+              attachments: h.attachments,
               stopped: h.stopped,
               streaming: false,
             })),
@@ -282,18 +298,40 @@ export function useAgentChat(conversationId: string) {
     }
   }, [conversationId])
 
-  const sendMessage = useCallback((content: string) => {
-    const ws = wsRef.current
-    if (!ws || ws.readyState !== WebSocket.OPEN) return
+  /**
+   * 发送一条消息。
+   *
+   * `attachments` 只传 att_id 列表——字节与元数据都由后端自己从磁盘取，
+   * 前端说什么都不算数（见 agent_ws.py 的 _resolve_attachments）。
+   */
+  const sendMessage = useCallback(
+    (content: string, attachments?: MessageAttachment[]) => {
+      const ws = wsRef.current
+      if (!ws || ws.readyState !== WebSocket.OPEN) return
 
-    setMessages((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), role: "user", content },
-    ])
-    setIsStreaming(true)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "user",
+          content,
+          attachments: attachments?.length ? attachments : undefined,
+        },
+      ])
+      setIsStreaming(true)
 
-    ws.send(JSON.stringify({ type: "message", content }))
-  }, [])
+      ws.send(
+        JSON.stringify({
+          type: "message",
+          content,
+          ...(attachments?.length
+            ? { attachments: attachments.map((a) => ({ id: a.id })) }
+            : {}),
+        }),
+      )
+    },
+    [],
+  )
 
   /** 中断当前生成：通知后端 cancel 本轮任务。
    *  真正的收尾（isStreaming 置假、部分回复落库）由后端随后的 done 事件驱动，
@@ -347,7 +385,9 @@ export function useAgentChat(conversationId: string) {
         requestBody: { message_id: target.dbId, inclusive: true },
       })
       truncateLocal(target.dbId, true)
-      sendMessage(target.content)
+      // 带上原附件一起重发：文档内容只在"发送那一刻"进上下文，
+      // 不带的话重新生成就变成了"对空文档提问"
+      sendMessage(target.content, target.attachments)
     } catch {
       errorToast("重新生成失败，请重试")
     }
@@ -357,18 +397,20 @@ export function useAgentChat(conversationId: string) {
   const editAndResend = useCallback(
     async (dbId: string, newContent: string) => {
       if (isStreaming) return
+      const target = messages.find((m) => m.dbId === dbId)
       try {
         await AgentService.truncateConversationMessages({
           conversationId,
           requestBody: { message_id: dbId, inclusive: true },
         })
         truncateLocal(dbId, true)
-        sendMessage(newContent)
+        // 附件文件仍在会话目录里（截断消息不删文件），可以原样带上
+        sendMessage(newContent, target?.attachments)
       } catch {
         errorToast("编辑重发失败，请重试")
       }
     },
-    [isStreaming, conversationId, truncateLocal, sendMessage],
+    [isStreaming, messages, conversationId, truncateLocal, sendMessage],
   )
 
   return {

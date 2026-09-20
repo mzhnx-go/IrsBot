@@ -3,10 +3,13 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { ArrowUp, Loader2, Square } from "lucide-react"
 import { type FormEvent, useEffect, useRef, useState } from "react"
 import { AgentService } from "@/client"
+import { AttachmentChips } from "@/components/Chat/AttachmentChips"
+import AttachmentMenu from "@/components/Chat/AttachmentMenu"
 import ChatOnboarding from "@/components/Chat/ChatOnboarding"
 import MessageItem from "@/components/Chat/MessageItem"
 import PersonaPicker from "@/components/Chat/PersonaPicker"
 import { useAgentChat } from "@/hooks/useAgentChat"
+import { useChatAttachments } from "@/hooks/useChatAttachments"
 
 export const Route = createFileRoute("/_layout/chat")({
   // 会话 ID 走 URL search param（/chat?c=<uuid>）：
@@ -86,8 +89,18 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
   const [input, setInput] = useState("")
   // 已点停止、等待后端收尾 done（done 到达后 isStreaming 置假自动复位）
   const [stopping, setStopping] = useState(false)
+  const { pending, addFiles, remove, clear, readyAttachments } =
+    useChatAttachments(conversationId)
   const queryClient = useQueryClient()
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  // 还有附件在上传/失败时不能发送：否则会把"没发出去的图"当成发出去了
+  const attachmentsReady = readyAttachments() !== null
+  const canSend =
+    (input.trim().length > 0 || pending.length > 0) &&
+    attachmentsReady &&
+    !isStreaming &&
+    isConnected
 
   useEffect(() => {
     if (!isStreaming) setStopping(false)
@@ -112,10 +125,12 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
+    if (!canSend) return
     const content = input.trim()
-    if (!content || isStreaming) return
-    sendMessage(content)
+    // 只发附件不打字是允许的（"看看这份文档"可以一个字都不说）
+    sendMessage(content, readyAttachments() ?? [])
     setInput("")
+    clear()
   }
 
   return (
@@ -200,7 +215,10 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
         // 底部留白叠加 iOS 安全区（home 指示条不遮住输入框）
         className="sticky bottom-4 mx-auto w-full max-w-3xl pb-[env(safe-area-inset-bottom)]"
       >
+        <AttachmentChips items={pending} onRemove={remove} />
         <div className="flex items-end gap-2 rounded-2xl border border-input bg-background px-4 py-2 shadow-sm transition-shadow duration-[150ms] ease-out focus-within:border-[var(--chat-accent)] focus-within:shadow-[0_0_0_3px_rgba(22,93,255,0.15)]">
+          {/* 「＋」上传入口固定在输入框内左侧（与发送按钮同一条自对齐基线） */}
+          <AttachmentMenu onPick={addFiles} disabled={!isConnected} />
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -248,14 +266,11 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
             <button
               type="submit"
               aria-label="发送"
-              disabled={!input.trim() || !isConnected}
+              disabled={!canSend}
               className="flex size-8 shrink-0 items-center justify-center self-end rounded-full text-white transition-all duration-[150ms] ease-out hover:scale-[1.05] active:scale-90 motion-reduce:transform-none disabled:pointer-events-none disabled:scale-100 disabled:bg-muted disabled:text-muted-foreground"
               style={{
                 // 可发送时用概念图强调蓝（token）；否则交给 disabled 灰态
-                background:
-                  input.trim() && isConnected
-                    ? "var(--chat-accent)"
-                    : undefined,
+                background: canSend ? "var(--chat-accent)" : undefined,
               }}
             >
               <ArrowUp className="size-4" />

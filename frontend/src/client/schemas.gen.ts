@@ -64,6 +64,58 @@ export const AgentRunPublicSchema = {
     description: '最近运行记录行'
 } as const;
 
+export const AttachmentOutSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            title: 'Id'
+        },
+        kind: {
+            type: 'string',
+            title: 'Kind'
+        },
+        filename: {
+            type: 'string',
+            title: 'Filename'
+        },
+        size: {
+            type: 'integer',
+            title: 'Size'
+        },
+        mime: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Mime'
+        },
+        extracted_chars: {
+            anyOf: [
+                {
+                    type: 'integer'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Extracted Chars'
+        },
+        truncated: {
+            type: 'boolean',
+            title: 'Truncated',
+            default: false
+        }
+    },
+    type: 'object',
+    required: ['id', 'kind', 'filename', 'size'],
+    title: 'AttachmentOut',
+    description: '上传成功后的附件元数据（前端据此渲染 chip / 缩略图）。'
+} as const;
+
 export const Body_agent_install_skillSchema = {
     properties: {
         skill_zip: {
@@ -75,6 +127,24 @@ export const Body_agent_install_skillSchema = {
     type: 'object',
     required: ['skill_zip'],
     title: 'Body_agent-install_skill'
+} as const;
+
+export const Body_agent_upload_attachmentSchema = {
+    properties: {
+        conversation_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Conversation Id'
+        },
+        file: {
+            type: 'string',
+            contentMediaType: 'application/octet-stream',
+            title: 'File'
+        }
+    },
+    type: 'object',
+    required: ['conversation_id', 'file'],
+    title: 'Body_agent-upload_attachment'
 } as const;
 
 export const Body_knowledge_base_upload_kb_documentSchema = {

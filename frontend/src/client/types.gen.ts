@@ -14,8 +14,26 @@ export type AgentRunPublic = {
     created_at: (string | null);
 };
 
+/**
+ * 上传成功后的附件元数据（前端据此渲染 chip / 缩略图）。
+ */
+export type AttachmentOut = {
+    id: string;
+    kind: string;
+    filename: string;
+    size: number;
+    mime?: (string | null);
+    extracted_chars?: (number | null);
+    truncated?: boolean;
+};
+
 export type Body_agent_install_skill = {
     skill_zip: string;
+};
+
+export type Body_agent_upload_attachment = {
+    conversation_id: string;
+    file: string;
 };
 
 export type Body_knowledge_base_upload_kb_document = {
@@ -715,6 +733,12 @@ export type AgentStatsRecentRunsData = {
 };
 
 export type AgentStatsRecentRunsResponse = (Array<AgentRunPublic>);
+
+export type AgentUploadAttachmentData = {
+    formData: Body_agent_upload_attachment;
+};
+
+export type AgentUploadAttachmentResponse = (AttachmentOut);
 
 export type KnowledgeBaseListKbsResponse = (Array<KBOut>);
 

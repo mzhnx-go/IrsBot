@@ -8,7 +8,7 @@ import {
   X,
 } from "lucide-react"
 import { type ReactNode, useState } from "react"
-
+import { MessageAttachments } from "@/components/Chat/AttachmentChips"
 import MarkdownContent from "@/components/Chat/MarkdownContent"
 import Sources from "@/components/Chat/Sources"
 import ToolCalls from "@/components/Chat/ToolCalls"
@@ -137,8 +137,15 @@ const MessageItem = ({
         {message.toolCalls && message.toolCalls.length > 0 && (
           <ToolCalls calls={message.toolCalls} />
         )}
+        {/* 用户消息携带的附件（文件名 chip；图片字节不内联展示） */}
+        {isUser && message.attachments && message.attachments.length > 0 && (
+          <MessageAttachments items={message.attachments} />
+        )}
         {isUser || message.error ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          // 只发附件没打字时正文为空，空段落会在气泡里留一段空白
+          message.content ? (
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : null
         ) : (
           <MarkdownContent
             content={message.content}
