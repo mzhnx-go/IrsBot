@@ -640,6 +640,31 @@ const ProviderDetail = ({ provider }: ProviderDetailProps) => {
           </div>
         </SettingRow>
       </div>
+
+      {/* 模型区（前端占位，功能待实现）：
+          「获取模型列表」需后端透传上游 GET /models 并落库；
+          「自定义模型」需模型管理表（每供应商多模型 + 默认模型选择）。
+          当前默认模型名在上方「设置」区维护 */}
+      <h4 className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-base font-semibold">模型</p>
+          <p className="text-xs text-muted-foreground">可用模型 0</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            disabled
+            placeholder="搜索模型或 ID"
+            title="待实现"
+            className="h-8 w-40 rounded-md border border-input bg-transparent px-2 text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
+          />
+          <Button variant="outline" size="sm" disabled title="待实现">
+            获取模型列表
+          </Button>
+          <Button variant="outline" size="sm" disabled title="待实现">
+            自定义模型
+          </Button>
+        </div>
+      </h4>
     </div>
   )
 }
