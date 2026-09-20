@@ -9,6 +9,7 @@ import {
   Plug,
   Settings,
   Sparkles,
+  TerminalSquare,
   Users,
 } from "lucide-react"
 
@@ -54,6 +55,7 @@ const navGroups: ItemGroup[] = [
       { icon: BarChart3, title: "统计", path: "/stats" },
       { icon: Settings, title: "设置", path: "/settings" },
       { icon: Users, title: "Admin", path: "/admin", superuserOnly: true },
+      { icon: TerminalSquare, title: "控制台", path: "/console", superuserOnly: true },
     ],
   },
 ]

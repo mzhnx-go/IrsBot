@@ -22,6 +22,7 @@ import { Route as LayoutPersonasRouteImport } from './routes/_layout/personas'
 import { Route as LayoutMcpRouteImport } from './routes/_layout/mcp'
 import { Route as LayoutKnowledgeBaseRouteImport } from './routes/_layout/knowledge-base'
 import { Route as LayoutConversationsRouteImport } from './routes/_layout/conversations'
+import { Route as LayoutConsoleRouteImport } from './routes/_layout/console'
 import { Route as LayoutChatRouteImport } from './routes/_layout/chat'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutKnowledgeBaseIndexRouteImport } from './routes/_layout/knowledge-base.index'
@@ -92,6 +93,11 @@ const LayoutConversationsRoute = LayoutConversationsRouteImport.update({
   path: '/conversations',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutConsoleRoute = LayoutConsoleRouteImport.update({
+  id: '/console',
+  path: '/console',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutChatRoute = LayoutChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -127,6 +133,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/admin': typeof LayoutAdminRoute
   '/chat': typeof LayoutChatRoute
+  '/console': typeof LayoutConsoleRoute
   '/conversations': typeof LayoutConversationsRoute
   '/knowledge-base': typeof LayoutKnowledgeBaseRouteWithChildren
   '/mcp': typeof LayoutMcpRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/admin': typeof LayoutAdminRoute
   '/chat': typeof LayoutChatRoute
+  '/console': typeof LayoutConsoleRoute
   '/conversations': typeof LayoutConversationsRoute
   '/mcp': typeof LayoutMcpRoute
   '/personas': typeof LayoutPersonasRoute
@@ -165,6 +173,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/chat': typeof LayoutChatRoute
+  '/_layout/console': typeof LayoutConsoleRoute
   '/_layout/conversations': typeof LayoutConversationsRoute
   '/_layout/knowledge-base': typeof LayoutKnowledgeBaseRouteWithChildren
   '/_layout/mcp': typeof LayoutMcpRoute
@@ -187,6 +196,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/chat'
+    | '/console'
     | '/conversations'
     | '/knowledge-base'
     | '/mcp'
@@ -205,6 +215,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/chat'
+    | '/console'
     | '/conversations'
     | '/mcp'
     | '/personas'
@@ -224,6 +235,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_layout/admin'
     | '/_layout/chat'
+    | '/_layout/console'
     | '/_layout/conversations'
     | '/_layout/knowledge-base'
     | '/_layout/mcp'
@@ -338,6 +350,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutConversationsRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/console': {
+      id: '/_layout/console'
+      path: '/console'
+      fullPath: '/console'
+      preLoaderRoute: typeof LayoutConsoleRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/chat': {
       id: '/_layout/chat'
       path: '/chat'
@@ -394,6 +413,7 @@ const LayoutKnowledgeBaseRouteWithChildren =
 interface LayoutRouteChildren {
   LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutChatRoute: typeof LayoutChatRoute
+  LayoutConsoleRoute: typeof LayoutConsoleRoute
   LayoutConversationsRoute: typeof LayoutConversationsRoute
   LayoutKnowledgeBaseRoute: typeof LayoutKnowledgeBaseRouteWithChildren
   LayoutMcpRoute: typeof LayoutMcpRoute
@@ -408,6 +428,7 @@ interface LayoutRouteChildren {
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminRoute: LayoutAdminRoute,
   LayoutChatRoute: LayoutChatRoute,
+  LayoutConsoleRoute: LayoutConsoleRoute,
   LayoutConversationsRoute: LayoutConversationsRoute,
   LayoutKnowledgeBaseRoute: LayoutKnowledgeBaseRouteWithChildren,
   LayoutMcpRoute: LayoutMcpRoute,
