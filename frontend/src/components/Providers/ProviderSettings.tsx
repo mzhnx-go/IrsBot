@@ -1,8 +1,14 @@
-import { zodResolver } from "@hookform/resolvers/zod"
-import { Plus, Star, Trash2, Wallet } from "lucide-react"
+import {
+  ArrowDownUp,
+  Braces,
+  Mic,
+  MessagesSquare,
+  Plus,
+  Trash2,
+  Volume2,
+  Wallet,
+} from "lucide-react"
 import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
 
 import type { ProviderOut } from "@/client"
 import { Badge } from "@/components/ui/badge"
@@ -36,8 +42,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { cn } from "@/lib/utils"
 import useProviderBalance from "@/hooks/useProviderBalance"
 import useProviders from "@/hooks/useProviders"
+import { z } from "zod"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+
+// ── 能力 Tab 栏（AstrBot 风格）────────────────────────────────
+// 「对话」是现有能力；其余四类供应商为前端占位，后端能力待实现。
+// TODO(待实现)：语音转文字 / 文字转语音 / 嵌入 / 重排序供应商的
+// 数据模型、CRUD 端点与 Agent 集成。届时 Tab 放开为 enabled。
+const CAPABILITY_TABS = [
+  { key: "chat", label: "对话", icon: MessagesSquare, enabled: true },
+  { key: "stt", label: "语音转文字", icon: Mic, enabled: false },
+  { key: "tts", label: "文字转语音", icon: Volume2, enabled: false },
+  { key: "embedding", label: "嵌入", icon: Braces, enabled: false },
+  { key: "rerank", label: "重排序", icon: ArrowDownUp, enabled: false },
+] as const
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "名称必填" }),
@@ -64,6 +87,8 @@ const VISION_TO_FORM = (v: boolean | null | undefined) =>
 
 const VISION_FROM_FORM = (v: "auto" | "yes" | "no") =>
   v === "auto" ? null : v === "yes"
+
+// ── 新增模型源弹窗（既有功能，原样保留）──────────────────────
 
 const AddProviderDialog = ({
   initialOpen = false,
@@ -110,9 +135,9 @@ const AddProviderDialog = ({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2" />
-          新增模型源
+        <Button variant="ghost" size="sm" className="text-primary">
+          <Plus className="mr-1" />
+          新增
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
@@ -285,19 +310,21 @@ const AddProviderDialog = ({
   )
 }
 
-interface ProviderRowProps {
+// ── 左列表卡片 ────────────────────────────────────────────────
+
+interface ProviderListItemProps {
   provider: ProviderOut
-  onSetDefault: (id: string) => void
-  onDelete: (id: string) => void
-  onSetVision: (id: string, value: boolean | null) => void
+  selected: boolean
+  onSelect: () => void
+  onDelete: () => void
 }
 
-const ProviderRow = ({
+const ProviderListItem = ({
   provider,
-  onSetDefault,
+  selected,
+  onSelect,
   onDelete,
-  onSetVision,
-}: ProviderRowProps) => {
+}: ProviderListItemProps) => {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const { balanceQuery } = useProviderBalance(provider.id)
 
@@ -322,83 +349,43 @@ const ProviderRow = ({
     <div
       data-testid="provider-row"
       data-provider-name={provider.name}
-      className="flex items-center justify-between gap-4 rounded-lg border p-4"
+      onClick={onSelect}
+      className={cn(
+        "group cursor-pointer rounded-lg border p-3 transition-colors",
+        selected ? "border-primary bg-primary/5" : "hover:bg-muted/60",
+      )}
     >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{provider.name}</span>
-          {provider.is_default && <Badge>默认</Badge>}
-          {!provider.is_active && <Badge variant="outline">已停用</Badge>}
-        </div>
-        <p className="truncate text-sm text-muted-foreground">
-          {TYPE_LABELS[provider.provider_type] ?? provider.provider_type}
-          {" · "}
-          {provider.model_name}
-          {provider.base_url ? ` · ${provider.base_url}` : ""}
-        </p>
-        {balanceText && (
-          <p
-            data-testid="provider-balance-result"
-            className="mt-1 text-sm text-muted-foreground"
-          >
-            {balanceText}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{provider.name}</span>
+            {provider.is_default && <Badge>默认</Badge>}
+            {!provider.is_active && <Badge variant="outline">已停用</Badge>}
+          </div>
+          <p className="truncate text-sm text-muted-foreground">
+            {provider.base_url ??
+              TYPE_LABELS[provider.provider_type] ??
+              provider.provider_type}
           </p>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <Select
-          value={VISION_TO_FORM(provider.supports_vision)}
-          onValueChange={(v) =>
-            onSetVision(
-              provider.id,
-              VISION_FROM_FORM(v as "auto" | "yes" | "no"),
-            )
-          }
-        >
-          <SelectTrigger
-            className="w-[7.5rem]"
-            aria-label="视觉能力"
-            data-testid="provider-vision-select"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="auto">自动判断</SelectItem>
-            <SelectItem value="yes">支持视觉</SelectItem>
-            <SelectItem value="no">不支持视觉</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="provider-balance-button"
-          disabled={balanceQuery.isFetching}
-          onClick={() => balanceQuery.refetch()}
-        >
-          <Wallet />
-          {balanceQuery.isFetching ? "查询中" : "查余额"}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={provider.is_default}
-          onClick={() => onSetDefault(provider.id)}
-        >
-          <Star />
-          设为默认
-        </Button>
+        </div>
         <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm" className="text-destructive">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
+              aria-label={`删除 ${provider.name}`}
+              onClick={(e) => e.stopPropagation()}
+            >
               <Trash2 />
-              删除
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>删除模型源</DialogTitle>
               <DialogDescription>
-                确定删除「{provider.name}」吗？该操作不可撤销。
+                确定删除「{provider.name}
+                」吗？该操作不可撤销。
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="mt-4">
@@ -407,8 +394,9 @@ const ProviderRow = ({
               </DialogClose>
               <Button
                 variant="destructive"
-                onClick={() => {
-                  onDelete(provider.id)
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete()
                   setConfirmOpen(false)
                 }}
               >
@@ -418,62 +406,294 @@ const ProviderRow = ({
           </DialogContent>
         </Dialog>
       </div>
+      {/* 查余额：e2e 按 provider-row 行内定位按钮与结果，必须留在卡片里 */}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7"
+          data-testid="provider-balance-button"
+          disabled={balanceQuery.isFetching}
+          onClick={(e) => {
+            e.stopPropagation()
+            balanceQuery.refetch()
+          }}
+        >
+          <Wallet />
+          {balanceQuery.isFetching ? "查询中" : "查余额"}
+        </Button>
+        {balanceText && (
+          <p
+            data-testid="provider-balance-result"
+            className="truncate text-xs text-muted-foreground"
+          >
+            {balanceText}
+          </p>
+        )}
+      </div>
     </div>
   )
 }
+
+// ── 右详情面板：设置区 ────────────────────────────────────────
+
+/** 详情表单行：左侧标签+说明，右侧控件（AstrBot 排版） */
+function SettingRow({
+  label,
+  description,
+  children,
+}: {
+  label: string
+  description?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="grid grid-cols-[220px_1fr] items-center gap-4 border-b py-3 last:border-b-0">
+      <div>
+        <p className="text-sm font-medium">{label}</p>
+        {description && (
+          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+        )}
+      </div>
+      <div>{children}</div>
+    </div>
+  )
+}
+
+interface ProviderDetailProps {
+  provider: ProviderOut
+}
+
+/** key={provider.id} 重挂载：切换选中项时表单回到该供应商的当前值 */
+const ProviderDetail = ({ provider }: ProviderDetailProps) => {
+  const { updateProvider } = useProviders()
+
+  const [name, setName] = useState(provider.name)
+  // API Key：后端从不回传明文——留空 = 不修改，输入新值才进 PATCH
+  const [apiKey, setApiKey] = useState("")
+  const [modelName, setModelName] = useState(provider.model_name)
+  const [baseUrl, setBaseUrl] = useState(provider.base_url ?? "")
+  const [isDefault, setIsDefault] = useState(provider.is_default)
+  const [supportsVision, setSupportsVision] = useState<
+    "auto" | "yes" | "no"
+  >(VISION_TO_FORM(provider.supports_vision))
+
+  const handleSave = () => {
+    if (!name.trim() || !modelName.trim()) return
+    updateProvider.mutate({
+      providerId: provider.id,
+      body: {
+        name: name.trim(),
+        model_name: modelName.trim(),
+        base_url: baseUrl.trim() || undefined,
+        is_default: isDefault,
+        supports_vision: VISION_FROM_FORM(supportsVision),
+        // 留空不提交，避免把占位串当新 Key 覆盖掉密文
+        ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
+      },
+    })
+  }
+
+  return (
+    <div
+      data-testid="provider-detail"
+      data-provider-name={provider.name}
+      className="flex h-full flex-col"
+    >
+      {/* 详情头部：名称 + 地址 + 保存配置 */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h3 className="truncate text-xl font-semibold">{provider.name}</h3>
+          <p className="truncate text-sm text-muted-foreground">
+            {provider.base_url ??
+              TYPE_LABELS[provider.provider_type] ??
+              provider.provider_type}
+          </p>
+        </div>
+        <LoadingButton
+          size="sm"
+          loading={updateProvider.isPending}
+          onClick={handleSave}
+          data-testid="provider-save"
+          disabled={!name.trim() || !modelName.trim()}
+        >
+          保存配置
+        </LoadingButton>
+      </div>
+
+      {/* 设置 */}
+      <h4 className="mt-6 text-base font-semibold">设置</h4>
+      <div>
+        <SettingRow label="名称" description="模型源显示名称">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </SettingRow>
+        <SettingRow
+          label="类型"
+          description="创建后不可修改（后端约定）"
+        >
+          <Input
+            value={TYPE_LABELS[provider.provider_type] ?? provider.provider_type}
+            disabled
+          />
+        </SettingRow>
+        <SettingRow
+          label="API Key"
+          description="已加密存储。留空表示不修改；输入新值则覆盖"
+        >
+          <div className="flex items-center gap-2">
+            <PasswordInput
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="••••••••••••••••"
+            />
+            {/* TODO(待实现)：多 Key 轮换（后端需 ProviderKey 表与轮询策略） */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              disabled
+              title="待实现"
+            >
+              添加更多
+            </Button>
+          </div>
+        </SettingRow>
+        <SettingRow label="API 地址" description="自定义 API 端点 URL（可选）">
+          <Input
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            placeholder="https://…/v1"
+          />
+        </SettingRow>
+        <SettingRow label="默认模型名" description="对话默认使用的模型">
+          <Input
+            value={modelName}
+            onChange={(e) => setModelName(e.target.value)}
+          />
+        </SettingRow>
+        <SettingRow label="设为默认" description="对话使用标记为默认的模型源">
+          <Switch
+            checked={isDefault}
+            onCheckedChange={setIsDefault}
+            data-testid="provider-default-switch"
+          />
+        </SettingRow>
+        <SettingRow
+          label="视觉能力"
+          description="传图片时：支持则直接发给模型，否则提示看不了图"
+        >
+          <Select
+            value={supportsVision}
+            onValueChange={(v) =>
+              setSupportsVision(v as "auto" | "yes" | "no")
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">自动判断（按模型名）</SelectItem>
+              <SelectItem value="yes">支持视觉</SelectItem>
+              <SelectItem value="no">不支持视觉</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingRow>
+      </div>
+    </div>
+  )
+}
+
+// ── 页面主体：能力 Tab + 主从两栏 ─────────────────────────────
 
 const ProviderSettings = ({
   autoOpenNew = false,
 }: {
   autoOpenNew?: boolean
 }) => {
-  const { providersQuery, updateProvider, deleteProvider } = useProviders()
+  const { providersQuery, deleteProvider } = useProviders()
+  // 未选中任何项时右侧显示空态（与 AstrBot 一致），不自动选中
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   if (providersQuery.isPending) {
     return null
   }
 
   const providers = providersQuery.data ?? []
+  const selected = providers.find((p) => p.id === selectedId) ?? null
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">模型源</h2>
-          <p className="text-sm text-muted-foreground">
-            管理多套模型 API 配置，AI 对话使用标记为「默认」的模型源。
-          </p>
-        </div>
-        <AddProviderDialog initialOpen={autoOpenNew} />
+      {/* 能力 Tab 栏 */}
+      <div className="flex flex-wrap items-center gap-2">
+        {CAPABILITY_TABS.map((tab) => {
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              disabled={!tab.enabled}
+              title={tab.enabled ? undefined : "待实现"}
+              data-testid={`provider-tab-${tab.key}`}
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors",
+                tab.key === "chat"
+                  ? "bg-muted font-medium text-foreground"
+                  : "text-muted-foreground hover:bg-muted/60",
+                !tab.enabled && "cursor-not-allowed opacity-50 hover:bg-transparent",
+              )}
+            >
+              <Icon className="size-4" />
+              {tab.label}
+            </button>
+          )
+        })}
       </div>
 
-      {providers.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          还没有模型源。点击右上角「新增模型源」添加一套配置。
+      {/* 主从两栏 */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[340px_1fr]">
+        {/* 左：模型源列表 */}
+        <div className="rounded-xl border p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">模型源</h2>
+            <AddProviderDialog initialOpen={autoOpenNew} />
+          </div>
+          {providers.length === 0 ? (
+            <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              还没有模型源，点击右上角「新增」添加
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {providers.map((p) => (
+                <ProviderListItem
+                  key={p.id}
+                  provider={p}
+                  selected={p.id === selectedId}
+                  onSelect={() => setSelectedId(p.id)}
+                  onDelete={() => {
+                    if (selectedId === p.id) setSelectedId(null)
+                    deleteProvider.mutate(p.id)
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {providers.map((p) => (
-            <ProviderRow
-              key={p.id}
-              provider={p}
-              onSetDefault={(id) =>
-                updateProvider.mutate({
-                  providerId: id,
-                  body: { is_default: true },
-                })
-              }
-              onDelete={(id) => deleteProvider.mutate(id)}
-              onSetVision={(id, value) =>
-                updateProvider.mutate({
-                  providerId: id,
-                  body: { supports_vision: value },
-                })
-              }
-            />
-          ))}
+
+        {/* 右：详情面板 */}
+        <div className="rounded-xl border p-6">
+          {selected ? (
+            <ProviderDetail key={selected.id} provider={selected} />
+          ) : (
+            <div
+              data-testid="provider-empty"
+              className="flex h-full min-h-72 flex-col items-center justify-center gap-2 text-muted-foreground"
+            >
+              <p className="text-4xl">🖱️</p>
+              <p className="text-sm">请选择一个模型源</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
