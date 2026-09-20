@@ -138,6 +138,27 @@ class ConversationStatusUpdate(SQLModel):
     is_enabled: bool
 
 
+#--工具权限相关模型（Phase 15.2f）
+class ToolPermissionsPublic(SQLModel):
+    """工具权限开关状态（GET/PATCH 共用响应）
+
+    Attributes:
+        shell_enabled / file_write_enabled: 当前生效值（表 > .env）。
+        env_shell_enabled / env_file_write_enabled: `.env` 兜底值，
+            便于判断「网页开关没动时为什么是这个行为」。
+    """
+    shell_enabled: bool
+    file_write_enabled: bool
+    env_shell_enabled: bool
+    env_file_write_enabled: bool
+
+
+class ToolPermissionsUpdate(SQLModel):
+    """更新工具权限（只更新提供的字段）"""
+    shell_enabled: bool | None = None
+    file_write_enabled: bool | None = None
+
+
 # ── 统计（Phase 15.2e / 14.3）──────────────────────────────────
 
 class StatsDailyPoint(SQLModel):

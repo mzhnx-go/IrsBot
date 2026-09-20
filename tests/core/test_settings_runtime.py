@@ -13,13 +13,18 @@ from sqlmodel import Session, delete
 from app.core.config import settings
 from app.core.db.models import AppSetting
 from app.core.settings_runtime import (
+    KEY_ENABLE_FILE_WRITE,
+    KEY_ENABLE_SHELL,
     KEY_OPEN_REGISTRATION,
     _parse_bool,
     count_users,
     deployment_mode,
+    file_write_enabled,
     get_setting,
     set_open_registration,
     set_setting,
+    set_tool_permissions,
+    shell_enabled,
 )
 
 # 便于测试直接校验其它键的通用读写
@@ -154,3 +159,57 @@ def test_count_users_is_positive(db: Session) -> None:
 def test_runtime_key_constant_matches_documented_name() -> None:
     """锁住键名：改名会让已部署实例上的旧记录**全部失效**（静默回落 .env）。"""
     assert KEY_OPEN_REGISTRATION == "users.open_registration"
+
+
+# ── 工具权限开关（D6 / Phase 15.2f）─────────────────────────────
+
+
+def test_tool_permission_key_constants_match_documented_names() -> None:
+    """锁住工具权限键名（同上：改名 = 已部署实例上的开关静默失效）。"""
+    assert KEY_ENABLE_SHELL == "tools.enable_shell"
+    assert KEY_ENABLE_FILE_WRITE == "tools.enable_file_write"
+
+
+def test_tool_flags_fall_back_to_env(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    """表里没有记录时，工具开关以 `.env` 为准 —— 两个方向都测。"""
+    monkeypatch.setattr(settings, "ENABLE_SHELL", False)
+    monkeypatch.setattr(settings, "ENABLE_FILE_WRITE", False)
+    assert shell_enabled(db) is False
+    assert file_write_enabled(db) is False
+
+    monkeypatch.setattr(settings, "ENABLE_SHELL", True)
+    monkeypatch.setattr(settings, "ENABLE_FILE_WRITE", True)
+    assert shell_enabled(db) is True
+    assert file_write_enabled(db) is True
+
+
+def test_tool_flags_runtime_override_wins_both_directions(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """运行时记录覆盖 `.env`：网页开了 `.env` 关 → 开；反之 → 关。"""
+    monkeypatch.setattr(settings, "ENABLE_SHELL", False)
+    set_tool_permissions(db, shell=True, file_write=False)
+    assert shell_enabled(db) is True
+    assert file_write_enabled(db) is False
+
+    # 再关掉：网页的关闭决定同样要赢过 `.env`
+    set_tool_permissions(db, shell=False, file_write=False)
+    assert shell_enabled(db) is False
+
+
+def test_tool_flags_garbage_falls_back_to_env(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """脏值不猜语义 —— 回落 `.env`，危险工具不会因为一行坏数据被放开。"""
+    monkeypatch.setattr(settings, "ENABLE_SHELL", False)
+    set_setting(db, KEY_ENABLE_SHELL, "maybe")
+    assert shell_enabled(db) is False
+
+
+def test_set_tool_permissions_round_trip(db: Session) -> None:
+    """类型化写入器：两个键都落库，值可被读回。"""
+    set_tool_permissions(db, shell=True, file_write=True)
+    assert get_setting(db, KEY_ENABLE_SHELL) == "true"
+    assert get_setting(db, KEY_ENABLE_FILE_WRITE) == "true"
+    assert shell_enabled(db) is True
+    assert file_write_enabled(db) is True

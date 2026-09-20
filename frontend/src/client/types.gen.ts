@@ -406,6 +406,29 @@ export type Token = {
 };
 
 /**
+ * 工具权限开关状态（GET/PATCH 共用响应）
+ *
+ * Attributes:
+ * shell_enabled / file_write_enabled: 当前生效值（表 > .env）。
+ * env_shell_enabled / env_file_write_enabled: `.env` 兜底值，
+ * 便于判断「网页开关没动时为什么是这个行为」。
+ */
+export type ToolPermissionsPublic = {
+    shell_enabled: boolean;
+    file_write_enabled: boolean;
+    env_shell_enabled: boolean;
+    env_file_write_enabled: boolean;
+};
+
+/**
+ * 更新工具权限（只更新提供的字段）
+ */
+export type ToolPermissionsUpdate = {
+    shell_enabled?: (boolean | null);
+    file_write_enabled?: (boolean | null);
+};
+
+/**
  * 回收站条目：DocumentOut 的字段 + 归属库 + 生命周期时间点。
  *
  * 带 kb_name 是因为回收站是跨库的扁平列表，用户需要知道「这是哪个库的文件」。
@@ -788,6 +811,14 @@ export type SettingsUpdateDeploymentSettingsData = {
 };
 
 export type SettingsUpdateDeploymentSettingsResponse = (DeploymentSettingsPublic);
+
+export type SettingsReadToolPermissionsResponse = (ToolPermissionsPublic);
+
+export type SettingsUpdateToolPermissionsData = {
+    requestBody: ToolPermissionsUpdate;
+};
+
+export type SettingsUpdateToolPermissionsResponse = (ToolPermissionsPublic);
 
 export type UsersReadUsersData = {
     limit?: number;

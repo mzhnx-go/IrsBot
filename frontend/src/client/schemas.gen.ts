@@ -1451,6 +1451,66 @@ export const TokenSchema = {
     title: 'Token'
 } as const;
 
+export const ToolPermissionsPublicSchema = {
+    properties: {
+        shell_enabled: {
+            type: 'boolean',
+            title: 'Shell Enabled'
+        },
+        file_write_enabled: {
+            type: 'boolean',
+            title: 'File Write Enabled'
+        },
+        env_shell_enabled: {
+            type: 'boolean',
+            title: 'Env Shell Enabled'
+        },
+        env_file_write_enabled: {
+            type: 'boolean',
+            title: 'Env File Write Enabled'
+        }
+    },
+    type: 'object',
+    required: ['shell_enabled', 'file_write_enabled', 'env_shell_enabled', 'env_file_write_enabled'],
+    title: 'ToolPermissionsPublic',
+    description: `工具权限开关状态（GET/PATCH 共用响应）
+
+Attributes:
+    shell_enabled / file_write_enabled: 当前生效值（表 > .env）。
+    env_shell_enabled / env_file_write_enabled: \`.env\` 兜底值，
+        便于判断「网页开关没动时为什么是这个行为」。`
+} as const;
+
+export const ToolPermissionsUpdateSchema = {
+    properties: {
+        shell_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Shell Enabled'
+        },
+        file_write_enabled: {
+            anyOf: [
+                {
+                    type: 'boolean'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'File Write Enabled'
+        }
+    },
+    type: 'object',
+    title: 'ToolPermissionsUpdate',
+    description: '更新工具权限（只更新提供的字段）'
+} as const;
+
 export const TrashDocumentOutSchema = {
     properties: {
         id: {

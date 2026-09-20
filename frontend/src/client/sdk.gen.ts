@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AgentCreateConversationData, AgentCreateConversationResponse, AgentListConversationsData, AgentListConversationsResponse, AgentRenameConversationData, AgentRenameConversationResponse, AgentDeleteConversationData, AgentDeleteConversationResponse, AgentSetConversationStatusData, AgentSetConversationStatusResponse, AgentExportConversationData, AgentExportConversationResponse, AgentListConversationMessagesData, AgentListConversationMessagesResponse, AgentDeleteConversationMessageData, AgentDeleteConversationMessageResponse, AgentTruncateConversationMessagesData, AgentTruncateConversationMessagesResponse, AgentChatData, AgentChatResponse, AgentCreateMcpServerData, AgentCreateMcpServerResponse, AgentListMcpServersData, AgentListMcpServersResponse, AgentGetMcpServerData, AgentGetMcpServerResponse, AgentUpdateMcpServerData, AgentUpdateMcpServerResponse, AgentDeleteMcpServerData, AgentDeleteMcpServerResponse, AgentConnectMcpServerData, AgentConnectMcpServerResponse, AgentCreatePersonaRouteData, AgentCreatePersonaRouteResponse, AgentListPersonasRouteData, AgentListPersonasRouteResponse, AgentGetPersonaRouteData, AgentGetPersonaRouteResponse, AgentUpdatePersonaRouteData, AgentUpdatePersonaRouteResponse, AgentDeletePersonaRouteData, AgentDeletePersonaRouteResponse, AgentBindConversationPersonaData, AgentBindConversationPersonaResponse, AgentListSkillsResponse, AgentGetSkillDetailData, AgentGetSkillDetailResponse, AgentDeleteSkillData, AgentDeleteSkillResponse, AgentScanSkillsResponse, AgentInstallSkillData, AgentInstallSkillResponse, AgentStatsOverviewData, AgentStatsOverviewResponse, AgentStatsRecentRunsData, AgentStatsRecentRunsResponse, KnowledgeBaseListKbsResponse, KnowledgeBaseCreateKbData, KnowledgeBaseCreateKbResponse, KnowledgeBaseListTrashResponse, KnowledgeBaseRestoreTrashedDocumentData, KnowledgeBaseRestoreTrashedDocumentResponse, KnowledgeBasePurgeTrashedDocumentData, KnowledgeBasePurgeTrashedDocumentResponse, KnowledgeBaseGetKbData, KnowledgeBaseGetKbResponse, KnowledgeBaseDeleteKbData, KnowledgeBaseDeleteKbResponse, KnowledgeBaseUploadKbDocumentData, KnowledgeBaseUploadKbDocumentResponse, KnowledgeBaseListKbDocumentsData, KnowledgeBaseListKbDocumentsResponse, KnowledgeBaseDeleteKbDocumentData, KnowledgeBaseDeleteKbDocumentResponse, KnowledgeBaseQueryKbData, KnowledgeBaseQueryKbResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginResetPasswordData, LoginResetPasswordResponse, PrivateCreateUserData, PrivateCreateUserResponse, ProvidersListProvidersResponse, ProvidersCreateProviderData, ProvidersCreateProviderResponse, ProvidersUpdateProviderData, ProvidersUpdateProviderResponse, ProvidersDeleteProviderData, ProvidersDeleteProviderResponse, SettingsReadDeploymentSettingsResponse, SettingsUpdateDeploymentSettingsData, SettingsUpdateDeploymentSettingsResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersReadMySystemPromptResponse, UsersUpdateMySystemPromptData, UsersUpdateMySystemPromptResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsHealthCheckResponse, UtilsReadPublicSettingsResponse } from './types.gen';
+import type { AgentCreateConversationData, AgentCreateConversationResponse, AgentListConversationsData, AgentListConversationsResponse, AgentRenameConversationData, AgentRenameConversationResponse, AgentDeleteConversationData, AgentDeleteConversationResponse, AgentSetConversationStatusData, AgentSetConversationStatusResponse, AgentExportConversationData, AgentExportConversationResponse, AgentListConversationMessagesData, AgentListConversationMessagesResponse, AgentDeleteConversationMessageData, AgentDeleteConversationMessageResponse, AgentTruncateConversationMessagesData, AgentTruncateConversationMessagesResponse, AgentChatData, AgentChatResponse, AgentCreateMcpServerData, AgentCreateMcpServerResponse, AgentListMcpServersData, AgentListMcpServersResponse, AgentGetMcpServerData, AgentGetMcpServerResponse, AgentUpdateMcpServerData, AgentUpdateMcpServerResponse, AgentDeleteMcpServerData, AgentDeleteMcpServerResponse, AgentConnectMcpServerData, AgentConnectMcpServerResponse, AgentCreatePersonaRouteData, AgentCreatePersonaRouteResponse, AgentListPersonasRouteData, AgentListPersonasRouteResponse, AgentGetPersonaRouteData, AgentGetPersonaRouteResponse, AgentUpdatePersonaRouteData, AgentUpdatePersonaRouteResponse, AgentDeletePersonaRouteData, AgentDeletePersonaRouteResponse, AgentBindConversationPersonaData, AgentBindConversationPersonaResponse, AgentListSkillsResponse, AgentGetSkillDetailData, AgentGetSkillDetailResponse, AgentDeleteSkillData, AgentDeleteSkillResponse, AgentScanSkillsResponse, AgentInstallSkillData, AgentInstallSkillResponse, AgentStatsOverviewData, AgentStatsOverviewResponse, AgentStatsRecentRunsData, AgentStatsRecentRunsResponse, KnowledgeBaseListKbsResponse, KnowledgeBaseCreateKbData, KnowledgeBaseCreateKbResponse, KnowledgeBaseListTrashResponse, KnowledgeBaseRestoreTrashedDocumentData, KnowledgeBaseRestoreTrashedDocumentResponse, KnowledgeBasePurgeTrashedDocumentData, KnowledgeBasePurgeTrashedDocumentResponse, KnowledgeBaseGetKbData, KnowledgeBaseGetKbResponse, KnowledgeBaseDeleteKbData, KnowledgeBaseDeleteKbResponse, KnowledgeBaseUploadKbDocumentData, KnowledgeBaseUploadKbDocumentResponse, KnowledgeBaseListKbDocumentsData, KnowledgeBaseListKbDocumentsResponse, KnowledgeBaseDeleteKbDocumentData, KnowledgeBaseDeleteKbDocumentResponse, KnowledgeBaseQueryKbData, KnowledgeBaseQueryKbResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginResetPasswordData, LoginResetPasswordResponse, PrivateCreateUserData, PrivateCreateUserResponse, ProvidersListProvidersResponse, ProvidersCreateProviderData, ProvidersCreateProviderResponse, ProvidersUpdateProviderData, ProvidersUpdateProviderResponse, ProvidersDeleteProviderData, ProvidersDeleteProviderResponse, SettingsReadDeploymentSettingsResponse, SettingsUpdateDeploymentSettingsData, SettingsUpdateDeploymentSettingsResponse, SettingsReadToolPermissionsResponse, SettingsUpdateToolPermissionsData, SettingsUpdateToolPermissionsResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersReadMySystemPromptResponse, UsersUpdateMySystemPromptData, UsersUpdateMySystemPromptResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsHealthCheckResponse, UtilsReadPublicSettingsResponse } from './types.gen';
 
 export class AgentService {
     /**
@@ -1082,6 +1082,42 @@ export class SettingsService {
         return __request(OpenAPI, {
             method: 'PATCH',
             url: '/api/v1/settings/deployment',
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Read Tool Permissions
+     * 读取工具权限开关（**超管专属**，Phase 15.2f）。
+     * @returns ToolPermissionsPublic Successful Response
+     * @throws ApiError
+     */
+    public static readToolPermissions(): CancelablePromise<SettingsReadToolPermissionsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/settings/tools'
+        });
+    }
+    
+    /**
+     * Update Tool Permissions
+     * 更新工具权限开关（**超管专属**），保存即生效、无需重启。
+     *
+     * 开启后 shell_execute / file_read / file_write 会出现在 Agent 可用工具
+     * 列表里；file_write 仍受 FILE_WRITE_ROOTS 路径白名单约束。
+     * @param data The data for the request.
+     * @param data.requestBody
+     * @returns ToolPermissionsPublic Successful Response
+     * @throws ApiError
+     */
+    public static updateToolPermissions(data: SettingsUpdateToolPermissionsData): CancelablePromise<SettingsUpdateToolPermissionsResponse> {
+        return __request(OpenAPI, {
+            method: 'PATCH',
+            url: '/api/v1/settings/tools',
             body: data.requestBody,
             mediaType: 'application/json',
             errors: {

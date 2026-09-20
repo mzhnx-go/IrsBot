@@ -21,6 +21,7 @@ from app.core.db.sqlmodel_models import User
 from tests.utils.utils import random_email, random_lower_string
 
 DEPLOYMENT_URL = f"{settings.API_V1_STR}/settings/deployment"
+TOOLS_URL = f"{settings.API_V1_STR}/settings/tools"
 PUBLIC_SETTINGS_URL = f"{settings.API_V1_STR}/utils/public-settings"
 SIGNUP_URL = f"{settings.API_V1_STR}/users/signup"
 USERS_URL = f"{settings.API_V1_STR}/users/"
@@ -262,3 +263,91 @@ def test_public_settings_tracks_runtime_value(
     r = client.get(PUBLIC_SETTINGS_URL)
     assert r.status_code == 200
     assert r.json() == {"open_registration": True}
+
+
+# ── 工具权限开关（15.2f，依赖 D6）────────────────────────────────
+
+
+def test_read_tool_permissions_falls_back_to_env(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """表里没有记录时，返回值就是 `.env` 兜底值（默认全关）。"""
+    r = client.get(TOOLS_URL, headers=superuser_token_headers)
+    assert r.status_code == 200
+
+    body = r.json()
+    assert body["shell_enabled"] is settings.ENABLE_SHELL
+    assert body["file_write_enabled"] is settings.ENABLE_FILE_WRITE
+    assert body["env_shell_enabled"] is settings.ENABLE_SHELL
+    assert body["env_file_write_enabled"] is settings.ENABLE_FILE_WRITE
+
+
+def test_patch_tool_permissions_overrides_env(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """运行时打开 shell → 立即生效且覆盖 `.env`；两个开关互不影响。"""
+    r = client.patch(
+        TOOLS_URL, headers=superuser_token_headers, json={"shell_enabled": True}
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["shell_enabled"] is True
+    assert body["env_shell_enabled"] is settings.ENABLE_SHELL
+    # file 开关未被本次 PATCH 触碰，保持默认
+    assert body["file_write_enabled"] is settings.ENABLE_FILE_WRITE
+
+    # 再改 file 开关，shell 应保持打开（PATCH 合并语义）
+    second = client.patch(
+        TOOLS_URL,
+        headers=superuser_token_headers,
+        json={"file_write_enabled": True},
+    )
+    assert second.status_code == 200
+    assert second.json()["shell_enabled"] is True
+    assert second.json()["file_write_enabled"] is True
+
+    # GET 与 PATCH 视图一致：运行时覆盖确实落库
+    read = client.get(TOOLS_URL, headers=superuser_token_headers).json()
+    assert read["shell_enabled"] is True
+    assert read["file_write_enabled"] is True
+
+
+def test_patch_tool_permissions_closes_again(
+    client: TestClient, superuser_token_headers: dict[str, str]
+) -> None:
+    """打开后能再关掉——开关是双向的，不是一次性承诺。"""
+    client.patch(
+        TOOLS_URL, headers=superuser_token_headers, json={"shell_enabled": True}
+    )
+    r = client.patch(
+        TOOLS_URL, headers=superuser_token_headers, json={"shell_enabled": False}
+    )
+    assert r.status_code == 200
+    assert r.json()["shell_enabled"] is False
+
+
+def test_tool_permissions_forbidden_for_normal_user(
+    client: TestClient,
+    normal_user_token_headers: dict[str, str],
+    superuser_token_headers: dict[str, str],
+) -> None:
+    """普通用户读写都 403 —— 危险工具的权限只能由超管决定。"""
+    assert (
+        client.get(TOOLS_URL, headers=normal_user_token_headers).status_code == 403
+    )
+    r = client.patch(
+        TOOLS_URL, headers=normal_user_token_headers, json={"shell_enabled": True}
+    )
+    assert r.status_code == 403
+
+    # 且确实没生效
+    read = client.get(TOOLS_URL, headers=superuser_token_headers).json()
+    assert read["shell_enabled"] is settings.ENABLE_SHELL
+
+
+def test_tool_permissions_requires_auth(client: TestClient) -> None:
+    """匿名读写均 401。"""
+    assert client.get(TOOLS_URL).status_code == 401
+    assert (
+        client.patch(TOOLS_URL, json={"shell_enabled": True}).status_code == 401
+    )

@@ -29,6 +29,10 @@ from app.core.db.sqlmodel_models import User
 #: 匿名自助注册是否开放。唯一对外的运行时开关。
 KEY_OPEN_REGISTRATION: Final = "users.open_registration"
 
+#: 危险内置工具权限开关（D6 / Phase 15.2f）。表里无记录时回落 .env。
+KEY_ENABLE_SHELL: Final = "tools.enable_shell"
+KEY_ENABLE_FILE_WRITE: Final = "tools.enable_file_write"
+
 _TRUTHY: Final = frozenset({"1", "true", "yes", "on"})
 _FALSY: Final = frozenset({"0", "false", "no", "off"})
 
@@ -144,3 +148,26 @@ def count_users(session: Session) -> int:
         用户表行数。
     """
     return session.exec(select(func.count()).select_from(User)).one()
+
+
+# ── 工具权限开关（D6 / Phase 15.2f）────────────────────────────
+
+
+def shell_enabled(session: Session) -> bool:
+    """shell_execute 是否可用（表 > .env，判断依据仅此一处）。"""
+    parsed = _parse_bool(get_setting(session, KEY_ENABLE_SHELL))
+    return settings.ENABLE_SHELL if parsed is None else parsed
+
+
+def file_write_enabled(session: Session) -> bool:
+    """file_read / file_write 是否可用（表 > .env）。"""
+    parsed = _parse_bool(get_setting(session, KEY_ENABLE_FILE_WRITE))
+    return settings.ENABLE_FILE_WRITE if parsed is None else parsed
+
+
+def set_tool_permissions(
+    session: Session, *, shell: bool, file_write: bool
+) -> None:
+    """写入工具权限开关（超管操作，保存即生效、无需重启）。"""
+    set_setting(session, KEY_ENABLE_SHELL, "true" if shell else "false")
+    set_setting(session, KEY_ENABLE_FILE_WRITE, "true" if file_write else "false")

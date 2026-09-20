@@ -11,8 +11,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-# 触发 builtin 工具的注册（注册是导入 app.core.agent.builtins 的副作用，
-# 其是否注册 shell/file_write 由 config 的 ENABLE_SHELL / ENABLE_FILE_WRITE 决定）。
+# 触发 builtin 工具的注册（注册是导入 app.core.agent.builtins 的副作用；
+# shell/file 工具默认注册但被权限开关过滤，见下方 __init__）。
 import app.core.agent.builtins  # noqa: F401
 from app.core.agent.builtins.kb_query import set_kb_user
 from app.core.agent.graph import create_compiled_agent_graph
@@ -24,6 +24,12 @@ from app.core.config import settings
 from app.core.db.models import Conversation, Persona
 from app.core.db.sqlmodel_models import User
 from app.core.pipeline.hooks import hook_bus
+from app.core.settings_runtime import (
+    file_write_enabled as runtime_file_write_enabled,
+)
+from app.core.settings_runtime import (
+    shell_enabled as runtime_shell_enabled,
+)
 
 
 class Agent:
@@ -120,8 +126,18 @@ class Agent:
             temperature=temperature,
         )
 
-        # 获取所有注册的工具
-        self.tools = ToolRegistry.instance().get_all_tools()
+        # 获取注册的工具并按**工具权限开关**过滤（D6 / Phase 15.2f）：
+        # 注册表始终收录全部内置工具，可用性每次构建时从运行时配置判定
+        # （表 > .env），所以在设置页改完立即生效，不需要重启。
+        # 执行侧（call_tools_node）只认 state["tools"]，被过滤掉的工具
+        # 即使被模型凭空调用也只会得到「工具不存在」。
+        tools = ToolRegistry.instance().get_all_tools()
+        hidden: set[str] = set()
+        if not runtime_shell_enabled(session):
+            hidden.add("shell_execute")
+        if not runtime_file_write_enabled(session):
+            hidden.update({"file_read", "file_write"})
+        self.tools = [t for t in tools if t.name not in hidden]
 
         # 编译图
         self.graph = create_compiled_agent_graph()

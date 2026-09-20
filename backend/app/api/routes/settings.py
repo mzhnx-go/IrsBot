@@ -16,11 +16,16 @@ from app.core.config import settings
 from app.core.db.sqlmodel_models import (
     DeploymentSettingsPublic,
     DeploymentSettingsUpdate,
+    ToolPermissionsPublic,
+    ToolPermissionsUpdate,
 )
 from app.core.settings_runtime import (
     count_users,
     deployment_mode,
+    file_write_enabled,
     set_open_registration,
+    set_tool_permissions,
+    shell_enabled,
     signup_allowed,
 )
 
@@ -84,3 +89,50 @@ def update_deployment_settings(
     """
     set_open_registration(session, body.open_registration)
     return _settings_response(session)
+
+
+def _tool_permissions_response(session: Session) -> ToolPermissionsPublic:
+    """组装工具权限响应（GET / PATCH 共用）。"""
+    return ToolPermissionsPublic(
+        shell_enabled=shell_enabled(session),
+        file_write_enabled=file_write_enabled(session),
+        env_shell_enabled=settings.ENABLE_SHELL,
+        env_file_write_enabled=settings.ENABLE_FILE_WRITE,
+    )
+
+
+@router.get(
+    "/tools",
+    dependencies=[Depends(get_current_active_superuser)],
+    response_model=ToolPermissionsPublic,
+)
+def read_tool_permissions(session: SessionDep) -> ToolPermissionsPublic:
+    """读取工具权限开关（**超管专属**，Phase 15.2f）。"""
+    return _tool_permissions_response(session)
+
+
+@router.patch(
+    "/tools",
+    dependencies=[Depends(get_current_active_superuser)],
+    response_model=ToolPermissionsPublic,
+)
+def update_tool_permissions(
+    *, session: SessionDep, body: ToolPermissionsUpdate
+) -> ToolPermissionsPublic:
+    """更新工具权限开关（**超管专属**），保存即生效、无需重启。
+
+    开启后 shell_execute / file_read / file_write 会出现在 Agent 可用工具
+    列表里；file_write 仍受 FILE_WRITE_ROOTS 路径白名单约束。
+    """
+    current_shell = shell_enabled(session)
+    current_file = file_write_enabled(session)
+    set_tool_permissions(
+        session,
+        shell=body.shell_enabled if body.shell_enabled is not None else current_shell,
+        file_write=(
+            body.file_write_enabled
+            if body.file_write_enabled is not None
+            else current_file
+        ),
+    )
+    return _tool_permissions_response(session)
