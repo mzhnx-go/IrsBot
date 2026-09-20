@@ -92,12 +92,12 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
   }, [isStreaming])
 
   // 新消息/流式增量时贴底；用户已上滑阅读历史时不打断
+  // biome-ignore lint/correctness/useExhaustiveDependencies: messages 仅作"有新内容"触发器，读取的是 DOM 滚动几何
   useEffect(() => {
     const el = document.documentElement
     const nearBottom =
       el.scrollHeight - window.scrollY - window.innerHeight < 160
     if (nearBottom) bottomRef.current?.scrollIntoView({ block: "end" })
-    // biome-ignore lint/correctness/useExhaustiveDependencies: messages 仅作"有新内容"触发器，读取的是 DOM 滚动几何
   }, [messages])
 
   // 一轮对话结束（done）→ 刷新侧边栏列表：
@@ -151,8 +151,10 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
             </div>
           )}
         {messages.length === 0 ? (
-          <div className="py-40 text-center">
-            <h1 className="text-2xl font-semibold">有什么可以帮你？</h1>
+          <div className="px-4 py-32 text-center md:py-40">
+            <h1 className="text-xl font-semibold md:text-2xl">
+              有什么可以帮你？
+            </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {connState === "open"
                 ? "连接就绪，输入消息开始对话"
@@ -185,7 +187,8 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
         动效：聚焦框 shadow 过渡 150ms；发送按钮 hover/按压微缩放 150ms；均有 reduced-motion 降级 */}
       <form
         onSubmit={handleSubmit}
-        className="sticky bottom-4 mx-auto w-full max-w-3xl"
+        // 底部留白叠加 iOS 安全区（home 指示条不遮住输入框）
+        className="sticky bottom-4 mx-auto w-full max-w-3xl pb-[env(safe-area-inset-bottom)]"
       >
         <div className="flex items-end gap-2 rounded-2xl border border-input bg-background px-4 py-2 shadow-sm transition-shadow duration-[150ms] ease-out focus-within:border-[var(--chat-accent)] focus-within:shadow-[0_0_0_3px_rgba(22,93,255,0.15)]">
           <textarea
@@ -202,6 +205,8 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
             }
             rows={1}
             disabled={!isConnected}
+            // 手机键盘右下角显示「发送」而非换行
+            enterKeyHint="send"
             onKeyDown={(e) => {
               // Enter 发送，Shift+Enter 换行
               if (e.key === "Enter" && !e.shiftKey) {

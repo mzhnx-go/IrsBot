@@ -36,7 +36,9 @@ function Layout() {
       <AppSidebar />
       <SidebarInset>
         <ChatExpandTrigger />
-        <main className={isChatPage ? "flex-1" : "flex-1 p-6 md:p-8"}>
+        <main
+          className={isChatPage ? "flex-1 md:px-0" : "flex-1 p-6 px-4 md:p-8"}
+        >
           <div className="mx-auto max-w-7xl">
             <Outlet />
           </div>
@@ -51,11 +53,16 @@ function Layout() {
  * 使用 useEffect 监听状态变化，延迟触发淡入动画，避免与侧边栏滑动动画冲突。
  */
 function ChatExpandTrigger() {
-  const { state } = useSidebar()
+  const { state, openMobile, isMobile } = useSidebar()
   // 独立控制按钮的淡入状态
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
+    // 移动端侧栏是抽屉且默认关闭：按钮常驻（面板打开时藏到浮层后面）
+    if (isMobile) {
+      setIsVisible(!openMobile)
+      return
+    }
     if (state === "collapsed") {
       // 侧边栏收起动画通常为 200ms，这里延迟 200ms 后再让按钮淡入
       const timer = setTimeout(() => {
@@ -67,12 +74,12 @@ function ChatExpandTrigger() {
     }
     // 展开时，立即隐藏按钮（无退出动画，符合你的需求）
     setIsVisible(false)
-  }, [state])
+  }, [state, isMobile, openMobile])
 
   return (
     <SidebarTrigger
       // 始终渲染组件，通过 opacity 和 pointer-events 控制视觉显隐和点击穿透
-      className={`chat-expand-trigger fixed left-[3.5rem] top-3 z-20 text-muted-foreground transition-opacity duration-150 ease-out ${
+      className={`chat-expand-trigger fixed left-3 top-3 z-20 text-muted-foreground transition-opacity duration-150 ease-out md:left-[3.5rem] ${
         isVisible ? "opacity-100" : "opacity-0 pointer-events-none"
       }`}
     >
