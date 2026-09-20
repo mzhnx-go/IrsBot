@@ -371,8 +371,13 @@ async def test_build_turn_content_inlines_image_when_vision() -> None:
     assert base64.b64decode(b64) == PNG
 
 
-async def test_build_turn_content_notes_image_when_not_vision() -> None:
-    """非视觉模型：不内联字节，改为文字说明——不能让模型凭空看图。"""
+async def test_build_turn_content_notes_image_when_not_vision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """非视觉模型 + OCR 不可用：不内联字节，改为文字说明。"""
+    from app.core.agent import ocr
+
+    monkeypatch.setattr(ocr, "is_available", lambda: False)
     user_id, conv_id = uuid.uuid4(), uuid.uuid4()
     meta = [await _store_image(user_id, conv_id, "照片.jpg", JPEG)]
     content = await attachments.build_turn_content(
@@ -382,7 +387,66 @@ async def test_build_turn_content_notes_image_when_not_vision() -> None:
     assert isinstance(content, str)
     assert "照片.jpg" in content
     assert "不支持图片理解" in content
+    assert "本地 OCR 引擎不可用" in content
     assert "base64" not in content
+
+
+async def test_build_turn_content_uses_ocr_when_not_vision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """非视觉模型 + OCR 命中：识别文字进上下文，不再说「看不了」。"""
+    from app.core.agent import ocr
+
+    async def _fake(*_args, **_kwargs):
+        return "【图片 OCR：名片.png】\n密级编号 ZQ-8891"
+
+    monkeypatch.setattr(ocr, "build_image_context", _fake)
+    user_id, conv_id = uuid.uuid4(), uuid.uuid4()
+    meta = [await _store_image(user_id, conv_id, "名片.png", PNG)]
+    content = await attachments.build_turn_content(
+        "这上面写了什么", meta, user_id=user_id, conversation_id=conv_id,
+        supports_vision=False,
+    )
+    assert isinstance(content, str)
+    assert "ZQ-8891" in content
+    assert "不支持图片理解" not in content
+
+
+async def test_build_turn_content_ocr_disabled_is_deterministic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "OCR_ENABLED", False)
+    user_id, conv_id = uuid.uuid4(), uuid.uuid4()
+    meta = [await _store_image(user_id, conv_id, "图.png", PNG)]
+    content = await attachments.build_turn_content(
+        "看图", meta, user_id=user_id, conversation_id=conv_id, supports_vision=False
+    )
+    assert isinstance(content, str)
+    assert "本地 OCR 引擎不可用" in content
+
+
+async def test_build_turn_content_ocr_finds_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """OCR 可用但没识别到文字 → 如实说明，不说「引擎不可用」。"""
+    from app.core.agent import ocr
+
+    monkeypatch.setattr(settings, "OCR_ENABLED", True)
+    monkeypatch.setattr(ocr, "is_available", lambda: True)
+
+    async def _empty(*_args, **_kwargs):
+        return ""
+
+    monkeypatch.setattr(ocr, "build_image_context", _empty)
+    user_id, conv_id = uuid.uuid4(), uuid.uuid4()
+    meta = [await _store_image(user_id, conv_id, "图.png", PNG)]
+    content = await attachments.build_turn_content(
+        "看图", meta, user_id=user_id, conversation_id=conv_id, supports_vision=False
+    )
+    assert isinstance(content, str)
+    assert "本地 OCR 未识别到文字" in content
+    assert "不支持图片理解" in content
+
 
 
 async def test_build_turn_content_image_only_vision_uses_placeholder_text() -> None:

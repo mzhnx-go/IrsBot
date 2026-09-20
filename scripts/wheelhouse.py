@@ -63,7 +63,9 @@ EXCLUDED_PACKAGES = frozenset({"colorama", "pywin32", "tzdata"})
 
 # 在 PyPI 只提供 sdist（没有 wheel）的包：下载时必须换 --no-binary，
 # 否则 --only-binary=:all: 会报 "No matching distribution found"。
-SDIST_ONLY_PACKAGES = frozenset({"jieba"})
+# antlr4-python3-runtime 4.9.* 只有 .tar.gz（omegaconf 的传递依赖，被 rapidocr 引入；
+# omegaconf 把版本卡在 ==4.9.*，升不上去）。
+SDIST_ONLY_PACKAGES = frozenset({"jieba", "antlr4-python3-runtime"})
 
 # 目标运行平台：镜像 base 是 python:3.13-slim（linux amd64）。
 # 列多个 manylinux 标签是为了覆盖各包声明的不同 GLIBC 基线（旧标签 pip 仍接受）。

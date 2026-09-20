@@ -47,6 +47,16 @@ ENV UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
 
 WORKDIR /app/
 
+# 🔴 本地 OCR（rapidocr + onnxruntime）在运行期要 `import cv2`，而 opencv-python
+#    的 manylinux wheel 会动态链接若干系统库 —— python:3.13-slim 里一个都没有。
+#    实测缺库顺序：先报 `libxcb.so.1`，补齐后又报 `libGL.so.1`；装了 headless 变体
+#    也没用（rapidocr 硬依赖 opencv-python，两个发行版都提供 cv2，GUI 版仍会被导入）。
+#    最小可用集合如下（在 python:3.13-slim 上实测 `import cv2` + 离线 OCR 通过）。
+#    不装这些，OCR 回退会在首次识图时抛 ImportError —— 上层虽有降级，但能力等于没有。
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libgl1 libglib2.0-0 libxcb1 libsm6 libxext6 libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Place executables in the environment at the front of the path
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#using-the-environment
 ENV PATH="/app/.venv/bin:$PATH"

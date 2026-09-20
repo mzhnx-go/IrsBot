@@ -69,6 +69,9 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str
     SENTRY_DSN: HttpUrl | None = None
+    # 日志级别（root logger）。环形缓冲全量收集，前端控制台再按级别过滤；
+    # 此项只影响控制台/终端输出量（见 core/logging.py）
+    LOG_LEVEL: str = "INFO"
     POSTGRES_SERVER: str
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str
@@ -163,6 +166,13 @@ class Settings(BaseSettings):
     # 单文件字节上限（图片/文档分开设：图片要 base64 后进上下文，膨胀约 1/3）
     ATTACHMENT_MAX_DOC_BYTES: int = 20 * 1024 * 1024
     ATTACHMENT_MAX_IMAGE_BYTES: int = 10 * 1024 * 1024
+
+    # ── 本地 OCR（视觉回退）────────────────────────────────────
+    # 模型不支持视觉时，用离线 OCR 把图中文字提出来送上下文。
+    # 关掉后行为退回「提示无法查看图片内容」（引擎依赖缺失时同样自动退回）。
+    OCR_ENABLED: bool = True
+    # 单张图片识别文字注入上下文的上限，超出截断（OCR 结果可能很长且噪声多）
+    OCR_MAX_CHARS: int = 4000
 
     # ── MCP 配置 ───────────────────────────────────────────────
     ENABLE_MCP: bool = True

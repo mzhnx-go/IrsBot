@@ -49,6 +49,13 @@ mcp = [
     "mcp>=1.0.0,<2.0.0",
     "aiohttp>=3.9.0,<4.0.0",
 ]
+ocr = [
+    # 本地 OCR 回退（模型不支持视觉时用）。rapidocr 是纯 Python 包且自带
+    # PP-OCRv6 的 onnx 模型，推理后端用 onnxruntime —— 全程离线，不联网下载模型。
+    # ⚠️ rapidocr 依赖 opencv-python，镜像里需要 libGL 等系统库（见 backend/Dockerfile）。
+    "rapidocr>=3.0.0,<4.0.0",
+    "onnxruntime>=1.20.0,<2.0.0",
+]
 all = [
     "langchain>=0.3.0,<0.4.0",
     "langchain-openai>=0.2.0,<0.3.0",
@@ -67,6 +74,8 @@ all = [
     "rank-bm25>=0.2.2",
     "mcp>=1.0.0,<2.0.0",
     "aiohttp>=3.9.0,<4.0.0",
+    "rapidocr>=3.0.0,<4.0.0",
+    "onnxruntime>=1.20.0,<2.0.0",
 ]
 
 [dependency-groups]

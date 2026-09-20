@@ -267,8 +267,8 @@ async def build_turn_content(
     """把「本轮用户文本 + 附件」拼成送模型的 message content。
 
     - 文档：解析成文本块拼在后面（与模型是否支持视觉无关）
-    - 图片：模型支持视觉 → 内联成 image_url 多模态块；不支持 → 以文字说明
-      「有图但看不了」（本地 OCR 回退在后续阶段接入此处）
+    - 图片：模型支持视觉 → 内联成 image_url 多模态块；不支持 → 走本地 OCR
+      把图中文字提出来并入文本（OCR 不可用或没识别到文字时，退回一句中文提示）
     - 附件正文**不进历史**，只本轮有效（见 build_document_context）
 
     Returns:
@@ -299,8 +299,27 @@ async def build_turn_content(
         # 图片一张都没读出来：退回纯文本，别发一个只有文本块的「多模态」
         return blocks if len(blocks) > 1 else blocks[0]["text"]
 
+    # ── 非视觉模型：本地 OCR 回退 ──
+    # 延迟导入：ocr 依赖本模块的 resolve/KIND_IMAGE，顶层互相 import 会成环。
+    from app.core.agent import ocr
+
+    ocr_context = ""
+    if settings.OCR_ENABLED:
+        ocr_context = await ocr.build_image_context(
+            meta, user_id=user_id, conversation_id=conversation_id
+        )
+    if ocr_context:
+        parts.append(ocr_context)
+        return "\n\n".join(parts)
+
+    # OCR 也没能提供文字：如实说明原因，别让用户以为图片已被理解
+    reason = (
+        "本地 OCR 引擎不可用"
+        if not settings.OCR_ENABLED or not ocr.is_available()
+        else "本地 OCR 未识别到文字"
+    )
     names = "、".join(str(m.get("filename") or "图片") for m in images)
-    parts.append(f"（用户随消息发送了图片：{names}；当前模型不支持图片理解，无法查看图片内容）")
+    parts.append(f"（用户随消息发送了图片：{names}；当前模型不支持图片理解，且{reason}）")
     return "\n\n".join(parts)
 
 
