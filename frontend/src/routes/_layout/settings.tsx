@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
 
-import ProviderSettings from "@/components/Providers/ProviderSettings"
 import ChangePassword from "@/components/UserSettings/ChangePassword"
 import DeleteAccount from "@/components/UserSettings/DeleteAccount"
 import SystemPromptSettings from "@/components/UserSettings/SystemPromptSettings"
@@ -16,7 +15,6 @@ const tabsConfig = [
     title: "系统提示词",
     component: SystemPromptSettings,
   },
-  { value: "providers", title: "模型源", component: ProviderSettings },
   { value: "danger-zone", title: "危险操作", component: DeleteAccount },
 ]
 

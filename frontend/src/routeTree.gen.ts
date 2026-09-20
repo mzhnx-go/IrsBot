@@ -17,6 +17,7 @@ import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutChatRouteImport } from './routes/_layout/chat'
 import { Route as LayoutKnowledgeBaseRouteImport } from './routes/_layout/knowledge-base'
+import { Route as LayoutProvidersRouteImport } from './routes/_layout/providers'
 import { Route as LayoutSettingsRouteImport } from './routes/_layout/settings'
 import { Route as LayoutKnowledgeBaseIndexRouteImport } from './routes/_layout/knowledge-base.index'
 import { Route as LayoutKnowledgeBaseKbIdRouteImport } from './routes/_layout/knowledge-base.$kbId'
@@ -61,6 +62,11 @@ const LayoutKnowledgeBaseRoute = LayoutKnowledgeBaseRouteImport.update({
   path: '/knowledge-base',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutProvidersRoute = LayoutProvidersRouteImport.update({
+  id: '/providers',
+  path: '/providers',
+  getParentRoute: () => LayoutRoute,
+} as any)
 const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof LayoutAdminRoute
   '/chat': typeof LayoutChatRoute
   '/knowledge-base': typeof LayoutKnowledgeBaseRouteWithChildren
+  '/providers': typeof LayoutProvidersRoute
   '/settings': typeof LayoutSettingsRoute
   '/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
   '/knowledge-base/trash': typeof LayoutKnowledgeBaseTrashRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/admin': typeof LayoutAdminRoute
   '/chat': typeof LayoutChatRoute
+  '/providers': typeof LayoutProvidersRoute
   '/settings': typeof LayoutSettingsRoute
   '/': typeof LayoutIndexRoute
   '/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/chat': typeof LayoutChatRoute
   '/_layout/knowledge-base': typeof LayoutKnowledgeBaseRouteWithChildren
+  '/_layout/providers': typeof LayoutProvidersRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/knowledge-base/$kbId': typeof LayoutKnowledgeBaseKbIdRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/chat'
     | '/knowledge-base'
+    | '/providers'
     | '/settings'
     | '/knowledge-base/$kbId'
     | '/knowledge-base/trash'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/chat'
+    | '/providers'
     | '/settings'
     | '/'
     | '/knowledge-base/$kbId'
@@ -159,6 +170,7 @@ export interface FileRouteTypes {
     | '/_layout/admin'
     | '/_layout/chat'
     | '/_layout/knowledge-base'
+    | '/_layout/providers'
     | '/_layout/settings'
     | '/_layout/'
     | '/_layout/knowledge-base/$kbId'
@@ -231,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutKnowledgeBaseRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/providers': {
+      id: '/_layout/providers'
+      path: '/providers'
+      fullPath: '/providers'
+      preLoaderRoute: typeof LayoutProvidersRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/settings': {
       id: '/_layout/settings'
       path: '/settings'
@@ -281,6 +300,7 @@ interface LayoutRouteChildren {
   LayoutAdminRoute: typeof LayoutAdminRoute
   LayoutChatRoute: typeof LayoutChatRoute
   LayoutKnowledgeBaseRoute: typeof LayoutKnowledgeBaseRouteWithChildren
+  LayoutProvidersRoute: typeof LayoutProvidersRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
 }
@@ -289,6 +309,7 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAdminRoute: LayoutAdminRoute,
   LayoutChatRoute: LayoutChatRoute,
   LayoutKnowledgeBaseRoute: LayoutKnowledgeBaseRouteWithChildren,
+  LayoutProvidersRoute: LayoutProvidersRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutIndexRoute: LayoutIndexRoute,
 }

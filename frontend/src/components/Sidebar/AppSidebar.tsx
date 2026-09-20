@@ -4,6 +4,7 @@ import {
   MessageSquare,
   PanelLeftClose,
   Settings,
+  Sparkles,
   Users,
 } from "lucide-react"
 
@@ -27,6 +28,7 @@ const baseItems: Item[] = [
   { icon: Home, title: "Dashboard", path: "/" },
   { icon: MessageSquare, title: "聊天", path: "/chat" },
   { icon: Library, title: "知识库", path: "/knowledge-base" },
+  { icon: Sparkles, title: "模型源", path: "/providers" },
   { icon: Settings, title: "设置", path: "/settings" },
 ]
 
