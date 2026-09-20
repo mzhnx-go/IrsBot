@@ -23,6 +23,7 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.api.deps import SessionDep, get_current_user_ws
 from app.core.agent.agent import Agent
+from app.core.agent.builtins.kb_query import begin_kb_citations
 from app.core.agent.conversation import ConversationManager
 from app.core.db.sqlmodel_models import User
 from app.core.pipeline import PipelineContext, run_entry_stages
@@ -56,6 +57,7 @@ class WSMessageType:
     TOOL_CALL = "tool_call"
     DONE = "done"
     ERROR = "error"
+    SOURCES = "sources"
 
 
 class WSMessageRole:
@@ -82,6 +84,7 @@ class WSMsgKey:
     OUTPUT = "output"
     INTERRUPTED = "interrupted"
     STOPPED = "stopped"
+    CITATIONS = "citations"
 
 
 class WSToolPhase:
@@ -143,6 +146,9 @@ def build_history_payload(msgs) -> dict:
             if isinstance(content, dict) and content.get("stopped"):
                 # 被中断的半成品回复：刷新后仍标注"已停止生成"
                 item[WSMsgKey.STOPPED] = True
+            cits = content.get("citations") if isinstance(content, dict) else None
+            if cits:
+                item[WSMsgKey.CITATIONS] = cits
         items.append(item)
     return {
         WSMsgKey.TYPE: WSMessageType.HISTORY,
@@ -212,6 +218,31 @@ def merge_tool_trace(trace: list[dict], event: dict) -> None:
         WSMsgKey.PHASE: WSToolPhase.END,
         WSMsgKey.OUTPUT: event.get(WSMsgKey.OUTPUT, ""),
     })
+
+#: 下发给前端的检索来源上限：多轮检索同一块会重复命中，去重后也要限量
+_MAX_CITATIONS = 20
+
+
+def _dedupe_citations(citations: list[dict]) -> list[dict]:
+    """按 库名+文件+摘录前缀 去重检索引用，保序截断到 _MAX_CITATIONS。
+
+    分数统一保留 4 位小数（RRF 分值是 0.0x 量级，相关度是 0~1）。
+    """
+    seen: set[tuple] = set()
+    out: list[dict] = []
+    for c in citations:
+        key = (c.get("kb"), c.get("source"), (c.get("snippet") or "")[:80])
+        if key in seen:
+            continue
+        seen.add(key)
+        score = c.get("score")
+        if isinstance(score, (int, float)):
+            c = {**c, "score": round(float(score), 4)}
+        out.append(c)
+        if len(out) >= _MAX_CITATIONS:
+            break
+    return out
+
 
 async def _run_turn(
     ws: WebSocket,
@@ -324,6 +355,9 @@ async def _run_turn_inner(
     tool_trace: list[dict] = []
     interrupted = False
     error_message: str | None = None
+    # 本轮 RAG 检索引用收集器：knowledge_base_query 工具在子任务里
+    # 往同一个 list 追加（contextvar 传引用），流结束后读取下发 sources
+    citations = begin_kb_citations()
 
     try:
         async for event in agent.stream(
@@ -344,17 +378,21 @@ async def _run_turn_inner(
         logger.exception("Agent 流式生成失败")
         error_message = "回复生成失败，请稍后重试。若持续失败，请检查模型源配置。"
 
+    unique_citations = _dedupe_citations(citations)
+
     # 工具轨迹存进 content.tool_trace：tool_calls 列会被
     # get_context_messages 转成 LangChain AIMessage.tool_calls，
     # 展示用轨迹格式不同，混写会污染发给模型的上下文
     assistant_id = None
-    if reply or tool_trace:
-        if tool_trace or interrupted:
+    if reply or tool_trace or unique_citations:
+        if tool_trace or interrupted or unique_citations:
             payload: dict = {"text": reply}
             if tool_trace:
                 payload["tool_trace"] = tool_trace
             if interrupted:
                 payload["stopped"] = True
+            if unique_citations:
+                payload["citations"] = unique_citations
             content_val: object = payload
         else:
             content_val = reply
@@ -377,6 +415,11 @@ async def _run_turn_inner(
     if interrupted:
         done[WSMsgKey.INTERRUPTED] = True
     try:
+        if unique_citations:
+            await ws.send_json({
+                WSMsgKey.TYPE: WSMessageType.SOURCES,
+                WSMsgKey.CITATIONS: unique_citations,
+            })
         if error_message:
             await ws.send_json(
                 {WSMsgKey.TYPE: WSMessageType.ERROR, "message": error_message}

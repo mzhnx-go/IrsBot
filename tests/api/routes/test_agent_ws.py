@@ -237,3 +237,61 @@ def test_chat_ws_generation_error_sends_chinese_error_and_partial_persisted(
         history = ws.receive_json()
         assistant = [m for m in history["messages"] if m["role"] == "assistant"][0]
         assert assistant["content"] == "开头"
+
+
+def test_chat_ws_sources_event_deduped_and_restored(
+    client, superuser_token_headers
+):
+    """RAG 引用应去重后经 sources 事件下发，重连后从 history 还原"""
+    token = superuser_token_headers["Authorization"].split(" ", 1)[1]
+    resp = client.post(
+        "/api/v1/agent/conversations",
+        json={"title": "ws-sources-test"},
+        headers=superuser_token_headers,
+    )
+    conv_id = resp.json()["id"]
+
+    canned = [
+        {
+            "kb": "小北",
+            "source": "uploads/kb/x/notes.pdf",
+            "snippet": "Cache 的三种映射方式",
+            "score": 0.8712345,
+        },
+        {
+            "kb": "小北",
+            "source": "uploads/kb/x/notes.pdf",
+            "snippet": "Cache 的三种映射方式",
+            "score": 0.8712345,
+        },  # 与第一条相同：应被去重
+    ]
+
+    with (
+        patch("app.api.routes.agent_ws.Agent") as mock_agent,
+        patch(
+            "app.api.routes.agent_ws.begin_kb_citations", return_value=canned
+        ),
+    ):
+        mock_agent.return_value.stream = fake_stream
+        with client.websocket_connect(
+            f"/api/v1/agent/chat/ws/{conv_id}?token={token}",
+        ) as ws:
+            ws.receive_json()  # history（空）
+            ws.send_json({"type": "message", "content": "hi"})
+            assert ws.receive_json()["type"] == "text_chunk"
+
+            sources = ws.receive_json()
+            assert sources["type"] == "sources"
+            assert len(sources["citations"]) == 1
+            assert sources["citations"][0]["score"] == 0.8712  # 保留 4 位
+
+            done = ws.receive_json()
+            assert done["type"] == "done"
+
+    # 重连：引用应从落库的 content.citations 还原
+    with client.websocket_connect(
+        f"/api/v1/agent/chat/ws/{conv_id}?token={token}",
+    ) as ws:
+        history = ws.receive_json()
+        assistant = [m for m in history["messages"] if m["role"] == "assistant"][0]
+        assert assistant["citations"][0]["kb"] == "小北"

@@ -12,6 +12,17 @@ export interface ToolCall {
   output?: string
 }
 
+export interface Citation {
+  /** 知识库名称 */
+  kb: string
+  /** 来源文件名（uploads 相对路径） */
+  source: string
+  /** 命中片段摘录（后端已截断） */
+  snippet: string
+  /** 相关度：rerank 0~1，或 RRF 融合分（~0.0x 量级） */
+  score?: number
+}
+
 export interface ChatMessage {
   id: string
   /** 数据库消息 ID（history 恢复或 done 事件回填；本地乐观新增时为空） */
@@ -19,6 +30,8 @@ export interface ChatMessage {
   role: "user" | "assistant"
   content: string
   toolCalls?: ToolCall[]
+  /** RAG 检索来源（sources 事件 / history 还原） */
+  citations?: Citation[]
   streaming?: boolean
   /** 本轮被用户中断，回复是半成品 */
   stopped?: boolean
@@ -120,6 +133,7 @@ export function useAgentChat(conversationId: string) {
                 role: "user" | "assistant"
                 content: string
                 tool_calls?: ToolCall[]
+                citations?: Citation[]
                 stopped?: boolean
               }>
             ).map((h) => ({
@@ -128,6 +142,7 @@ export function useAgentChat(conversationId: string) {
               role: h.role,
               content: h.content,
               toolCalls: h.tool_calls,
+              citations: h.citations,
               stopped: h.stopped,
               streaming: false,
             })),
@@ -181,6 +196,22 @@ export function useAgentChat(conversationId: string) {
                 })
             }
             return [...base, { ...target, toolCalls: calls }]
+          })
+        } else if (msg.type === "sources") {
+          // RAG 检索来源：挂到最后一条 assistant 消息
+          setMessages((prev) => {
+            const last = prev[prev.length - 1]
+            const hasAssistant = last?.role === "assistant"
+            const base = hasAssistant ? prev.slice(0, -1) : prev
+            const target: ChatMessage = hasAssistant
+              ? last
+              : {
+                  id: crypto.randomUUID(),
+                  role: "assistant",
+                  content: "",
+                  streaming: true,
+                }
+            return [...base, { ...target, citations: msg.citations }]
           })
         } else if (msg.type === "done") {
           // 本轮回复结束；后端回传落库消息 ID，回填给本地乐观消息，

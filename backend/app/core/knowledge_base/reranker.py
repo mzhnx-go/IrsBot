@@ -62,7 +62,14 @@ def rerank(query: str, docs: list[Document], top_n: int) -> list[Document]:
         if not results:
             logger.warning("Rerank 返回空结果，降级为 RRF 原序")
             return fallback
-        return [docs[item["index"]] for item in results]
+        ranked = []
+        for item in results:
+            doc = docs[item["index"]]
+            # cross-encoder 相关度（0~1）写回 metadata，供前端来源展示
+            if isinstance(item.get("relevance_score"), (int, float)):
+                doc.metadata["relevance_score"] = item["relevance_score"]
+            ranked.append(doc)
+        return ranked
     except Exception as e:  # noqa: BLE001 —— 降级是特性，不是疏漏
         logger.warning(f"Rerank 调用失败，降级为 RRF 原序: {e}")
         return fallback

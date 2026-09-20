@@ -69,7 +69,12 @@ def rrf_fuse(result_lists: list[list[Document]], k: int = _DEFAULT_RRF_K) -> lis
             docs_by_key[key] = doc
 
     ordered = sorted(docs_by_key, key=lambda key: scores[key], reverse=True)
-    return [docs_by_key[key] for key in ordered]
+    fused = [docs_by_key[key] for key in ordered]
+    # RRF 分数写回 metadata：前端「检索来源」展示相关度时需要它
+    #（rerank 关闭/降级时这是唯一的分数来源）
+    for doc in fused:
+        doc.metadata["rrf_score"] = scores[_doc_key(doc)]
+    return fused
 
 
 class BM25Retriever:

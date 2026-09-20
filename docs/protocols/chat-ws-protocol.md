@@ -2,7 +2,7 @@
 
 | 项 | 值 |
 |---|---|
-| 版本 | 1.3 |
+| 版本 | 1.4 |
 | 端点 | `ws://<host>/agent/chat/ws/{conversation_id}` |
 | 后端实现 | `backend/app/api/routes/agent_ws.py` |
 | 前端实现 | `frontend/src/hooks/useAgentChat.ts` |
@@ -43,6 +43,7 @@
     { "id": "uuid", "role": "user", "content": "你好" },
     { "id": "uuid", "role": "assistant", "content": "你好！",
       "tool_calls": [ { "name": "kb_search", "phase": "end", "input": "{...}", "output": "..." } ],
+      "citations": [ { "kb": "小北", "source": "uploads/kb/x/notes.pdf", "snippet": "…", "score": 0.8712 } ],
       "stopped": true }
   ]
 }
@@ -50,7 +51,7 @@
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `messages` | array | 历史消息（仅含 user / assistant，按时间正序）；每条带数据库 `id`（消息级 REST 操作用），`assistant` 可能带 `tool_calls` 展示轨迹与 `stopped`（被中断的半成品）标记 |
+| `messages` | array | 历史消息（仅含 user / assistant，按时间正序）；每条带数据库 `id`（消息级 REST 操作用），`assistant` 可能带 `tool_calls` 展示轨迹、`citations` 检索来源（随 `content.citations` 落库，刷新后可还原）与 `stopped`（被中断的半成品）标记 |
 
 **text_chunk** — AI 回复文字块（一条对话多条，按序追加渲染）
 
@@ -90,6 +91,18 @@
 |---|---|---|
 | `message` | string | 面向用户的中文提示；原始异常只进后端日志，不透出细节 |
 
+**sources** — 本轮 RAG 检索来源（工具实际检索命中时才发，位于 `done` 之前）
+
+```json
+{ "type": "sources", "citations": [
+  { "kb": "小北", "source": "uploads/kb/x/notes.pdf", "snippet": "Cache 的三种映射方式…", "score": 0.8712 }
+] }
+```
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `citations` | array | 去重保序、最多 20 条。`kb` 知识库名；`source` 文件路径（前端只显示文件名）；`snippet` 命中分块正文前 300 字符；`score` 相关度（rerank 分数优先，缺省为 RRF 融合分），保留 4 位小数 |
+
 ## 时序示例
 
 ```
@@ -115,3 +128,4 @@
 | 2026-09-20 | 1.1：history 每条消息带真实 `id`；done 回传 `user_message_id`/`assistant_message_id`；tool_call 携带 `input`/`output`（截断 4000 字符）并随 assistant 消息落库（`content.tool_trace`） |
 | 2026-09-20 | 1.2：新增上行 `interrupt`（中断当前生成，部分回复落库并带 `content.stopped`）；done 增加 `interrupted` 标记；history 条目透传 `stopped` |
 | 2026-09-20 | 1.3：新增下行 `error`（`{"type":"error","message":"…"}`，中文，随后可收尾 done）；前端断线自动重连，重连后重推 history |
+| 2026-09-20 | 1.4：新增下行 `sources`（检索来源，去重≤20 条，随 assistant 消息 `content.citations` 落库）；history 的 assistant 条目透传 `citations` |

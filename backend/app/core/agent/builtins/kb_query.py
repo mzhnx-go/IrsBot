@@ -23,6 +23,23 @@ _current_user_id: contextvars.ContextVar[uuid.UUID | None] = contextvars.Context
     "kb_current_user_id", default=None
 )
 
+# ContextVar：检索引用收集口袋。WS 路由在每轮生成前 begin_kb_citations()
+# 放入一个空 list；本工具往里 append 命中片段。contextvar 随子任务向下
+# 传播的是同一个 list 引用，所以工具内的 append 外层可见。
+_citation_sink: contextvars.ContextVar[list[dict] | None] = contextvars.ContextVar(
+    "kb_citation_sink", default=None
+)
+
+# 引用摘录的最大长度（前端来源面板展示用，不截正文喂给 LLM 的部分）
+_CITATION_SNIPPET_MAX = 300
+
+
+def begin_kb_citations() -> list[dict]:
+    """开一轮新的引用收集，返回那个可变的 list（轮次结束后读它）"""
+    sink: list[dict] = []
+    _citation_sink.set(sink)
+    return sink
+
 # top_k 允许范围：太小检索不到内容，太大撑爆 LLM 上下文
 _TOP_K_MIN, _TOP_K_MAX = 1, 10
 
@@ -79,6 +96,22 @@ async def knowledge_base_query(
             docs = mgr.query(kb_id=kb.id, query=query, top_k=top_k)
             if docs:
                 sections.append(f"【知识库：{kb.name}】\n{mgr.get_retrieval_context(docs)}")
+                # 记录引用来源（供前端「检索来源」展示，不进 LLM 上下文）
+                sink = _citation_sink.get()
+                if sink is not None:
+                    for doc in docs:
+                        meta = doc.metadata or {}
+                        sink.append(
+                            {
+                                "kb": kb.name,
+                                "source": meta.get("source", "未知"),
+                                "snippet": (doc.page_content or "")[
+                                    :_CITATION_SNIPPET_MAX
+                                ],
+                                "score": meta.get("relevance_score")
+                                or meta.get("rrf_score"),
+                            }
+                        )
 
     if not sections:
         return "知识库中没有检索到与该问题相关的内容。"

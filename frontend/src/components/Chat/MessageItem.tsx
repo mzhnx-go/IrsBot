@@ -10,6 +10,7 @@ import {
 import { type ReactNode, useState } from "react"
 
 import MarkdownContent from "@/components/Chat/MarkdownContent"
+import Sources from "@/components/Chat/Sources"
 import ToolCalls from "@/components/Chat/ToolCalls"
 import type { ChatMessage } from "@/hooks/useAgentChat"
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
@@ -145,6 +146,13 @@ const MessageItem = ({
           />
         )}
       </div>
+
+      {/* RAG 检索来源：气泡下方可折叠列表 */}
+      {!isUser && message.citations && message.citations.length > 0 && (
+        <div className="mt-1.5 w-full max-w-[85%]">
+          <Sources citations={message.citations} />
+        </div>
+      )}
 
       {/* 被中断的半成品回复：明确标注，避免误以为回复完整 */}
       {!isUser && message.stopped && (
