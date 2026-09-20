@@ -75,6 +75,13 @@
 
 **我的建议：1a。** 理由与「上游接口适配器」同源——能力边界由用户自带的服务提供，我们不往镜像里塞重型本地模型。
 
+> **实际决策（2026-09-21，用户拍板）：走 1b 本地 OCR 引擎。** 用户明确选了本地方案
+> （「不依赖网络、开箱可用」优先于镜像体积）。已知代价如实记录：镜像 +~200MB；
+> `rapidocr` 硬依 GUI 版 `opencv-python`，`python:3.13-slim` 需补
+> `libgl1 libglib2.0-0 libxcb1 libsm6 libxext6 libxrender1`（换 headless 也躲不掉）；
+> wheelhouse 需重下 wheel（`scripts/wheelhouse.py update`，清单 151 包）。
+> 另：该方案下**能力边界**与 1a 相反——OCR 是否可用由镜像决定，不由用户是否配了视觉源决定。
+
 ### 🟡 决策 2：视觉能力怎么判定？
 
 | 方案 | 说明 |
@@ -104,17 +111,21 @@
   "text": "帮我看看这份财报讲了什么",
   "attachments": [
     {
-      "id": "att_7f3a…",        // 落盘文件名前缀，后端据此读文件
+      "id": "7f3a9c1b…",         // 服务端生成的 32 位 hex（uuid4().hex），后端据此读文件
       "kind": "document",        // document | image
       "filename": "2024财报.pdf",
       "size": 284113,
       "extracted_chars": 18420,  // 文档解析出的字符数（前端可显示「已解析 1.8 万字」）
       "truncated": false         // 超长被截断时为 true
     },
-    { "id": "att_9c1b…", "kind": "image", "filename": "截图-2026-09-21.png", "size": 88213 }
+    { "id": "9c1b7f3a…", "kind": "image", "filename": "截图-2026-09-21.png", "size": 88213 }
   ]
 }
 ```
+
+> 实施偏差（2026-09-21）：`id` 一路都是**裸 32 位 hex**（`uuid.uuid4().hex`），
+> 没有 `att_` 前缀——下面示例里写作 `att_7f3a…` 只是文档最初的示意，实际以
+> 本节为准。读取侧按 `^[0-9a-f]{32}$` 校验形状后再 glob，形状不对直接拒绝。
 
 - 前端 `history` 事件已有 `content.get("text")` 口径 → **附件不破坏既有渲染**，只需新增 `attachments` 字段的读取。
 - assistant 消息不带 attachments。
@@ -124,13 +135,16 @@
 **① 附件上传端点**（新文件 `backend/app/api/routes/attachments.py`）
 
 ```
-POST /api/v1/agent/attachments        multipart: file
-  → 201 {"id":"att_7f3a…", "kind":"document", "filename":"…", "size":…, "extracted_chars":…, "truncated":…}
+POST /api/v1/agent/attachments        multipart: conversation_id + file
+  → 201 {"id":"7f3a9c1b…", "kind":"document", "filename":"…", "size":…, "extracted_chars":…, "truncated":…}
   → 400 不支持的格式（.xlsx 等）/ 超过大小上限
   → 401 未登录
+  → 404 会话不存在或不属于当前用户
 ```
 
-- 落盘：`settings.CHAT_ATTACHMENT_DIR/{user_id}/{att_id}_{safe_name}`
+- 落盘：`{CHAT_ATTACHMENT_DIR}/{user_id}/{conversation_id}/{att_id}_{safe_filename}`
+  （目录按**用户/会话两级隔离**——删会话即 `shutil.rmtree` 整个会话目录，
+  这也是「附件保留多久」的最简答案；`safe_filename` 剥掉路径分隔符等危险字符）
 - 文档：`DocumentParser.parse()` → 拼接 `page_content` → 超限截断（建议 `ATTACHMENT_MAX_CHARS = 60000`，超出部分丢弃并回 `truncated=true`）
 - 图片：只落盘 + 校验大小/魔数，**不做任何解析**（送模型时才读字节）
 - 大小上限：`ATTACHMENT_MAX_BYTES`（建议图片 10MB、文档 20MB）
@@ -141,11 +155,11 @@ POST /api/v1/agent/attachments        multipart: file
 // 旧（保持兼容）
 {"type": "message", "content": "你好"}
 // 新
-{"type": "message", "content": "看看这个", "attachments": [{"id": "att_7f3a…"}]}
+{"type": "message", "content": "看看这个", "attachments": [{"id": "7f3a9c1b…"}]}
 ```
 
 - `_run_turn_inner` 的 `content: str` 参数改为 `content: str, attachments: list[dict]`
-- **越权防线**：按 `att_id` 查文件时必须校验路径在 `CHAT_ATTACHMENT_DIR/{current_user.id}/` 之内，且文件存在——**绝不接受前端传任意路径**（否则变成任意文件读取漏洞）
+- **越权防线**：按 `att_id` 查文件时必须先校验形状（`^[0-9a-f]{32}$`），再在 `CHAT_ATTACHMENT_DIR/{current_user.id}/{conversation_id}/` 目录内 glob，且只接受唯一命中——**绝不接受前端传任意路径**（否则变成任意文件读取漏洞）
 - 用户消息落库：`content = {"text": …, "attachments": [完整元数据]}`
 
 **③ 送模型**（`agent.py`）
@@ -177,7 +191,7 @@ def _build_user_content(text, atts, supports_vision) -> str | list:
 
 **⑤ 附件清理**
 
-- `DELETE /agent/conversations/{id}` 时 `shutil.rmtree(CHAT_ATTACHMENT_DIR/{user_id}/{该会话用到的 att_id})`——或更简单：附件目录按 `{user_id}/{conversation_id}/` 组织，删会话即删整目录
+- `DELETE /agent/conversations/{id}` 时 `shutil.rmtree(CHAT_ATTACHMENT_DIR/{user_id}/{conversation_id})`——落地为 `attachments.remove_conversation_dir()`，目录不存在不报错（删会话不该因为「没有附件」失败）
 
 ### 4.3 前端改动清单
 
@@ -228,18 +242,35 @@ def _build_user_content(text, atts, supports_vision) -> str | list:
 
 > S0 与 S1 无依赖关系，可并行；S0 很适合当第一个「先让用户看到东西」的交付。
 
+**实施结果（2026-09-21）**：S0–S8 全部完成，提交链
+`1dfe24c`(S0) → `10e8123`(S1) → `c98a67b`(S2) → `17950bd`(S3) → `f24080d`(S4)
+→ `419da15`(S5) → `2f3ea1e`(S5b 模型源页三态开关) → `6dca04a`(S6)
+→ `844589e`(S7) → `14abe8d`(S8)。每个 S 一个可回退提交点。
+
 ---
 
 ## 六、验收标准
 
 1. 侧边栏「工作台」分组只剩 Dashboard / 会话管理；「新对话」在「最近对话」标签之上。
+   **✅ 达成**（e2e 断言用 DOM 纵坐标比较，不靠文案顺序）。
 2. 输入框左侧有「＋」按钮，点击弹出三项菜单，**无「共享屏幕和应用」**。
+   **✅ 达成**（`chat-attachments.spec.ts` 断言菜单恰为三项；截屏项在
+   `navigator.mediaDevices.getDisplayMedia` 缺失时置灰）。
 3. 上传 .pdf/.txt/.md/.docx → 输入框上方出现附件 chip → 发送后模型回答能体现文档内容。
+   **✅ 达成**（e2e 覆盖到 chip「已解析 N 字」；端到端读文档内容在 S4 手工验收）。
 4. 上传图片 + 视觉模型 → 模型能描述图片内容；换成非视觉模型 → 走 OCR，模型能看到图里的文字。
-5. 截屏提问 → 浏览器弹一次屏幕捕获授权 → 截图作为附件入输入框 → **授权弹窗关闭后共享立即停止**（浏览器标签页无「正在共享」指示）。
+   **✅ 达成**（S6 容器内实测：非视觉模型下 content 含 `【图片 OCR：扫描件.png】` + 识别文本）。
+5. 截屏提问 → 浏览器弹一次屏幕捕获授权 → 截图作为附件入输入框 → **授权弹窗关闭后共享立即停止**。
+   **✅ 达成**（`captureScreenshot()` 在 `finally` 里 `stop()` 全部轨道，抓一帧即停）。
 6. 所有错误路径都有中文提示：格式不支持、文件过大、解析失败、模型不支持视觉且无 OCR 引擎、屏幕捕获被拒绝。
+   **✅ 达成**（后端 400/404 中文 detail；OCR 不可用与「未识别到文字」分别给出不同说明；
+   截屏失败 `toast.error("未能截屏：屏幕捕获被拒绝或已取消")`）。
 7. 后端新增单测全绿（附件端点 + 视觉判定 + 截断 + 越权）；e2e 全绿。
+   **✅ 达成**（`tests/core/agent/test_attachments.py`、`tests/core/agent/test_ocr.py`、
+   `tests/provider/test_vision_capability.py`；全量非集成 **706 passed**。
+   e2e `chat-attachments.spec.ts` 3 条在 8000 实机 dist 通过）。
 8. 刷新页面后，历史消息里的附件仍然可见（图片缩略图 + 文档 chip）。
+   **✅ 达成**（S2 已把附件元数据随消息落库并在 `history` 回放）。
 
 ---
 
@@ -247,11 +278,11 @@ def _build_user_content(text, atts, supports_vision) -> str | list:
 
 | 风险 | 等级 | 说明 | 应对 |
 |---|---|---|---|
-| 视觉判定误判 | 中 | 启发式对新模型名可能猜错 | 决策 2a 的显式覆盖；误判时用户可在模型源页一键改 |
-| OCR 无引擎可用 | 中 | 决策 1a 下，用户没配视觉模型源时 OCR 不可用 | 明确中文提示 + 指路「模型源」页；图片仍保存并显示 |
-| 上下文膨胀 | 中 | 文档 + 多图会显著吃 token | 文档截断上限；历史不回放附件；必要时提示用户 |
+| 视觉判定误判 | 中 | 启发式对新模型名可能猜错 | 决策 2a 的显式覆盖；误判时用户可在模型源页一键改。**已实锤一例**：`agnes-3.0-flash` 真支持视觉，但名字里没有 `vl`/`vision`/`4o` 等模式 → 启发式判为不支持；已把该源在库中显式标为「支持视觉」。结论：启发式只能当兜底，**新源默认三态为「自动判断」时要预期它会漏** |
+| OCR 无引擎可用 | 中 | 决策 1a 下，用户没配视觉模型源时 OCR 不可用 | 明确中文提示 + 指路「模型源」页；图片仍保存并显示。**实际走了 1b（本地引擎）**，本行降为「引擎缺失/未识别到文字」两种情形，提示文案分开写 |
+| 上下文膨胀 | 中 | 文档 + 多图会显著吃 token | 文档截断上限（`ATTACHMENT_MAX_CHARS=60000`）；历史不回放附件正文；单条消息附件数上限 `MAX_PER_MESSAGE=10` |
 | 截屏在非安全上下文失效 | 低 | 局域网 IP 访问时不可用 | 能力检测 + 置灰 + 说明 |
-| 附件目录无限增长 | 低 | 用户反复上传但不发消息 | 上传即落盘，未发送的附件成为孤儿——S1 里加「上传时记录，会话删除时清理」，或增加惰性清理 |
+| 附件目录无限增长 | 低 | 用户反复上传但不发消息 | 上传即落盘，未发送的附件成为孤儿——落地为「目录按 `{user}/{conversation}/` 组织，删会话即删整目录」，孤儿文件随所属会话消失；`MAX_PER_MESSAGE` 再压一层 |
 
 ---
 
@@ -261,3 +292,31 @@ def _build_user_content(text, atts, supports_vision) -> str | list:
 - **不影响单端口部署**：新增端点走同一后端；前端改动需 `npm run build` 重建 dist。
 - **PROGRESS.md 待办**：本方案落地后新增一条待办并在进度记录追加一行（含踩坑留档）。
 - **文档同步**：`istbot-implement-plan.md` 未覆盖本需求（延伸需求），故只记 PROGRESS.md——与「模型源余额查询」同一处理方式。
+
+---
+
+## 九、实施记录与偏差（2026-09-21 闭环）
+
+| 项 | 计划 | 实际 | 原因 |
+|---|---|---|---|
+| 附件 id 形态 | `att_7f3a…`（前缀 + 短 id） | 裸 32 位 hex（`uuid4().hex`） | 前缀无功能价值；形状校验用 `^[0-9a-f]{32}$` 即可，少一层约定 |
+| 落盘布局 | `{user_id}/{att_id}_{safe_name}` | `{user_id}/{conversation_id}/{att_id}_{safe_filename}` | 多一层**会话**目录，删会话直接 `rmtree`，不必反查「这个 att_id 属于哪个会话」 |
+| 上传端点 | `POST /api/v1/agent/attachments`（multipart: file） | 同路径，另带 `conversation_id` 表单字段 | 落盘要按会话分目录，且要在写入前校验**会话归属** |
+| 类型判定 | 「校验大小/魔数」 | 文档走**扩展名白名单**（与 `DocumentParser.SUPPORTED_EXTENSIONS` 同源），图片才**嗅探魔数** | 文档格式由解析器定义，魔数嗅探对 docx/pdf 无增量收益；图片的扩展名与 Content-Type 都是客户端可伪造的，必须看字节 |
+| OCR 引擎 | 决策 1a（复用视觉源，推荐） | **1b 本地 `rapidocr`** | 用户拍板；见 §三「实际决策」 |
+| 孤儿附件清理 | 方案未定 | 目录随会话删除，`MAX_PER_MESSAGE=10` | 用布局本身消掉这个问题，不写定时任务 |
+
+**踩坑留档**
+
+1. **截图首帧未必就绪**：`video.play()` 返回时首帧可能还没解码，立刻 `drawImage` 会得到全黑图 → 等一帧 `requestAnimationFrame` 再画。
+2. **OCR 依赖的系统库**：`rapidocr` 硬依 GUI 版 `opencv-python`，slim 镜像先后报 `libxcb.so.1`、`libGL.so.1`；换 `opencv-python-headless` 也躲不掉（依赖是硬编码的）→ Dockerfile 装 `libgl1 libglib2.0-0 libxcb1 libsm6 libxext6 libxrender1`。
+3. **测试必须与引擎解耦**：OCR 用例一律 monkeypatch `ocr.recognize` / `ocr.is_available`，否则「本机没装引擎就挂」——这恰恰是会误报的测试。
+4. **Windows GBK 控制台**：`scripts/wheelhouse.py` 的 emoji 输出在 GBK 终端抛 `UnicodeEncodeError`（清单已写完、只是末尾打印崩），跑脚本时带 `PYTHONIOENCODING=utf-8 PYTHONUTF8=1`。
+5. **离线 wheel 源的坑**：`antlr4-python3-runtime==4.9.3` 只有 sdist（`omegaconf` 钉 `==4.9.*`），`pip download --only-binary=:all:` 找不到 → 加入 `scripts/wheelhouse.py` 的 `SDIST_ONLY_PACKAGES`，改走 sdist 离线构建。另外当时清华 PyPI 镜像整站 403（宿主与容器皆是），缺的 wheel 只能从 pypi.org 补下。
+
+**测试落点**
+
+- `tests/core/agent/test_attachments.py`：落盘/读回、`safe_filename`、`describe` 从磁盘反推元数据（不信客户端声明）、`build_turn_content` 各分支（纯文本 / 文档 / 图片 × 视觉 / OCR 回退 / 混合 / 文件丢失退化）。
+- `tests/core/agent/test_ocr.py`：`is_available`、引擎单例与失败粘滞、`recognize` 拼行、`build_image_context` 截断。
+- `tests/provider/test_vision_capability.py`：三态值 + 模型名启发式命中/未命中。
+- `frontend/tests/chat-attachments.spec.ts`：菜单三项（无「共享屏幕」）、文档 chip、截屏 chip。
