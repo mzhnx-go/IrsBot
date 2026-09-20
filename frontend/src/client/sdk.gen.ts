@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AgentCreateConversationData, AgentCreateConversationResponse, AgentListConversationsData, AgentListConversationsResponse, AgentRenameConversationData, AgentRenameConversationResponse, AgentDeleteConversationData, AgentDeleteConversationResponse, AgentSetConversationStatusData, AgentSetConversationStatusResponse, AgentExportConversationData, AgentExportConversationResponse, AgentListConversationMessagesData, AgentListConversationMessagesResponse, AgentDeleteConversationMessageData, AgentDeleteConversationMessageResponse, AgentTruncateConversationMessagesData, AgentTruncateConversationMessagesResponse, AgentChatData, AgentChatResponse, AgentCreateMcpServerData, AgentCreateMcpServerResponse, AgentListMcpServersData, AgentListMcpServersResponse, AgentGetMcpServerData, AgentGetMcpServerResponse, AgentUpdateMcpServerData, AgentUpdateMcpServerResponse, AgentDeleteMcpServerData, AgentDeleteMcpServerResponse, AgentConnectMcpServerData, AgentConnectMcpServerResponse, AgentCreatePersonaRouteData, AgentCreatePersonaRouteResponse, AgentListPersonasRouteData, AgentListPersonasRouteResponse, AgentGetPersonaRouteData, AgentGetPersonaRouteResponse, AgentUpdatePersonaRouteData, AgentUpdatePersonaRouteResponse, AgentDeletePersonaRouteData, AgentDeletePersonaRouteResponse, AgentBindConversationPersonaData, AgentBindConversationPersonaResponse, AgentListSkillsResponse, AgentGetSkillDetailData, AgentGetSkillDetailResponse, AgentDeleteSkillData, AgentDeleteSkillResponse, AgentScanSkillsResponse, AgentInstallSkillData, AgentInstallSkillResponse, AgentStatsOverviewData, AgentStatsOverviewResponse, AgentStatsRecentRunsData, AgentStatsRecentRunsResponse, AgentUploadAttachmentData, AgentUploadAttachmentResponse, KnowledgeBaseListKbsResponse, KnowledgeBaseCreateKbData, KnowledgeBaseCreateKbResponse, KnowledgeBaseListTrashResponse, KnowledgeBaseRestoreTrashedDocumentData, KnowledgeBaseRestoreTrashedDocumentResponse, KnowledgeBasePurgeTrashedDocumentData, KnowledgeBasePurgeTrashedDocumentResponse, KnowledgeBaseGetKbData, KnowledgeBaseGetKbResponse, KnowledgeBaseDeleteKbData, KnowledgeBaseDeleteKbResponse, KnowledgeBaseUploadKbDocumentData, KnowledgeBaseUploadKbDocumentResponse, KnowledgeBaseListKbDocumentsData, KnowledgeBaseListKbDocumentsResponse, KnowledgeBaseDeleteKbDocumentData, KnowledgeBaseDeleteKbDocumentResponse, KnowledgeBaseQueryKbData, KnowledgeBaseQueryKbResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginResetPasswordData, LoginResetPasswordResponse, LogsReadLogsData, LogsReadLogsResponse, PrivateCreateUserData, PrivateCreateUserResponse, ProvidersListProvidersResponse, ProvidersCreateProviderData, ProvidersCreateProviderResponse, ProvidersGetProviderBalanceData, ProvidersGetProviderBalanceResponse, ProvidersUpdateProviderData, ProvidersUpdateProviderResponse, ProvidersDeleteProviderData, ProvidersDeleteProviderResponse, SettingsReadDeploymentSettingsResponse, SettingsUpdateDeploymentSettingsData, SettingsUpdateDeploymentSettingsResponse, SettingsReadToolPermissionsResponse, SettingsUpdateToolPermissionsData, SettingsUpdateToolPermissionsResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersReadMySystemPromptResponse, UsersUpdateMySystemPromptData, UsersUpdateMySystemPromptResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsHealthCheckResponse, UtilsReadPublicSettingsResponse } from './types.gen';
+import type { AgentCreateConversationData, AgentCreateConversationResponse, AgentListConversationsData, AgentListConversationsResponse, AgentRenameConversationData, AgentRenameConversationResponse, AgentDeleteConversationData, AgentDeleteConversationResponse, AgentSetConversationStatusData, AgentSetConversationStatusResponse, AgentExportConversationData, AgentExportConversationResponse, AgentListConversationMessagesData, AgentListConversationMessagesResponse, AgentDeleteConversationMessageData, AgentDeleteConversationMessageResponse, AgentTruncateConversationMessagesData, AgentTruncateConversationMessagesResponse, AgentChatData, AgentChatResponse, AgentCreateMcpServerData, AgentCreateMcpServerResponse, AgentListMcpServersData, AgentListMcpServersResponse, AgentGetMcpServerData, AgentGetMcpServerResponse, AgentUpdateMcpServerData, AgentUpdateMcpServerResponse, AgentDeleteMcpServerData, AgentDeleteMcpServerResponse, AgentConnectMcpServerData, AgentConnectMcpServerResponse, AgentCreatePersonaRouteData, AgentCreatePersonaRouteResponse, AgentListPersonasRouteData, AgentListPersonasRouteResponse, AgentGetPersonaRouteData, AgentGetPersonaRouteResponse, AgentUpdatePersonaRouteData, AgentUpdatePersonaRouteResponse, AgentDeletePersonaRouteData, AgentDeletePersonaRouteResponse, AgentBindConversationPersonaData, AgentBindConversationPersonaResponse, AgentListSkillsResponse, AgentGetSkillDetailData, AgentGetSkillDetailResponse, AgentDeleteSkillData, AgentDeleteSkillResponse, AgentScanSkillsResponse, AgentInstallSkillData, AgentInstallSkillResponse, AgentStatsOverviewData, AgentStatsOverviewResponse, AgentStatsRecentRunsData, AgentStatsRecentRunsResponse, AgentUploadAttachmentData, AgentUploadAttachmentResponse, KnowledgeBaseListKbsResponse, KnowledgeBaseCreateKbData, KnowledgeBaseCreateKbResponse, KnowledgeBaseListTrashResponse, KnowledgeBaseRestoreTrashedDocumentData, KnowledgeBaseRestoreTrashedDocumentResponse, KnowledgeBasePurgeTrashedDocumentData, KnowledgeBasePurgeTrashedDocumentResponse, KnowledgeBaseGetKbData, KnowledgeBaseGetKbResponse, KnowledgeBaseDeleteKbData, KnowledgeBaseDeleteKbResponse, KnowledgeBaseUploadKbDocumentData, KnowledgeBaseUploadKbDocumentResponse, KnowledgeBaseListKbDocumentsData, KnowledgeBaseListKbDocumentsResponse, KnowledgeBaseDeleteKbDocumentData, KnowledgeBaseDeleteKbDocumentResponse, KnowledgeBaseQueryKbData, KnowledgeBaseQueryKbResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginResetPasswordData, LoginResetPasswordResponse, LogsReadLogsData, LogsReadLogsResponse, PrivateCreateUserData, PrivateCreateUserResponse, ProvidersListProvidersResponse, ProvidersCreateProviderData, ProvidersCreateProviderResponse, ProvidersGetProviderBalanceData, ProvidersGetProviderBalanceResponse, ProvidersUpdateProviderData, ProvidersUpdateProviderResponse, ProvidersDeleteProviderData, ProvidersDeleteProviderResponse, ProvidersListProviderModelsData, ProvidersListProviderModelsResponse, ProvidersAddProviderModelData, ProvidersAddProviderModelResponse, ProvidersFetchProviderModelsData, ProvidersFetchProviderModelsResponse, ProvidersDeleteProviderModelData, ProvidersDeleteProviderModelResponse, SettingsReadDeploymentSettingsResponse, SettingsUpdateDeploymentSettingsData, SettingsUpdateDeploymentSettingsResponse, SettingsReadToolPermissionsResponse, SettingsUpdateToolPermissionsData, SettingsUpdateToolPermissionsResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersReadMySystemPromptResponse, UsersUpdateMySystemPromptData, UsersUpdateMySystemPromptResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsHealthCheckResponse, UtilsReadPublicSettingsResponse } from './types.gen';
 
 export class AgentService {
     /**
@@ -1111,6 +1111,97 @@ export class ProvidersService {
             url: '/api/v1/providers/{provider_id}',
             path: {
                 provider_id: data.providerId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Provider Models
+     * 列出该供应商的模型清单。
+     * @param data The data for the request.
+     * @param data.providerId
+     * @returns ProviderModelsOut Successful Response
+     * @throws ApiError
+     */
+    public static listProviderModels(data: ProvidersListProviderModelsData): CancelablePromise<ProvidersListProviderModelsResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/providers/{provider_id}/models',
+            path: {
+                provider_id: data.providerId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Add Provider Model
+     * 「自定义模型」：手填一个上游清单里没有的模型 ID。
+     * @param data The data for the request.
+     * @param data.providerId
+     * @param data.requestBody
+     * @returns ProviderModelOut Successful Response
+     * @throws ApiError
+     */
+    public static addProviderModel(data: ProvidersAddProviderModelData): CancelablePromise<ProvidersAddProviderModelResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/providers/{provider_id}/models',
+            path: {
+                provider_id: data.providerId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Fetch Provider Models
+     * 从上游拉取模型列表并 upsert 落库（**显式动作**，不自动触发）。
+     *
+     * 上游失败翻译为中文 502/504：Key 无效 / 不可达 / 超时，便于用户排障。
+     * @param data The data for the request.
+     * @param data.providerId
+     * @returns ProviderModelsOut Successful Response
+     * @throws ApiError
+     */
+    public static fetchProviderModels(data: ProvidersFetchProviderModelsData): CancelablePromise<ProvidersFetchProviderModelsResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/providers/{provider_id}/models/fetch',
+            path: {
+                provider_id: data.providerId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Provider Model
+     * 从清单移除一个模型（404 = 不存在或不是自己的）。
+     * @param data The data for the request.
+     * @param data.providerId
+     * @param data.modelId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static deleteProviderModel(data: ProvidersDeleteProviderModelData): CancelablePromise<ProvidersDeleteProviderModelResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/providers/{provider_id}/models/{model_id}',
+            path: {
+                provider_id: data.providerId,
+                model_id: data.modelId
             },
             errors: {
                 422: 'Validation Error'

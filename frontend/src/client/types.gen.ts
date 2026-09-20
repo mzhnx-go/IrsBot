@@ -362,6 +362,25 @@ export type ProviderCreate = {
 };
 
 /**
+ * 「自定义模型」请求体
+ */
+export type ProviderModelCreate = {
+    model_id: string;
+    display_name?: (string | null);
+};
+
+export type ProviderModelOut = {
+    id: string;
+    model_id: string;
+    display_name?: (string | null);
+};
+
+export type ProviderModelsOut = {
+    items: Array<ProviderModelOut>;
+    count: number;
+};
+
+/**
  * 响应体: 绝不返回明文 api_key
  */
 export type ProviderOut = {
@@ -881,6 +900,32 @@ export type ProvidersDeleteProviderData = {
 };
 
 export type ProvidersDeleteProviderResponse = (unknown);
+
+export type ProvidersListProviderModelsData = {
+    providerId: string;
+};
+
+export type ProvidersListProviderModelsResponse = (ProviderModelsOut);
+
+export type ProvidersAddProviderModelData = {
+    providerId: string;
+    requestBody: ProviderModelCreate;
+};
+
+export type ProvidersAddProviderModelResponse = (ProviderModelOut);
+
+export type ProvidersFetchProviderModelsData = {
+    providerId: string;
+};
+
+export type ProvidersFetchProviderModelsResponse = (ProviderModelsOut);
+
+export type ProvidersDeleteProviderModelData = {
+    modelId: string;
+    providerId: string;
+};
+
+export type ProvidersDeleteProviderModelResponse = (unknown);
 
 export type SettingsReadDeploymentSettingsResponse = (DeploymentSettingsPublic);
 

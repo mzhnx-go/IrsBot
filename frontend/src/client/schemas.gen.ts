@@ -1370,6 +1370,80 @@ export const ProviderCreateSchema = {
     description: '创建请求体'
 } as const;
 
+export const ProviderModelCreateSchema = {
+    properties: {
+        model_id: {
+            type: 'string',
+            maxLength: 200,
+            minLength: 1,
+            title: 'Model Id'
+        },
+        display_name: {
+            anyOf: [
+                {
+                    type: 'string',
+                    maxLength: 200
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Display Name'
+        }
+    },
+    type: 'object',
+    required: ['model_id'],
+    title: 'ProviderModelCreate',
+    description: '「自定义模型」请求体'
+} as const;
+
+export const ProviderModelOutSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        model_id: {
+            type: 'string',
+            title: 'Model Id'
+        },
+        display_name: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Display Name'
+        }
+    },
+    type: 'object',
+    required: ['id', 'model_id'],
+    title: 'ProviderModelOut'
+} as const;
+
+export const ProviderModelsOutSchema = {
+    properties: {
+        items: {
+            items: {
+                '$ref': '#/components/schemas/ProviderModelOut'
+            },
+            type: 'array',
+            title: 'Items'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['items', 'count'],
+    title: 'ProviderModelsOut'
+} as const;
+
 export const ProviderOutSchema = {
     properties: {
         id: {

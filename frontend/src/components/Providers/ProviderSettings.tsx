@@ -1,16 +1,26 @@
+import { zodResolver } from "@hookform/resolvers/zod"
 import {
   ArrowDownUp,
   Braces,
+  Download,
   Mic,
   MessagesSquare,
   Plus,
+  Search,
+  SquarePen,
+  Trash2 as TrashIcon,
   Trash2,
   Volume2,
   Wallet,
 } from "lucide-react"
-import { useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { toast } from "sonner"
 
-import type { ProviderOut } from "@/client"
+import {
+  type ProviderModelOut,
+  type ProviderOut,
+  ProvidersService,
+} from "@/client"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -47,7 +57,6 @@ import { cn } from "@/lib/utils"
 import useProviderBalance from "@/hooks/useProviderBalance"
 import useProviders from "@/hooks/useProviders"
 import { z } from "zod"
-import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 
 // ── 能力 Tab 栏（AstrBot 风格）────────────────────────────────
@@ -728,30 +737,192 @@ const ProviderDetail = ({ provider }: ProviderDetailProps) => {
         </SettingRow>
       </div>
 
-      {/* 模型区（前端占位，功能待实现）：
-          「获取模型列表」需后端透传上游 GET /models 并落库；
-          「自定义模型」需模型管理表（每供应商多模型 + 默认模型选择）。
-          当前默认模型名在上方「设置」区维护 */}
-      <h4 className="mt-6 flex flex-wrap items-center justify-between gap-3">
+      {/* 模型区：清单存后端 provider_models 表（P7 已落地）。
+          「获取模型列表」是显式动作，不随页面自动触发（与查余额同范式） */}
+      <ModelsSection providerId={provider.id} />
+    </div>
+  )
+}
+
+// ── 模型区：清单管理（获取模型列表 / 自定义模型 / 搜索 / 删除）──
+
+/** 从 API 错误中提取后端中文明细（ApiError.body.detail） */
+function apiErrMsg(e: unknown, fallback: string) {
+  const detail = (e as { body?: { detail?: string } })?.body?.detail
+  return detail ?? fallback
+}
+
+const ModelsSection = ({ providerId }: { providerId: string }) => {
+  const [models, setModels] = useState<ProviderModelOut[]>([])
+  const [search, setSearch] = useState("")
+  const [fetching, setFetching] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [customId, setCustomId] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await ProvidersService.listProviderModels({ providerId })
+      setModels(res.items)
+    } catch {
+      // 静默：清单空态即可用，列表拉取失败不打断页面
+    }
+  }, [providerId])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  // 获取模型列表：显式动作，用供应商自己的 Key 调上游 /models 并落库
+  const handleFetch = async () => {
+    setFetching(true)
+    try {
+      const res = await ProvidersService.fetchProviderModels({ providerId })
+      setModels(res.items)
+      toast.success(`已获取 ${res.count} 个模型`)
+    } catch (e) {
+      toast.error(apiErrMsg(e, "获取模型列表失败，请检查模型源配置"))
+    } finally {
+      setFetching(false)
+    }
+  }
+
+  const handleAdd = async () => {
+    const id = customId.trim()
+    if (!id) return
+    setSaving(true)
+    try {
+      await ProvidersService.addProviderModel({
+        providerId,
+        requestBody: { model_id: id },
+      })
+      setCustomId("")
+      setAdding(false)
+      await load()
+      toast.success("模型已添加")
+    } catch (e) {
+      toast.error(apiErrMsg(e, "添加失败，请重试"))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await ProvidersService.deleteProviderModel({ providerId, modelId: id })
+      setModels((prev) => prev.filter((m) => m.id !== id))
+    } catch (e) {
+      toast.error(apiErrMsg(e, "删除失败，请重试"))
+    }
+  }
+
+  const filtered = useMemo(() => {
+    const kw = search.trim().toLowerCase()
+    return kw
+      ? models.filter(
+          (m) =>
+            m.model_id.toLowerCase().includes(kw) ||
+            (m.display_name ?? "").toLowerCase().includes(kw),
+        )
+      : models
+  }, [models, search])
+
+  return (
+    <div className="mt-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-base font-semibold">模型</p>
-          <p className="text-xs text-muted-foreground">可用模型 0</p>
+          <p className="text-xs text-muted-foreground">
+            可用模型 {models.length}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            disabled
-            placeholder="搜索模型或 ID"
-            title="待实现"
-            className="h-8 w-40 rounded-md border border-input bg-transparent px-2 text-sm placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
-          />
-          <Button variant="outline" size="sm" disabled title="待实现">
-            获取模型列表
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索模型或 ID"
+              className="h-8 w-40 rounded-md border border-input bg-transparent pl-7 pr-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="provider-fetch-models"
+            disabled={fetching}
+            onClick={handleFetch}
+          >
+            <Download />
+            {fetching ? "获取中…" : "获取模型列表"}
           </Button>
-          <Button variant="outline" size="sm" disabled title="待实现">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAdding((v) => !v)}
+          >
+            <SquarePen />
             自定义模型
           </Button>
         </div>
-      </h4>
+      </div>
+
+      {/* 自定义模型：手填上游清单里没有的模型 ID */}
+      {adding && (
+        <div className="mt-3 flex items-center gap-2">
+          <Input
+            autoFocus
+            value={customId}
+            onChange={(e) => setCustomId(e.target.value)}
+            placeholder="模型 ID，如 qwen3-max"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleAdd()
+            }}
+          />
+          <LoadingButton size="sm" loading={saving} onClick={handleAdd}>
+            添加
+          </LoadingButton>
+          <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>
+            取消
+          </Button>
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          {models.length === 0
+            ? "还没有模型清单，点击「获取模型列表」从服务商拉取，或「自定义模型」手动添加"
+            : "没有匹配的模型"}
+        </p>
+      ) : (
+        <ul className="mt-3 flex flex-col divide-y">
+          {filtered.map((m) => (
+            <li
+              key={m.id}
+              data-testid="provider-model-item"
+              className="group flex items-center justify-between gap-3 py-2"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-mono text-sm">{m.model_id}</p>
+                {m.display_name && m.display_name !== m.model_id && (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {m.display_name}
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
+                aria-label={`删除 ${m.model_id}`}
+                onClick={() => void handleDelete(m.id)}
+              >
+                <TrashIcon />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
