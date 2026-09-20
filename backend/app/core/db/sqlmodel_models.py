@@ -128,8 +128,14 @@ class ConversationResponse(SQLModel):
     title: str
     session_id: str
     persona_id: uuid.UUID | None = None
+    is_enabled: bool = True
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+class ConversationStatusUpdate(SQLModel):
+    """会话启用/停用请求（False 时新消息被管线拦截）"""
+    is_enabled: bool
 
 
 class ChatResponse(SQLModel):

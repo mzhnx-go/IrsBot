@@ -24,6 +24,7 @@ from app.core.db.sqlmodel_models import (
     ConversationPersonaUpdate,
     ConversationRename,
     ConversationResponse,
+    ConversationStatusUpdate,
     MCPServerConnectResponse,
     MCPServerCreate,
     MCPServerResponse,
@@ -86,6 +87,7 @@ def _conversation_response(c: Conversation) -> ConversationResponse:
         title=c.title,
         session_id=c.session_id,
         persona_id=c.persona_id,
+        is_enabled=c.is_enabled,
         created_at=c.created_at,
         updated_at=c.updated_at,
     )
@@ -139,6 +141,27 @@ def rename_conversation(
     if not conversation:
         raise HTTPException(status_code=404, detail="对话不存在")
     conversation.title = body.title
+    session.commit()
+    session.refresh(conversation)
+    return _conversation_response(conversation)
+
+
+@router.patch("/conversations/{conversation_id}/status", response_model=ConversationResponse)
+def set_conversation_status(
+    conversation_id: uuid.UUID,
+    body: ConversationStatusUpdate,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """启用/停用会话。停用后管线 SessionStatus 阶段会拦截该会话的新消息"""
+    conversation = crud.get_conversation(
+        session,
+        conv_id=conversation_id,
+        user_id=current_user.id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    conversation.is_enabled = body.is_enabled
     session.commit()
     session.refresh(conversation)
     return _conversation_response(conversation)
@@ -211,6 +234,15 @@ def _message_text(content: object) -> str:
     return str(content) if content is not None else ""
 
 
+def _message_tool_calls(m: object) -> list[dict] | None:
+    """展示用工具轨迹优先取 content.tool_trace（与 WS history 口径一致），
+    兼容直接写在 tool_calls 列上的旧数据。"""
+    content = getattr(m, "content", None)
+    if isinstance(content, dict) and content.get("tool_trace"):
+        return content["tool_trace"]
+    return getattr(m, "tool_calls", None)
+
+
 @router.get(
     "/conversations/{conversation_id}/messages", response_model=list[MessageOut]
 )
@@ -237,7 +269,7 @@ def list_conversation_messages(
             id=m.id,
             role=m.role,
             content=_message_text(m.content),
-            tool_calls=m.tool_calls,
+            tool_calls=_message_tool_calls(m),
             created_at=m.created_at,
         )
         for m in msgs

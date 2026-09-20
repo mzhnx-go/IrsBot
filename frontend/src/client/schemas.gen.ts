@@ -224,6 +224,11 @@ export const ConversationResponseSchema = {
             ],
             title: 'Persona Id'
         },
+        is_enabled: {
+            type: 'boolean',
+            title: 'Is Enabled',
+            default: true
+        },
         created_at: {
             anyOf: [
                 {
@@ -253,6 +258,19 @@ export const ConversationResponseSchema = {
     required: ['id', 'title', 'session_id'],
     title: 'ConversationResponse',
     description: '对话响应'
+} as const;
+
+export const ConversationStatusUpdateSchema = {
+    properties: {
+        is_enabled: {
+            type: 'boolean',
+            title: 'Is Enabled'
+        }
+    },
+    type: 'object',
+    required: ['is_enabled'],
+    title: 'ConversationStatusUpdate',
+    description: '会话启用/停用请求（False 时新消息被管线拦截）'
 } as const;
 
 export const DeploymentSettingsPublicSchema = {

@@ -67,8 +67,16 @@ export type ConversationResponse = {
     title: string;
     session_id: string;
     persona_id?: (string | null);
+    is_enabled?: boolean;
     created_at?: (string | null);
     updated_at?: (string | null);
+};
+
+/**
+ * 会话启用/停用请求（False 时新消息被管线拦截）
+ */
+export type ConversationStatusUpdate = {
+    is_enabled: boolean;
 };
 
 /**
@@ -449,6 +457,13 @@ export type AgentDeleteConversationData = {
 };
 
 export type AgentDeleteConversationResponse = (unknown);
+
+export type AgentSetConversationStatusData = {
+    conversationId: string;
+    requestBody: ConversationStatusUpdate;
+};
+
+export type AgentSetConversationStatusResponse = (ConversationResponse);
 
 export type AgentExportConversationData = {
     conversationId: string;

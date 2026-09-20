@@ -4,6 +4,7 @@ import {
   Home,
   Library,
   MessageSquare,
+  MessagesSquare,
   PanelLeftClose,
   Plug,
   Settings,
@@ -35,6 +36,7 @@ const baseItems: Item[] = [
   { icon: Plug, title: "MCP 服务", path: "/mcp" },
   { icon: BookOpen, title: "技能", path: "/skills" },
   { icon: Drama, title: "人设", path: "/personas" },
+  { icon: MessagesSquare, title: "会话管理", path: "/conversations" },
   { icon: Settings, title: "设置", path: "/settings" },
 ]
 

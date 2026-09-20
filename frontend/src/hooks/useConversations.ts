@@ -1,3 +1,4 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   type AgentExportConversationData,
   AgentService,
@@ -6,7 +7,6 @@ import {
 } from "@/client"
 import useCustomToast from "@/hooks/useCustomToast"
 import { handleError } from "@/utils"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 /** 导出格式：直接取自 OpenAPI 生成的类型，前端不再手抄一份字符串联合 */
 export type ConversationExportFormat = NonNullable<
@@ -133,9 +133,34 @@ const useConversations = () => {
     }: {
       conversationId: string
       title: string
-    }) => AgentService.renameConversation({ conversationId, requestBody: { title } }),
+    }) =>
+      AgentService.renameConversation({
+        conversationId,
+        requestBody: { title },
+      }),
     onSuccess: () => {
       showSuccessToast("已重命名")
+    },
+    onError: handleError.bind(showErrorToast),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["conversations"] })
+    },
+  })
+
+  const setConversationStatus = useMutation({
+    mutationFn: ({
+      conversationId,
+      isEnabled,
+    }: {
+      conversationId: string
+      isEnabled: boolean
+    }) =>
+      AgentService.setConversationStatus({
+        conversationId,
+        requestBody: { is_enabled: isEnabled },
+      }),
+    onSuccess: (_data, { isEnabled }) => {
+      showSuccessToast(isEnabled ? "会话已启用" : "会话已停用")
     },
     onError: handleError.bind(showErrorToast),
     onSettled: () => {
@@ -166,6 +191,7 @@ const useConversations = () => {
     createConversation,
     deleteConversation,
     renameConversation,
+    setConversationStatus,
     exportConversation,
   }
 }
