@@ -40,6 +40,18 @@ test("/stats 指标卡渲染", async ({ page }) => {
   }
 })
 
+test("/providers 查余额按钮：不支持的服务商给出明确提示", async ({ page }) => {
+  await page.goto("/providers")
+  const button = page.getByTestId("provider-balance-button").first()
+  await expect(button).toBeVisible()
+  await button.click()
+  // 种子 default 源指向 dashscope（.env 的 OPENAI_BASE_URL），该厂商无余额接口：
+  // 后端走本地提示分支、不发上游请求，因此本用例离线可稳定复现
+  await expect(
+    page.getByTestId("provider-balance-result").first(),
+  ).toContainText("阿里云")
+})
+
 test("/settings 工具权限标签（超管可见且开关渲染）", async ({ page }) => {
   await page.goto("/settings")
   await page.getByRole("tab", { name: "工具权限" }).click()
