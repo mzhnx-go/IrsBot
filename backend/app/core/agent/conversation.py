@@ -208,6 +208,58 @@ class ConversationManager:
         )
         return self.session.exec(stmt).one()
 
+    def delete_message(self, conv_id: uuid.UUID, message_id: uuid.UUID) -> bool:
+        """删除单条消息（校验消息确实属于该会话）。
+
+        参数:
+            conv_id: 所属会话 ID。
+            message_id: 目标消息 ID。
+
+        返回:
+            删除成功返回 True；消息不存在或不属于该会话返回 False。
+        """
+        obj = self.session.get(Message, message_id)
+        if not obj or obj.conversation_id != conv_id:
+            return False
+        self.session.delete(obj)
+        self.session.commit()
+        return True
+
+    def truncate_messages(
+        self,
+        conv_id: uuid.UUID,
+        message_id: uuid.UUID,
+        inclusive: bool = True,
+    ) -> int:
+        """删除某条消息之后的所有消息（「编辑重发 / 重新生成」的底层操作）。
+
+        按时间正序定位目标消息再切片删除，而不是用 created_at 比较——
+        同一秒内写入的多条消息时间戳可能相同，比较会误删/漏删。
+
+        参数:
+            conv_id: 所属会话 ID。
+            message_id: 锚点消息 ID。
+            inclusive: True 时连锚点消息一起删（编辑重发），False 保留锚点。
+
+        返回:
+            删除的条数；锚点不存在或不属于该会话返回 -1。
+        """
+        rows = list(
+            self.session.exec(
+                select(Message)
+                .where(Message.conversation_id == conv_id)
+                .order_by(col(Message.created_at).asc())
+            ).all()
+        )
+        idx = next((i for i, r in enumerate(rows) if r.id == message_id), None)
+        if idx is None:
+            return -1
+        targets = rows[idx:] if inclusive else rows[idx + 1 :]
+        for r in targets:
+            self.session.delete(r)
+        self.session.commit()
+        return len(targets)
+
     # ── LangChain 集成 ───────────────────────────────────────────
 
     def get_langchain_messages(self, conv_id: uuid.UUID) -> list[Any]:

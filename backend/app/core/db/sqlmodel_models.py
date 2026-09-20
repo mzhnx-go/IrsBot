@@ -135,6 +135,21 @@ class ChatResponse(SQLModel):
     conversation_id: uuid.UUID
 
 
+class MessageOut(SQLModel):
+    """会话消息响应（配置台消息列表用）"""
+    id: uuid.UUID
+    role: str
+    content: str
+    tool_calls: list[dict] | None = None
+    created_at: datetime | None = None
+
+
+class MessageTruncateRequest(SQLModel):
+    """截断消息请求：删除指定消息及其后所有消息（inclusive=False 时保留该条）"""
+    message_id: uuid.UUID
+    inclusive: bool = True
+
+
 #-- MCP Server相关模型
 class MCPServerCreate(SQLModel):
     """创建MCP Server请求

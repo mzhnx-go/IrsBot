@@ -6,10 +6,10 @@
     {"type": "message", "content": "用户消息"}
 
 下行：
-    {"type": "history", "messages": [...]}
+    {"type": "history", "messages": [{"id", "role", "content", "tool_calls"?}...]}
     {"type": "text_chunk", "content": "文字块"}
     {"type": "tool_call", "name": "工具名", "phase": "start" | "end"}
-    {"type": "done"}
+    {"type": "done", "user_message_id"?: "...", "assistant_message_id"?: "..."}
 
 协议细节见 docs/protocols/chat-ws-protocol.md
 """
@@ -67,6 +67,9 @@ class WSMsgKey:
     MESSAGES = "messages"
     ROLE = "role"
     TOOL_CALLS = "tool_calls"
+    ID = "id"
+    USER_MESSAGE_ID = "user_message_id"
+    ASSISTANT_MESSAGE_ID = "assistant_message_id"
 
 
 class WSToolPhase:
@@ -92,6 +95,7 @@ def build_history_payload(msgs) -> dict:
         else:
             text = str(content)
         item = {
+            WSMsgKey.ID: str(m.id),
             WSMsgKey.ROLE: m.role,
             WSMsgKey.CONTENT: text,
         }
@@ -160,7 +164,7 @@ async def chat_ws(
         while True:
             data = await ws.receive_json()
             if data[WSMsgKey.TYPE] == WSMessageType.USER_MESSAGE:
-                conv_manager.add_message(
+                user_msg = conv_manager.add_message(
                     conv_id=conversation.id,
                     role=WSMessageRole.USER,
                     content=data[WSMsgKey.CONTENT],
@@ -231,11 +235,18 @@ async def chat_ws(
                         if msg[WSMsgKey.TYPE] == WSMessageType.TEXT_CHUNK:
                             reply += msg[WSMsgKey.CONTENT]
 
-                conv_manager.add_message(
+                assistant_msg = conv_manager.add_message(
                     conv_id=conversation.id,
                     role=WSMessageRole.ASSISTANT,
                     content=reply,
                 )
-                await ws.send_json({WSMsgKey.TYPE: WSMessageType.DONE})
+                # done 回传两条落库消息的真实 ID：
+                # 前端消息操作（删除/编辑重发/重新生成）按 ID 调 REST，
+                # 没有 ID 就只能整表重拉。
+                await ws.send_json({
+                    WSMsgKey.TYPE: WSMessageType.DONE,
+                    WSMsgKey.USER_MESSAGE_ID: str(user_msg.id),
+                    WSMsgKey.ASSISTANT_MESSAGE_ID: str(assistant_msg.id),
+                })
     except WebSocketDisconnect:
         pass

@@ -56,6 +56,8 @@ def test_chat_ws_streams_and_finishes(client, superuser_token_headers):
             second = ws.receive_json()
             assert second == {"type": "text_chunk", "content": "你好"}
 
-            # Agent 流结束，路由补发 done
+            # Agent 流结束，路由补发 done（携带两条落库消息的真实 ID）
             third = ws.receive_json()
-            assert third == {"type": "done"}
+            assert third["type"] == "done"
+            assert third["user_message_id"]
+            assert third["assistant_message_id"]

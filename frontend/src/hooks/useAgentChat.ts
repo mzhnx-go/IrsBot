@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
+import { AgentService } from "@/client"
+import useCustomToast from "@/hooks/useCustomToast"
+
 export interface ToolCall {
   name: string
   phase: "start" | "end"
@@ -7,6 +10,8 @@ export interface ToolCall {
 
 export interface ChatMessage {
   id: string
+  /** 数据库消息 ID（history 恢复或 done 事件回填；本地乐观新增时为空） */
+  dbId?: string
   role: "user" | "assistant"
   content: string
   toolCalls?: ToolCall[]
@@ -19,6 +24,7 @@ export function useAgentChat(conversationId: string) {
   const [isStreaming, setIsStreaming] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
+  const { showErrorToast } = useCustomToast()
 
   useEffect(() => {
     // 给"最后一条 assistant 消息"追加文字；没有就新建一条
@@ -78,12 +84,14 @@ export function useAgentChat(conversationId: string) {
         setMessages(
           (
             msg.messages as Array<{
+              id?: string
               role: "user" | "assistant"
               content: string
               tool_calls?: ToolCall[]
             }>
           ).map((h) => ({
-            id: crypto.randomUUID(),
+            id: h.id ?? crypto.randomUUID(),
+            dbId: h.id,
             role: h.role,
             content: h.content,
             toolCalls: h.tool_calls,
@@ -110,11 +118,26 @@ export function useAgentChat(conversationId: string) {
           ]
         })
       } else if (msg.type === "done") {
-        // 本轮回复结束
+        // 本轮回复结束；后端回传落库消息 ID，回填给本地乐观消息，
+        // 之后删除/编辑重发/重新生成才能按 ID 调 REST
         setIsStreaming(false)
-        setMessages((prev) =>
-          prev.map((m) => (m.streaming ? { ...m, streaming: false } : m)),
-        )
+        setMessages((prev) => {
+          let lastUser = -1
+          let lastAssistant = -1
+          prev.forEach((m, i) => {
+            if (m.role === "user") lastUser = i
+            if (m.role === "assistant") lastAssistant = i
+          })
+          return prev.map((m, i) => {
+            let next = m
+            if (m.streaming) next = { ...next, streaming: false }
+            if (i === lastUser && msg.user_message_id)
+              next = { ...next, dbId: msg.user_message_id }
+            if (i === lastAssistant && msg.assistant_message_id)
+              next = { ...next, dbId: msg.assistant_message_id }
+            return next
+          })
+        })
       }
     }
 
@@ -128,8 +151,6 @@ export function useAgentChat(conversationId: string) {
     }
   }, [conversationId])
 
-  // 给"最后一条 assistant 消息"追加文字；没有就新建一条
-  // （定义在 useEffect 内部：它只服务于消息事件，也避免依赖数组警告）
   const sendMessage = useCallback((content: string) => {
     const ws = wsRef.current
     if (!ws || ws.readyState !== WebSocket.OPEN) return
@@ -143,5 +164,87 @@ export function useAgentChat(conversationId: string) {
     ws.send(JSON.stringify({ type: "message", content }))
   }, [])
 
-  return { messages, isConnected, isStreaming, sendMessage }
+  /** 截断本地状态：删掉 dbId 对应消息及其后的所有消息 */
+  const truncateLocal = useCallback((dbId: string, inclusive: boolean) => {
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m.dbId === dbId)
+      if (idx < 0) return prev
+      return idx === 0 && inclusive
+        ? []
+        : prev.slice(0, inclusive ? idx : idx + 1)
+    })
+  }, [])
+
+  /** 删除单条消息 */
+  const deleteMessage = useCallback(
+    async (dbId: string) => {
+      try {
+        await AgentService.deleteConversationMessage({
+          conversationId,
+          messageId: dbId,
+        })
+        setMessages((prev) => prev.filter((m) => m.dbId !== dbId))
+      } catch {
+        showErrorToast("删除消息失败，请重试")
+      }
+    },
+    [conversationId, showErrorToast],
+  )
+
+  /** 重新生成：截掉最后一条用户消息及其后回复，重新发送同一问题 */
+  const regenerate = useCallback(async () => {
+    let target: ChatMessage | undefined
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        target = messages[i]
+        break
+      }
+    }
+    if (!target?.dbId || isStreaming) return
+    try {
+      await AgentService.truncateConversationMessages({
+        conversationId,
+        requestBody: { message_id: target.dbId, inclusive: true },
+      })
+      truncateLocal(target.dbId, true)
+      sendMessage(target.content)
+    } catch {
+      showErrorToast("重新生成失败，请重试")
+    }
+  }, [
+    messages,
+    isStreaming,
+    conversationId,
+    truncateLocal,
+    sendMessage,
+    showErrorToast,
+  ])
+
+  /** 编辑重发：改用户消息内容并删掉其后的所有消息，重新发送 */
+  const editAndResend = useCallback(
+    async (dbId: string, newContent: string) => {
+      if (isStreaming) return
+      try {
+        await AgentService.truncateConversationMessages({
+          conversationId,
+          requestBody: { message_id: dbId, inclusive: true },
+        })
+        truncateLocal(dbId, true)
+        sendMessage(newContent)
+      } catch {
+        showErrorToast("编辑重发失败，请重试")
+      }
+    },
+    [isStreaming, conversationId, truncateLocal, sendMessage, showErrorToast],
+  )
+
+  return {
+    messages,
+    isConnected,
+    isStreaming,
+    sendMessage,
+    deleteMessage,
+    regenerate,
+    editAndResend,
+  }
 }

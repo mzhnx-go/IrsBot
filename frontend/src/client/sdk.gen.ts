@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AgentCreateConversationData, AgentCreateConversationResponse, AgentListConversationsData, AgentListConversationsResponse, AgentRenameConversationData, AgentRenameConversationResponse, AgentDeleteConversationData, AgentDeleteConversationResponse, AgentExportConversationData, AgentExportConversationResponse, AgentChatData, AgentChatResponse, AgentCreateMcpServerData, AgentCreateMcpServerResponse, AgentListMcpServersData, AgentListMcpServersResponse, AgentGetMcpServerData, AgentGetMcpServerResponse, AgentUpdateMcpServerData, AgentUpdateMcpServerResponse, AgentDeleteMcpServerData, AgentDeleteMcpServerResponse, AgentConnectMcpServerData, AgentConnectMcpServerResponse, AgentListSkillsResponse, AgentGetSkillDetailData, AgentGetSkillDetailResponse, AgentDeleteSkillData, AgentDeleteSkillResponse, AgentScanSkillsResponse, AgentInstallSkillData, AgentInstallSkillResponse, KnowledgeBaseListKbsResponse, KnowledgeBaseCreateKbData, KnowledgeBaseCreateKbResponse, KnowledgeBaseListTrashResponse, KnowledgeBaseRestoreTrashedDocumentData, KnowledgeBaseRestoreTrashedDocumentResponse, KnowledgeBasePurgeTrashedDocumentData, KnowledgeBasePurgeTrashedDocumentResponse, KnowledgeBaseGetKbData, KnowledgeBaseGetKbResponse, KnowledgeBaseDeleteKbData, KnowledgeBaseDeleteKbResponse, KnowledgeBaseUploadKbDocumentData, KnowledgeBaseUploadKbDocumentResponse, KnowledgeBaseListKbDocumentsData, KnowledgeBaseListKbDocumentsResponse, KnowledgeBaseDeleteKbDocumentData, KnowledgeBaseDeleteKbDocumentResponse, KnowledgeBaseQueryKbData, KnowledgeBaseQueryKbResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginResetPasswordData, LoginResetPasswordResponse, PrivateCreateUserData, PrivateCreateUserResponse, ProvidersListProvidersResponse, ProvidersCreateProviderData, ProvidersCreateProviderResponse, ProvidersUpdateProviderData, ProvidersUpdateProviderResponse, ProvidersDeleteProviderData, ProvidersDeleteProviderResponse, SettingsReadDeploymentSettingsResponse, SettingsUpdateDeploymentSettingsData, SettingsUpdateDeploymentSettingsResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersReadMySystemPromptResponse, UsersUpdateMySystemPromptData, UsersUpdateMySystemPromptResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsHealthCheckResponse, UtilsReadPublicSettingsResponse } from './types.gen';
+import type { AgentCreateConversationData, AgentCreateConversationResponse, AgentListConversationsData, AgentListConversationsResponse, AgentRenameConversationData, AgentRenameConversationResponse, AgentDeleteConversationData, AgentDeleteConversationResponse, AgentExportConversationData, AgentExportConversationResponse, AgentListConversationMessagesData, AgentListConversationMessagesResponse, AgentDeleteConversationMessageData, AgentDeleteConversationMessageResponse, AgentTruncateConversationMessagesData, AgentTruncateConversationMessagesResponse, AgentChatData, AgentChatResponse, AgentCreateMcpServerData, AgentCreateMcpServerResponse, AgentListMcpServersData, AgentListMcpServersResponse, AgentGetMcpServerData, AgentGetMcpServerResponse, AgentUpdateMcpServerData, AgentUpdateMcpServerResponse, AgentDeleteMcpServerData, AgentDeleteMcpServerResponse, AgentConnectMcpServerData, AgentConnectMcpServerResponse, AgentListSkillsResponse, AgentGetSkillDetailData, AgentGetSkillDetailResponse, AgentDeleteSkillData, AgentDeleteSkillResponse, AgentScanSkillsResponse, AgentInstallSkillData, AgentInstallSkillResponse, KnowledgeBaseListKbsResponse, KnowledgeBaseCreateKbData, KnowledgeBaseCreateKbResponse, KnowledgeBaseListTrashResponse, KnowledgeBaseRestoreTrashedDocumentData, KnowledgeBaseRestoreTrashedDocumentResponse, KnowledgeBasePurgeTrashedDocumentData, KnowledgeBasePurgeTrashedDocumentResponse, KnowledgeBaseGetKbData, KnowledgeBaseGetKbResponse, KnowledgeBaseDeleteKbData, KnowledgeBaseDeleteKbResponse, KnowledgeBaseUploadKbDocumentData, KnowledgeBaseUploadKbDocumentResponse, KnowledgeBaseListKbDocumentsData, KnowledgeBaseListKbDocumentsResponse, KnowledgeBaseDeleteKbDocumentData, KnowledgeBaseDeleteKbDocumentResponse, KnowledgeBaseQueryKbData, KnowledgeBaseQueryKbResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginResetPasswordData, LoginResetPasswordResponse, PrivateCreateUserData, PrivateCreateUserResponse, ProvidersListProvidersResponse, ProvidersCreateProviderData, ProvidersCreateProviderResponse, ProvidersUpdateProviderData, ProvidersUpdateProviderResponse, ProvidersDeleteProviderData, ProvidersDeleteProviderResponse, SettingsReadDeploymentSettingsResponse, SettingsUpdateDeploymentSettingsData, SettingsUpdateDeploymentSettingsResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersReadMySystemPromptResponse, UsersUpdateMySystemPromptData, UsersUpdateMySystemPromptResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsHealthCheckResponse, UtilsReadPublicSettingsResponse } from './types.gen';
 
 export class AgentService {
     /**
@@ -124,6 +124,80 @@ export class AgentService {
             query: {
                 format: data.format
             },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * List Conversation Messages
+     * 获取会话消息列表（时间正序；system 消息属内部产物不下发）。
+     * @param data The data for the request.
+     * @param data.conversationId
+     * @param data.skip
+     * @param data.limit
+     * @returns MessageOut Successful Response
+     * @throws ApiError
+     */
+    public static listConversationMessages(data: AgentListConversationMessagesData): CancelablePromise<AgentListConversationMessagesResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/agent/conversations/{conversation_id}/messages',
+            path: {
+                conversation_id: data.conversationId
+            },
+            query: {
+                skip: data.skip,
+                limit: data.limit
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Delete Conversation Message
+     * 删除会话中的单条消息。
+     * @param data The data for the request.
+     * @param data.conversationId
+     * @param data.messageId
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static deleteConversationMessage(data: AgentDeleteConversationMessageData): CancelablePromise<AgentDeleteConversationMessageResponse> {
+        return __request(OpenAPI, {
+            method: 'DELETE',
+            url: '/api/v1/agent/conversations/{conversation_id}/messages/{message_id}',
+            path: {
+                conversation_id: data.conversationId,
+                message_id: data.messageId
+            },
+            errors: {
+                422: 'Validation Error'
+            }
+        });
+    }
+    
+    /**
+     * Truncate Conversation Messages
+     * 截断消息：删除锚点消息及其后的全部消息（编辑重发 / 重新生成用）。
+     * @param data The data for the request.
+     * @param data.conversationId
+     * @param data.requestBody
+     * @returns unknown Successful Response
+     * @throws ApiError
+     */
+    public static truncateConversationMessages(data: AgentTruncateConversationMessagesData): CancelablePromise<AgentTruncateConversationMessagesResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/agent/conversations/{conversation_id}/messages/truncate',
+            path: {
+                conversation_id: data.conversationId
+            },
+            body: data.requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: 'Validation Error'
             }

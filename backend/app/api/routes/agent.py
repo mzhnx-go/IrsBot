@@ -25,6 +25,8 @@ from app.core.db.sqlmodel_models import (
     MCPServerCreate,
     MCPServerResponse,
     MCPServerUpdate,
+    MessageOut,
+    MessageTruncateRequest,
 )
 from app.core.mcp.bridge import MCPToolBridge
 from app.core.mcp.client import MCPClient
@@ -203,6 +205,93 @@ def export_conversation(
         media_type=exported.media_type,
         headers={"Content-Disposition": _content_disposition(exported.filename)},
     )
+
+
+def _message_text(content: object) -> str:
+    """Message.content（JSON 多态）→ 纯文本，与 WS history 下发口径一致。"""
+    if isinstance(content, dict):
+        return content.get("text") or ""
+    return str(content) if content is not None else ""
+
+
+@router.get(
+    "/conversations/{conversation_id}/messages", response_model=list[MessageOut]
+)
+def list_conversation_messages(
+    conversation_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+    skip: int = 0,
+    limit: int = 500,
+):
+    """获取会话消息列表（时间正序；system 消息属内部产物不下发）。"""
+    conversation = crud.get_conversation(
+        session,
+        conv_id=conversation_id,
+        user_id=current_user.id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    msgs = ConversationManager(session).get_messages(
+        conversation.id, skip=skip, limit=limit
+    )
+    return [
+        MessageOut(
+            id=m.id,
+            role=m.role,
+            content=_message_text(m.content),
+            tool_calls=m.tool_calls,
+            created_at=m.created_at,
+        )
+        for m in msgs
+        if m.role != "system"
+    ]
+
+
+@router.delete("/conversations/{conversation_id}/messages/{message_id}")
+def delete_conversation_message(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """删除会话中的单条消息。"""
+    conversation = crud.get_conversation(
+        session,
+        conv_id=conversation_id,
+        user_id=current_user.id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    deleted = ConversationManager(session).delete_message(
+        conversation.id, message_id
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="消息不存在")
+    return {"message": "消息已删除"}
+
+
+@router.post("/conversations/{conversation_id}/messages/truncate")
+def truncate_conversation_messages(
+    conversation_id: uuid.UUID,
+    body: MessageTruncateRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+):
+    """截断消息：删除锚点消息及其后的全部消息（编辑重发 / 重新生成用）。"""
+    conversation = crud.get_conversation(
+        session,
+        conv_id=conversation_id,
+        user_id=current_user.id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    deleted = ConversationManager(session).truncate_messages(
+        conversation.id, body.message_id, inclusive=body.inclusive
+    )
+    if deleted < 0:
+        raise HTTPException(status_code=404, detail="消息不存在")
+    return {"deleted": deleted}
 
 
 @router.post("/conversations/{conversation_id}/chat",response_model=ChatResponse)

@@ -3,8 +3,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { ArrowUp } from "lucide-react"
 import { type FormEvent, useEffect, useRef, useState } from "react"
 import { AgentService } from "@/client"
-import MarkdownContent from "@/components/Chat/MarkdownContent"
-import { type ChatMessage, useAgentChat } from "@/hooks/useAgentChat"
+import MessageItem from "@/components/Chat/MessageItem"
+import { useAgentChat } from "@/hooks/useAgentChat"
 
 export const Route = createFileRoute("/_layout/chat")({
   // 会话 ID 走 URL search param（/chat?c=<uuid>）：
@@ -70,8 +70,15 @@ function ChatPage() {
 
 /** 内层组件：conversationId 一定有效，useAgentChat 在这里调用 */
 function ChatRoom({ conversationId }: { conversationId: string }) {
-  const { messages, isConnected, isStreaming, sendMessage } =
-    useAgentChat(conversationId)
+  const {
+    messages,
+    isConnected,
+    isStreaming,
+    sendMessage,
+    deleteMessage,
+    regenerate,
+    editAndResend,
+  } = useAgentChat(conversationId)
   const [input, setInput] = useState("")
   const queryClient = useQueryClient()
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -112,8 +119,16 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
           </div>
         ) : (
           <div className="space-y-4 py-8">
-            {messages.map((m) => (
-              <MessageBubble key={m.id} message={m} />
+            {messages.map((m, i) => (
+              <MessageItem
+                key={m.id}
+                message={m}
+                isLast={i === messages.length - 1}
+                disabled={isStreaming}
+                onDelete={deleteMessage}
+                onRegenerate={regenerate}
+                onEditResend={editAndResend}
+              />
             ))}
             <div ref={bottomRef} />
           </div>
@@ -159,38 +174,6 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
           </button>
         </div>
       </form>
-    </div>
-  )
-}
-
-/** 消息气泡：用户靠右、AI 靠左 */
-function MessageBubble({ message }: { message: ChatMessage }) {
-  const isUser = message.role === "user"
-
-  return (
-    <div className={isUser ? "flex justify-end" : "flex justify-start"}>
-      <div
-        className={
-          isUser
-            ? "max-w-[80%] rounded-2xl rounded-br-sm bg-[var(--chat-accent)] px-4 py-2.5 text-sm leading-6 text-white"
-            : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-foreground"
-        }
-      >
-        {/* 工具调用状态行（AI 消息且有工具调用时显示） */}
-        {message.toolCalls?.map((tc, i) => (
-          <p key={i} className="mb-1 text-xs text-muted-foreground">
-            [{tc.phase === "start" ? "调用" : "完成"}] {tc.name}
-          </p>
-        ))}
-        {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
-        ) : (
-          <MarkdownContent
-            content={message.content}
-            streaming={message.streaming}
-          />
-        )}
-      </div>
     </div>
   )
 }

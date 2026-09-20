@@ -664,6 +664,74 @@ export const MessageSchema = {
     title: 'Message'
 } as const;
 
+export const MessageOutSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        role: {
+            type: 'string',
+            title: 'Role'
+        },
+        content: {
+            type: 'string',
+            title: 'Content'
+        },
+        tool_calls: {
+            anyOf: [
+                {
+                    items: {
+                        additionalProperties: true,
+                        type: 'object'
+                    },
+                    type: 'array'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Tool Calls'
+        },
+        created_at: {
+            anyOf: [
+                {
+                    type: 'string',
+                    format: 'date-time'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Created At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'role', 'content'],
+    title: 'MessageOut',
+    description: '会话消息响应（配置台消息列表用）'
+} as const;
+
+export const MessageTruncateRequestSchema = {
+    properties: {
+        message_id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Message Id'
+        },
+        inclusive: {
+            type: 'boolean',
+            title: 'Inclusive',
+            default: true
+        }
+    },
+    type: 'object',
+    required: ['message_id'],
+    title: 'MessageTruncateRequest',
+    description: '截断消息请求：删除指定消息及其后所有消息（inclusive=False 时保留该条）'
+} as const;
+
 export const NewPasswordSchema = {
     properties: {
         token: {

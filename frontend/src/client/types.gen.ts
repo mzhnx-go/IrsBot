@@ -200,6 +200,27 @@ export type Message = {
     message: string;
 };
 
+/**
+ * 会话消息响应（配置台消息列表用）
+ */
+export type MessageOut = {
+    id: string;
+    role: string;
+    content: string;
+    tool_calls?: (Array<{
+    [key: string]: unknown;
+}> | null);
+    created_at?: (string | null);
+};
+
+/**
+ * 截断消息请求：删除指定消息及其后所有消息（inclusive=False 时保留该条）
+ */
+export type MessageTruncateRequest = {
+    message_id: string;
+    inclusive?: boolean;
+};
+
 export type NewPassword = {
     token: string;
     new_password: string;
@@ -391,6 +412,28 @@ export type AgentExportConversationData = {
 };
 
 export type AgentExportConversationResponse = (unknown);
+
+export type AgentListConversationMessagesData = {
+    conversationId: string;
+    limit?: number;
+    skip?: number;
+};
+
+export type AgentListConversationMessagesResponse = (Array<MessageOut>);
+
+export type AgentDeleteConversationMessageData = {
+    conversationId: string;
+    messageId: string;
+};
+
+export type AgentDeleteConversationMessageResponse = (unknown);
+
+export type AgentTruncateConversationMessagesData = {
+    conversationId: string;
+    requestBody: MessageTruncateRequest;
+};
+
+export type AgentTruncateConversationMessagesResponse = (unknown);
 
 export type AgentChatData = {
     conversationId: string;
