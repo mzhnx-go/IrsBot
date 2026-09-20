@@ -1,20 +1,7 @@
 import { expect, type Page } from "@playwright/test"
 
-export async function signUpNewUser(
-  page: Page,
-  name: string,
-  email: string,
-  password: string,
-) {
-  await page.goto("/signup")
-
-  await page.getByTestId("full-name-input").fill(name)
-  await page.getByTestId("email-input").fill(email)
-  await page.getByTestId("password-input").fill(password)
-  await page.getByTestId("confirm-password-input").fill(password)
-  await page.getByRole("button", { name: "注册" }).click()
-  await page.goto("/login")
-}
+// ⚠️ signUpNewUser 辅助已删除：注册默认关闭（单用户模式），
+//    测试建统一律走 privateApi.createUser，不再经由注册页。
 
 export async function logInUser(page: Page, email: string, password: string) {
   await page.goto("/login")

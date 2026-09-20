@@ -29,11 +29,8 @@ test("Log In button is visible", async ({ page }) => {
   await expect(page.getByRole("button", { name: "登录" })).toBeVisible()
 })
 
-test("Forgot Password link is visible", async ({ page }) => {
-  await page.goto("/login")
-
-  await expect(page.getByRole("link", { name: "忘记密码？" })).toBeVisible()
-})
+// ⚠️ 「忘记密码」链接的用例已删除：本部署邮件功能关闭（SMTP_HOST 为空），
+//    密码找回整条链路不可用，登录页也没有该入口（见 reset-password 处置）。
 
 test("Log in with valid email and password ", async ({ page }) => {
   await page.goto("/login")

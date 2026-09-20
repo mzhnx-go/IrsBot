@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test"
 
+import { firstSuperuser, firstSuperuserPassword } from "./config.ts"
 import { randomEmail, randomPassword } from "./utils/random"
 
 test.use({ storageState: { cookies: [], origins: [] } })
@@ -70,24 +71,65 @@ test("Sign up with invalid email", async ({ page }) => {
   await expect(page.getByText("Invalid email address")).toBeVisible()
 })
 
-test("Sign up with existing email", async ({ page }) => {
-  const fullName = "Test User"
-  const email = randomEmail()
-  const password = randomPassword()
+// 默认部署是单用户模式（注册关闭）。本用例验证**开放注册下**的重复邮箱报错，
+// 所以在 describe 级别临时打开、afterAll 恢复原值 —— 即使用例中途超时，
+// 恢复也一定执行（此前放在用例体内 + finally，超时后 context 已关闭导致恢复失败）。
+test.describe("开放注册场景", () => {
+  let authHeaders: Record<string, string>
+  let original: boolean
 
-  await page.goto("/signup")
+  test.beforeAll(async ({ request }) => {
+    const login = await request.post("/api/v1/login/access-token", {
+      form: { username: firstSuperuser, password: firstSuperuserPassword },
+    })
+    expect(login.ok()).toBeTruthy()
+    const token = (await login.json()).access_token as string
+    authHeaders = { Authorization: `Bearer ${token}` }
 
-  await fillForm(page, fullName, email, password, password)
-  await page.getByRole("button", { name: "注册" }).click()
+    const before = await request.get("/api/v1/settings/deployment", {
+      headers: authHeaders,
+    })
+    original = (await before.json()).open_registration as boolean
 
-  await page.goto("/signup")
+    await request.patch("/api/v1/settings/deployment", {
+      headers: authHeaders,
+      data: { open_registration: true },
+    })
+  })
 
-  await fillForm(page, fullName, email, password, password)
-  await page.getByRole("button", { name: "注册" }).click()
+  test.afterAll(async ({ request }) => {
+    if (!original) {
+      const login = await request.post("/api/v1/login/access-token", {
+        form: { username: firstSuperuser, password: firstSuperuserPassword },
+      })
+      const token = (await login.json()).access_token as string
+      await request.patch("/api/v1/settings/deployment", {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { open_registration: false },
+      })
+    }
+  })
 
-  await page
-    .getByText("The user with this email already exists in the system")
-    .click()
+  test("Sign up with existing email", async ({ page }) => {
+    test.setTimeout(60000)
+    const fullName = "Test User"
+    const email = randomEmail()
+    const password = randomPassword()
+
+    await page.goto("/signup")
+    await fillForm(page, fullName, email, password, password)
+    await page.getByRole("button", { name: "注册" }).click()
+    // 注册成功不自动登录：跳转 /login 让用户手动登录
+    await page.waitForURL("/login")
+
+    await page.goto("/signup")
+    await fillForm(page, fullName, email, password, password)
+    await page.getByRole("button", { name: "注册" }).click()
+
+    await expect(
+      page.getByText("The user with this email already exists in the system"),
+    ).toBeVisible()
+  })
 })
 
 test("Sign up with weak password", async ({ page }) => {
