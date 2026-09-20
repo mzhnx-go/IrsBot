@@ -3,6 +3,7 @@ import {
   Library,
   MessageSquare,
   PanelLeftClose,
+  Plug,
   Settings,
   Sparkles,
   Users,
@@ -29,6 +30,7 @@ const baseItems: Item[] = [
   { icon: MessageSquare, title: "聊天", path: "/chat" },
   { icon: Library, title: "知识库", path: "/knowledge-base" },
   { icon: Sparkles, title: "模型源", path: "/providers" },
+  { icon: Plug, title: "MCP 服务", path: "/mcp" },
   { icon: Settings, title: "设置", path: "/settings" },
 ]
 
