@@ -1,4 +1,5 @@
 # ── 标准库 ──
+import logging
 import shutil
 import uuid
 from datetime import datetime, timedelta
@@ -19,6 +20,8 @@ from app.core.knowledge_base.manager import KBManager, invalidate_kb_cache
 from app.core.knowledge_base.vec_store import VectorStore
 
 router = APIRouter(prefix="/kb", tags=["knowledge-base"])
+
+logger = logging.getLogger(__name__)
 
 UPLOAD_ROOT = Path(settings.KB_FILE_STORAGE_DIR)  # 上传文件落盘目录（按环境隔离）
 
@@ -283,8 +286,10 @@ async def upload_kb_document(
         # 展示层从此看不到 UUID
         record = await mgr.upload_document(kb_id=kb_id, file_path=str(dest), filename=safe_name, user_id=current_user.id)
     except Exception as e:
+        logger.exception("文档处理失败：kb=%s file=%s", kb.name, safe_name)
         raise HTTPException(status_code=500, detail=f"文档处理失败: {e}")
 
+    logger.info("文档上传完成：kb=%s file=%s chunks=%s", kb.name, safe_name, record.chunks_count)
     return record
 
 @router.get("/{kb_id}/documents", response_model=list[DocumentOut])
@@ -327,6 +332,7 @@ def delete_kb_document(
     doc.deleted_at = get_datetime_utc()
     session.add(doc)
     session.commit()
+    logger.info("文档移入回收站：kb=%s file=%s", kb.name, doc.filename)
     return {"message": "文档已移入回收站"}
 
 # ── 检索 ──

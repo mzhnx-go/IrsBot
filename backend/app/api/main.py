@@ -6,6 +6,7 @@ from app.api.routes import (
     attachments,
     knowledge_base,
     login,
+    logs,
     private,
     providers,
     settings as settings_routes,
@@ -24,6 +25,7 @@ api_router.include_router(knowledge_base.router)
 api_router.include_router(agent_ws.router)
 api_router.include_router(providers.router)
 api_router.include_router(settings_routes.router)
+api_router.include_router(logs.router)
 
 if settings.ENVIRONMENT == "local":
     api_router.include_router(private.router)

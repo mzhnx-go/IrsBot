@@ -1,4 +1,5 @@
 from datetime import timedelta
+import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,6 +20,8 @@ from app.core.utils.tokens import verify_password_reset_token
 
 router = APIRouter(tags=["login"])
 
+logger = logging.getLogger(__name__)
+
 
 @router.post("/login/access-token")
 def login_access_token(
@@ -31,9 +34,12 @@ def login_access_token(
         session=session, email=form_data.username, password=form_data.password
     )
     if not user:
+        logger.warning("登录失败（凭据错误）：email=%s", form_data.username)
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     elif not user.is_active:
+        logger.warning("登录拒绝（账号已停用）：email=%s", form_data.username)
         raise HTTPException(status_code=400, detail="Inactive user")
+    logger.info("登录成功：%s", user.email)
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return Token(
         access_token=security.create_access_token(
