@@ -24,30 +24,49 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import useAuth from "@/hooks/useAuth"
-import { type Item, Main } from "./Main"
+import { type ItemGroup, Main } from "./Main"
 import { User } from "./User"
 
-// ⚠️ 原 `{ icon: Briefcase, title: "Items", path: "/items" }` 已随 D1.4 删除
-//    （模板残留的示例待办功能，IrsBot 不使用）。
-const baseItems: Item[] = [
-  { icon: Home, title: "Dashboard", path: "/" },
-  { icon: MessageSquare, title: "聊天", path: "/chat" },
-  { icon: Library, title: "知识库", path: "/knowledge-base" },
-  { icon: Sparkles, title: "模型源", path: "/providers" },
-  { icon: Plug, title: "MCP 服务", path: "/mcp" },
-  { icon: BookOpen, title: "技能", path: "/skills" },
-  { icon: Drama, title: "人设", path: "/personas" },
-  { icon: MessagesSquare, title: "会话管理", path: "/conversations" },
-  { icon: BarChart3, title: "统计", path: "/stats" },
-  { icon: Settings, title: "设置", path: "/settings" },
+// 信息架构重组（Phase 15.3a）：按「工作台 / 资源 / 系统」三段分组，
+// 使用频率高的对话类入口放最上，资源管理居中，低频的系统配置垫底。
+const navGroups: ItemGroup[] = [
+  {
+    label: "工作台",
+    items: [
+      { icon: Home, title: "Dashboard", path: "/" },
+      { icon: MessageSquare, title: "聊天", path: "/chat" },
+      { icon: MessagesSquare, title: "会话管理", path: "/conversations" },
+    ],
+  },
+  {
+    label: "资源",
+    items: [
+      { icon: Library, title: "知识库", path: "/knowledge-base" },
+      { icon: Plug, title: "MCP 服务", path: "/mcp" },
+      { icon: BookOpen, title: "技能", path: "/skills" },
+      { icon: Drama, title: "人设", path: "/personas" },
+    ],
+  },
+  {
+    label: "系统",
+    items: [
+      { icon: Sparkles, title: "模型源", path: "/providers" },
+      { icon: BarChart3, title: "统计", path: "/stats" },
+      { icon: Settings, title: "设置", path: "/settings" },
+      { icon: Users, title: "Admin", path: "/admin", superuserOnly: true },
+    ],
+  },
 ]
 
 export function AppSidebar() {
   const { user: currentUser } = useAuth()
 
-  const items = currentUser?.is_superuser
-    ? [...baseItems, { icon: Users, title: "Admin", path: "/admin" }]
-    : baseItems
+  const groups: ItemGroup[] = navGroups.map((group) => ({
+    ...group,
+    items: group.items.filter(
+      (item) => !item.superuserOnly || Boolean(currentUser?.is_superuser),
+    ),
+  }))
 
   return (
     <Sidebar collapsible="icon">
@@ -59,7 +78,7 @@ export function AppSidebar() {
         </SidebarTrigger>
       </SidebarHeader>
       <SidebarContent>
-        <Main items={items} />
+        <Main groups={groups} />
         {/* 历史对话（Phase 15.1）：仅在有会话数据的聊天场景展示 */}
         <ConversationList />
       </SidebarContent>
