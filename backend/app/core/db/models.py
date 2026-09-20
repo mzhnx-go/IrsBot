@@ -90,6 +90,42 @@ class ProviderConfig(SQLModel, table=True):
     # 用户自带 base_url + 自填模型名是常态，固定能力表覆盖不到，故留可纠正的开关。
     supports_vision: bool | None = Field(default=None)
     config: dict = Field(default_factory=dict, sa_type=JSON)
+
+    # ── 高级配置（存于 config JSON，免建列；前端「高级配置…」区读写）──
+    # 用 property 而非列：FastAPI 的 ProviderOut 序列化时经 getattr 取值，
+    # 语义上仍是 ProviderConfig 的一等字段。
+    @property
+    def timeout_seconds(self) -> int:
+        """对上游 API 的请求超时（秒）。"""
+        return int(self.config.get("timeout_seconds") or 120)
+
+    @property
+    def proxy_url(self) -> str | None:
+        """HTTP/HTTPS 代理地址，仅对该提供商的出站请求生效。"""
+        return self.config.get("proxy_url") or None
+
+    @property
+    def extra_headers(self) -> dict[str, str]:
+        """合并进该提供商 HTTP 请求头的自定义键值对。"""
+        headers = self.config.get("extra_headers")
+        return headers if isinstance(headers, dict) else {}
+
+    def apply_advanced_config(
+        self,
+        *,
+        timeout_seconds: int | None = None,
+        proxy_url: str | None = None,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
+        """把高级配置合并进 config JSON（None 表示不修改该项）。"""
+        new_config = dict(self.config or {})
+        if timeout_seconds is not None:
+            new_config["timeout_seconds"] = timeout_seconds
+        if proxy_url is not None:
+            new_config["proxy_url"] = proxy_url or ""  # 空串 = 清除
+        if extra_headers is not None:
+            new_config["extra_headers"] = extra_headers
+        self.config = new_config
     is_active: bool = True
     is_default: bool = False
     fallback_order: int = 999

@@ -9,7 +9,7 @@ import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlmodel import select
 
 from app.api.deps import SessionDep, get_current_user
@@ -37,12 +37,20 @@ class ProviderCreate(BaseModel):
 
 class ProviderUpdate(BaseModel):
     """更新请求体：所有字段可选"""
+
     name: str | None = None
     api_key: str | None = None
     model_name: str | None = None
     base_url: str | None = None
     is_default: bool | None = None
     supports_vision: bool | None = None
+    # ── 高级配置（存 config JSON）──
+    # 超时：5–600 秒，越界由 pydantic 直接 422
+    timeout_seconds: int | None = Field(default=None, ge=5, le=600)
+    # 代理：路由层校验协议前缀；空串 = 清除
+    proxy_url: str | None = None
+    # 自定义请求头：pydantic dict[str, str] 保证值必须是字符串（非 str 直接 422）
+    extra_headers: dict[str, str] | None = None
 
 class ProviderOut(BaseModel):
     """响应体: 绝不返回明文 api_key"""
@@ -54,6 +62,10 @@ class ProviderOut(BaseModel):
     is_default: bool
     is_active: bool
     supports_vision: bool | None = None
+    # 高级配置：从 ProviderConfig 的同名 property 读取（存于 config JSON）
+    timeout_seconds: int = 120
+    proxy_url: str | None = None
+    extra_headers: dict[str, str] = {}
 
 
 
@@ -110,7 +122,11 @@ async def get_provider_balance(
         raise HTTPException(status_code=404, detail="Provider not found")
 
     result = await query_balance(
-        base_url=pc.base_url, api_key=decrypt_api_key(pc.api_key)
+        base_url=pc.base_url,
+        api_key=decrypt_api_key(pc.api_key),
+        timeout_seconds=pc.timeout_seconds,
+        proxy_url=pc.proxy_url,
+        extra_headers=pc.extra_headers or None,
     )
     if result.supported:
         logger.info(
@@ -145,11 +161,30 @@ def update_provider(
         raise HTTPException(status_code=404, detail="Provider not found")
     if body.is_default:
         mgr.clear_other_defaults(user_id=current_user.id, keep_id=provider_id)
-    fields = body.model_dump(exclude_none=True)
+    fields = body.model_dump(exclude_none=True, exclude={"timeout_seconds", "proxy_url", "extra_headers"})
     # supports_vision 是唯一「None 本身有意义」的字段（None=自动），
     # exclude_none 会把「改回自动」的请求吃掉，故显式按是否传过来判断。
     if "supports_vision" in body.model_fields_set:
         fields["supports_vision"] = body.supports_vision
+
+    # ── 高级配置：校验后合并进 config JSON（与普通字段同事务落库）──
+    if body.proxy_url is not None:
+        proxy = body.proxy_url.strip()
+        if proxy and not proxy.startswith(("http://", "https://")):
+            raise HTTPException(
+                status_code=400,
+                detail="代理地址必须以 http:// 或 https:// 开头",
+            )
+        pc.apply_advanced_config(
+            proxy_url=proxy,  # 空串 = 清除
+            timeout_seconds=body.timeout_seconds,
+            extra_headers=body.extra_headers,
+        )
+    elif body.timeout_seconds is not None or body.extra_headers is not None:
+        pc.apply_advanced_config(
+            timeout_seconds=body.timeout_seconds,
+            extra_headers=body.extra_headers,
+        )
     return mgr.update_provider(provider_id, **fields)
 
 

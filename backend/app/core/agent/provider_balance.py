@@ -241,17 +241,34 @@ def _unsupported_reason(base_url: str | None) -> str:
 
 
 async def query_balance(
-    *, base_url: str | None, api_key: str
+    *,
+    base_url: str | None,
+    api_key: str,
+    timeout_seconds: int | None = None,
+    proxy_url: str | None = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> ProviderBalanceOut:
-    """查询余额。返回归一化结果；不支持的服务商返回 supported=False + 原因。"""
+    """查询余额。返回归一化结果；不支持的服务商返回 supported=False + 原因。
+
+    超时 / 代理 / 自定义请求头来自该供应商的高级配置（ProviderConfig.config），
+    未配置时用模块默认超时、直连、无附加头。
+    """
     vendor = detect_vendor(base_url)
     if vendor is None:
         return ProviderBalanceOut(supported=False, detail=_unsupported_reason(base_url))
 
     provider, adapter = vendor
     root = _root_url(base_url or "")
+    client_kwargs: dict = {
+        "timeout": timeout_seconds or _TIMEOUT,
+        "follow_redirects": True,
+    }
+    if proxy_url:
+        client_kwargs["proxy"] = proxy_url
+    if extra_headers:
+        client_kwargs["headers"] = extra_headers
     try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
+        async with httpx.AsyncClient(**client_kwargs) as client:
             return await adapter(client, root, api_key)
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code

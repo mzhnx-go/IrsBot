@@ -7,14 +7,18 @@
    并支持缓存、回退切换和热更新。
 """
 
+import logging
 import uuid
 from collections import OrderedDict
 from typing import Any
 
+import httpx
 from sqlmodel import Session, col, select
 
 from app.core.db.models import ProviderConfig
 from app.utils.crypto import decrypt_api_key, encrypt_api_key
+
+logger = logging.getLogger(__name__)
 
 # ── 模型来源定义（原 sources.py 内容）─────────────────────────
 
@@ -292,18 +296,26 @@ class ProviderManager:
         """
         from langchain.chat_models import init_chat_model
 
-        # ⚠️ cache key 必须含 user_id：否则不同用户用同一 provider_id=None 时
-        #    会命中同一缓存条目，拿到别人的模型实例。
-        cache_key = f"{user_id}:{provider_id}:{model_name}:{temperature}"
-        hit = self._chat_cache.get_hit(cache_key)
-        if hit is not None:
-            return hit
-
+        # pc 先读再算缓存键：高级配置（config JSON）参与签名，改配置即换实例。
+        # 代价是每次调用一次主键 SELECT（对比 LLM 请求耗时可忽略）。
         pc = self.get_active_config(user_id=user_id, provider_id=provider_id)
         if pc is None:
             raise RuntimeError(
                 "No active provider configured. Create a ProviderConfig first."
             )
+
+        advanced_sig = (
+            f"{pc.timeout_seconds}|{pc.proxy_url or ''}|"
+            f"{sorted((pc.extra_headers or {}).items())}"
+        )
+        # ⚠️ cache key 必须含 user_id：否则不同用户用同一 provider_id=None 时
+        #    会命中同一缓存条目，拿到别人的模型实例。
+        cache_key = (
+            f"{user_id}:{provider_id}:{model_name}:{temperature}:{advanced_sig}"
+        )
+        hit = self._chat_cache.get_hit(cache_key)
+        if hit is not None:
+            return hit
 
         kwargs: dict[str, Any] = {
             "model": model_name or pc.model_name,
@@ -313,10 +325,33 @@ class ProviderManager:
         if pc.base_url:
             kwargs["base_url"] = pc.base_url
 
+        # ── 高级配置（config JSON）：超时 / 代理 / 自定义请求头 ──
+        # openai / anthropic 客户端原生支持；gemini 走 google_genai 的
+        # 传输层，暂不接线（如实记录，不静默）。
+        timeout_seconds = pc.timeout_seconds
+        extra_headers = pc.extra_headers or None
+        proxy_url = pc.proxy_url
+
         # 模型名作为位置参数传入，避免与 kwargs["model"] 冲突
         model_name_arg = kwargs.pop("model", pc.model_name)
 
         provider_type = pc.provider_type.lower()
+        if provider_type in ("openai", "anthropic"):
+            if extra_headers:
+                kwargs["default_headers"] = extra_headers
+            if provider_type == "openai":
+                kwargs["timeout"] = timeout_seconds
+            else:
+                kwargs["default_request_timeout"] = timeout_seconds
+            if proxy_url:
+                kwargs["http_client"] = httpx.Client(
+                    proxy=proxy_url, timeout=timeout_seconds
+                )
+        elif provider_type != "gemini":
+            logger.info(
+                "高级配置对类型 %s 暂未生效（仅 openai/anthropic 支持）",
+                provider_type,
+            )
         if provider_type == "openai":
             model = init_chat_model(model_name_arg, model_provider="openai", **kwargs)
         elif provider_type == "anthropic":
