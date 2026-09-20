@@ -23,8 +23,6 @@ from app.core.config import settings
 CONV_BASE = f"{settings.API_V1_STR}/agent/conversations"
 ATT_BASE = f"{settings.API_V1_STR}/agent/attachments"
 
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
-
 
 @pytest.fixture(autouse=True)
 def attach_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
@@ -32,7 +30,7 @@ def attach_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Pat
     yield tmp_path
 
 
-async def fake_stream(_content, _history=None):
+async def fake_stream(_content, _history=None, _attachments=None):
     yield {
         "event": "on_chat_model_stream",
         "data": {"chunk": SimpleNamespace(content="收到")},
@@ -40,10 +38,11 @@ async def fake_stream(_content, _history=None):
 
 
 def _capturing_stream(sink: list):
-    """把喂给模型的 content 记下来，验证文档正文确实进了本轮上下文。"""
+    """把 (content, history, attachments) 记下来，验证路由确实把附件元数据
+    交给了 Agent（正文拼装属 Agent/attachments 层，在那边单测覆盖）。"""
 
-    async def _stream(content, _history=None):
-        sink.append(content)
+    async def _stream(content, history=None, attachments=None):
+        sink.append((content, history, attachments))
         yield {
             "event": "on_chat_model_stream",
             "data": {"chunk": SimpleNamespace(content="收到")},
@@ -243,8 +242,10 @@ def test_document_text_not_replayed_into_context(
     assert "机密正文" not in joined
 
 
-def test_document_text_reaches_model(client, superuser_token_headers, db: Session):
-    """文档正文随本轮消息送模型，且**不落库**（库内仍是用户原话）"""
+def test_turn_forwards_attachment_metadata_to_agent(
+    client, superuser_token_headers, db: Session
+):
+    """路由把附件元数据交给 Agent；库内仍是用户原话，不含解析产物"""
     conv_id = _create_conversation(client, superuser_token_headers, "进上下文")
     uploaded = _upload(
         client,
@@ -270,11 +271,12 @@ def test_document_text_reaches_model(client, superuser_token_headers, db: Sessio
             ws.receive_json()
 
     assert len(seen) == 1
-    model_content = seen[0]
-    # 用户原话在前，文档正文在后，二者都要在
-    assert "这份文档讲了什么" in model_content
-    assert "本年度净利润为 12345 万元" in model_content
-    assert "年报.txt" in model_content
+    content, _history, atts = seen[0]
+    assert content == "这份文档讲了什么"
+    assert atts is not None and len(atts) == 1
+    assert atts[0]["id"] == uploaded["id"]
+    assert atts[0]["kind"] == "document"
+    assert atts[0]["filename"] == "年报.txt"
 
     # 库里只存原话 + 元数据，正文不进消息表
     import uuid
@@ -285,8 +287,8 @@ def test_document_text_reaches_model(client, superuser_token_headers, db: Sessio
     assert "本年度净利润" not in str(user_row.content)
 
 
-def test_attachment_only_message_still_reaches_model(client, superuser_token_headers):
-    """只发文档不打字：不再被 PreProcess 拦下，模型仍拿到文档正文"""
+def test_attachment_only_message_reaches_agent(client, superuser_token_headers):
+    """只发文档不打字：不再被 PreProcess 拦下，Agent 仍被调用"""
     conv_id = _create_conversation(client, superuser_token_headers, "只发附件")
     uploaded = _upload(
         client, superuser_token_headers, conv_id, "片段.txt", "关键结论：可行".encode()
@@ -302,25 +304,24 @@ def test_attachment_only_message_still_reaches_model(client, superuser_token_hea
             assert ws.receive_json()["type"] == "done"
 
     assert len(seen) == 1
-    assert "关键结论：可行" in seen[0]
+    _content, _history, atts = seen[0]
+    assert atts is not None and atts[0]["filename"] == "片段.txt"
 
 
-def test_image_only_message_does_not_fabricate_user_words(
-    client, superuser_token_headers
-):
-    """只有图片时：不能把附件当用户话编造，给模型一句如实的说明"""
-    conv_id = _create_conversation(client, superuser_token_headers, "只发图片")
-    uploaded = _upload(client, superuser_token_headers, conv_id, "图.png", PNG_BYTES)
+def test_no_attachment_turn_passes_none(client, superuser_token_headers):
+    """不带附件的普通消息：attachments 传空列表，行为与旧版一致"""
+    conv_id = _create_conversation(client, superuser_token_headers, "纯文本")
 
     seen: list = []
     with patch("app.api.routes.agent_ws.Agent") as mock_agent:
         mock_agent.return_value.stream = _capturing_stream(seen)
         with client.websocket_connect(_ws_url(conv_id, superuser_token_headers)) as ws:
             ws.receive_json()
-            ws.send_json({"type": "message", "attachments": [{"id": uploaded["id"]}]})
+            ws.send_json({"type": "message", "content": "你好"})
             ws.receive_json()
             ws.receive_json()
 
     assert len(seen) == 1
-    assert "图.png" not in seen[0]
-    assert seen[0].strip() != ""
+    content, _history, atts = seen[0]
+    assert content == "你好"
+    assert atts == []

@@ -12,6 +12,7 @@
   但要如实回报 `truncated=True`，让前端能提示用户。
 """
 
+import base64
 import logging
 import re
 import shutil
@@ -233,6 +234,74 @@ async def build_document_context(
         suffix = "\n（内容过长已截断）" if truncated else ""
         blocks.append(f"【附件：{filename}】\n{text}{suffix}")
     return "\n\n".join(blocks)
+
+
+def _image_data_url(
+    item: dict, *, user_id: uuid.UUID | str, conversation_id: uuid.UUID | str
+) -> str | None:
+    """把一张图片附件读成 `data:<mime>;base64,<...>`，读不到返回 None。
+
+    MIME 由**字节魔数**推定（不从客户端声明或扩展名取），与上传时的校验同源。
+    """
+    att_id = str(item.get("id") or "")
+    path = resolve(user_id=user_id, conversation_id=conversation_id, att_id=att_id)
+    if path is None:
+        return None
+    try:
+        data = read_bytes(path)
+    except OSError:
+        logger.exception("图片附件读取失败: %s", item.get("filename"))
+        return None
+    mime = sniff_image_mime(data) or "application/octet-stream"
+    return f"data:{mime};base64,{base64.b64encode(data).decode()}"
+
+
+async def build_turn_content(
+    text: str,
+    meta: list[dict],
+    *,
+    user_id: uuid.UUID | str,
+    conversation_id: uuid.UUID | str,
+    supports_vision: bool,
+) -> str | list[dict]:
+    """把「本轮用户文本 + 附件」拼成送模型的 message content。
+
+    - 文档：解析成文本块拼在后面（与模型是否支持视觉无关）
+    - 图片：模型支持视觉 → 内联成 image_url 多模态块；不支持 → 以文字说明
+      「有图但看不了」（本地 OCR 回退在后续阶段接入此处）
+    - 附件正文**不进历史**，只本轮有效（见 build_document_context）
+
+    Returns:
+        str（纯文本场景）或 LangChain 多模态 content 列表。
+    """
+    parts: list[str] = [text] if text else []
+    doc_context = await build_document_context(
+        meta, user_id=user_id, conversation_id=conversation_id
+    )
+    if doc_context:
+        parts.append(doc_context)
+
+    images = [m for m in meta if m.get("kind") == KIND_IMAGE]
+    if not images:
+        return "\n\n".join(parts)
+
+    if supports_vision:
+        blocks: list[dict] = [
+            {"type": "text", "text": "\n\n".join(parts) or "（用户只发送了图片）"}
+        ]
+        for item in images:
+            url = _image_data_url(
+                item, user_id=user_id, conversation_id=conversation_id
+            )
+            if url is None:
+                continue
+            blocks.append({"type": "image_url", "image_url": {"url": url}})
+        # 图片一张都没读出来：退回纯文本，别发一个只有文本块的「多模态」
+        return blocks if len(blocks) > 1 else blocks[0]["text"]
+
+    names = "、".join(str(m.get("filename") or "图片") for m in images)
+    parts.append(f"（用户随消息发送了图片：{names}；当前模型不支持图片理解，无法查看图片内容）")
+    return "\n\n".join(parts)
 
 
 def remove_conversation_dir(

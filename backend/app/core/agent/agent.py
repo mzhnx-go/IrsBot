@@ -14,10 +14,11 @@ from sqlalchemy.orm import Session
 # 触发 builtin 工具的注册（注册是导入 app.core.agent.builtins 的副作用；
 # shell/file 工具默认注册但被权限开关过滤，见下方 __init__）。
 import app.core.agent.builtins  # noqa: F401
+from app.core.agent.attachments import build_turn_content
 from app.core.agent.builtins.kb_query import set_kb_user
 from app.core.agent.graph import create_compiled_agent_graph
 from app.core.agent.prompts import apply_persona, resolve_system_prompt
-from app.core.agent.provider import ProviderManager
+from app.core.agent.provider import ProviderManager, resolve_supports_vision
 from app.core.agent.state import AgentState
 from app.core.agent.tools import ToolRegistry
 from app.core.config import settings
@@ -125,6 +126,14 @@ class Agent:
             model_name=model_name,
             temperature=temperature,
         )
+        # 视觉能力判定（显式标记优先，模型名启发式兜底）：决定图片附件是
+        # 内联成多模态块，还是退回文字说明/OCR。与上面选源同一套租户过滤。
+        self.supports_vision = resolve_supports_vision(
+            provider_mgr.get_active_config(
+                user_id=user_uuid, provider_id=provider_id
+            ),
+            model_name=model_name,
+        )
 
         # 获取注册的工具并按**工具权限开关**过滤（D6 / Phase 15.2f）：
         # 注册表始终收录全部内置工具，可用性每次构建时从运行时配置判定
@@ -198,7 +207,10 @@ class Agent:
         return result
 
     async def stream(
-        self, user_message: str, history: list | None = None
+        self,
+        user_message: str,
+        history: list | None = None,
+        attachments: list[dict] | None = None,
     ) -> AsyncGenerator:
         """运行 Agent（流式）
 
@@ -207,6 +219,8 @@ class Agent:
         Args:
             user_message: 用户输入的消息文本
             history: 历史消息列表（可选）
+            attachments: 本轮附件元数据（可选）。文档解析成文本块拼进正文；
+                图片在视觉模型下内联为多模态块，否则退回文字说明。
 
         Yields:
             LangGraph 的 astream_events 事件字典
@@ -214,12 +228,23 @@ class Agent:
         # 把当前用户身份挂到任务上下文，供 kb_query 等工具在任意深度读取
         set_kb_user(self.user_uuid)
 
+        # 正文 + 附件拼成最终 content（附件只本轮有效，见 attachments 模块）
+        content: str | list = user_message
+        if attachments:
+            content = await build_turn_content(
+                user_message,
+                attachments,
+                user_id=self.user_id,
+                conversation_id=self.conversation_id,
+                supports_vision=self.supports_vision,
+            )
+
         # 组装消息列表：系统提示词（最前）+ 历史消息 + 新用户消息
         messages: list = [
             SystemMessage(content=resolve_system_prompt(self.system_prompt))
         ]
         messages.extend(history or [])
-        messages.append(HumanMessage(content=user_message))
+        messages.append(HumanMessage(content=content))
 
         initial_state = self._build_initial_state(messages)
 

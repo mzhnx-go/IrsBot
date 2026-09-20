@@ -51,6 +51,7 @@ class ProviderConfig(SQLModel, table=True):
         api_key: API 密钥。
         base_url: 自定义 API 地址（兼容 OpenAI 协议的中转站等）。
         model_name: 默认使用的模型名。
+        supports_vision: 视觉能力三态（None=自动/True/False）。
         config: 额外扩展配置（JSON）。
         is_active: 是否启用。
         is_default: 是否为该用户的默认配置。
@@ -85,6 +86,9 @@ class ProviderConfig(SQLModel, table=True):
     api_key: str = Field(sa_type=Text)  # 加密存储
     base_url: str | None = Field(default=None, sa_type=String(500), max_length=500)
     model_name: str = Field(sa_type=String(100), max_length=100)
+    # 视觉能力三态：None=自动（按模型名启发式判断），True/False=用户显式声明。
+    # 用户自带 base_url + 自填模型名是常态，固定能力表覆盖不到，故留可纠正的开关。
+    supports_vision: bool | None = Field(default=None)
     config: dict = Field(default_factory=dict, sa_type=JSON)
     is_active: bool = True
     is_default: bool = False

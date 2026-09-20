@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 
-async def fake_slow_stream(content, history=None):
+async def fake_slow_stream(content, history=None, attachments=None):
     """吐一个文字块后卡在长睡眠里，等着被 interrupt 取消。
 
     总时长有上限（600 × 50ms = 30s），即使取消逻辑失效测试也会结束，
@@ -25,7 +25,7 @@ async def fake_slow_stream(content, history=None):
         await asyncio.sleep(0.05)
 
 
-async def fake_stream(content, history=None):
+async def fake_stream(content, history=None, attachments=None):
     """模拟 agent.stream：按编排吐出原始 LangGraph 事件
 
     与真实 Agent.stream(user_message, history) 签名一致，
@@ -39,7 +39,7 @@ async def fake_stream(content, history=None):
     yield {"event": "on_chain_start", "data": {}}
 
 
-async def fake_stream_with_tool(content, history=None):
+async def fake_stream_with_tool(content, history=None, attachments=None):
     """模拟带工具调用的流：start 带 dict 入参，end 带 ToolMessage 式输出。"""
     yield {
         "event": "on_tool_start",
@@ -189,7 +189,7 @@ def test_chat_ws_interrupt_stops_and_persists_partial(
         assert assistant.get("stopped") is True
 
 
-async def fake_failing_stream(content, history=None):
+async def fake_failing_stream(content, history=None, attachments=None):
     """吐一个文字块后抛异常，模拟 LLM 中途失败"""
     yield {
         "event": "on_chat_model_stream",

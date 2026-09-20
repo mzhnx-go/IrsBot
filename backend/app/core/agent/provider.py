@@ -120,6 +120,63 @@ def get_model_capabilities(provider_type: str, model_name: str) -> dict | None:
     }
 
 
+#: 模型名里出现这些片段，通常就是视觉（多模态）模型。
+#: 覆盖常见厂商命名：qwen-vl / gpt-4o / claude-3 / gemini / glm-4v / internvl…
+#: 纯启发式，只为「没显式声明时」给个合理默认，猜错可由用户一键改。
+VISION_NAME_HINTS: tuple[str, ...] = (
+    "vision",
+    "vl",
+    "4o",
+    "claude-3",
+    "claude-4",
+    "gemini",
+    "gpt-4.1",
+    "gpt-5",
+    "glm-4v",
+    "qvq",
+    "internvl",
+    "minicpm-v",
+    "llava",
+    "omni",
+    "multimodal",
+)
+
+
+def looks_like_vision_model(model_name: str | None) -> bool:
+    """按模型名启发式判断是否可能是视觉模型（纯函数，好测）。
+
+    只做子串匹配、大小写无关；名字里带 "vl" 这类短片段是常见命名的
+    真实产物（qwen-vl-max、qvq-72b 等），宁可多认几个也不漏掉视觉模型
+    —— 误判成支持视觉时用户可显式改；漏判则要用户自己发现并去改。
+    """
+    if not model_name:
+        return False
+    lowered = model_name.lower()
+    return any(hint in lowered for hint in VISION_NAME_HINTS)
+
+
+def resolve_supports_vision(
+    provider_config: Any, model_name: str | None = None
+) -> bool:
+    """判定该模型源当前使用的模型是否支持视觉输入。
+
+    优先级：ProviderConfig.supports_vision 显式值 > 模型名启发式。
+    模型名优先取调用方指定的（Agent 可能临时换模型），否则用配置里的。
+
+    Args:
+        provider_config: ProviderConfig 实例；None 时只能靠 model_name 猜。
+        model_name: 本次实际使用的模型名；None 则回落到配置的 model_name。
+
+    Returns:
+        是否支持视觉输入。
+    """
+    explicit = getattr(provider_config, "supports_vision", None)
+    if explicit is not None:
+        return bool(explicit)
+    name = model_name or getattr(provider_config, "model_name", None)
+    return looks_like_vision_model(name)
+
+
 # ── Provider 管理器（原 manager.py 内容）──────────────────────
 
 
@@ -170,6 +227,39 @@ class ProviderManager:
 
     # -- 对话模型 ChatModel ----------------------------------------
 
+    def get_active_config(
+        self,
+        user_id: uuid.UUID | None,
+        provider_id: uuid.UUID | None = None,
+    ) -> ProviderConfig | None:
+        """解析本次实际生效的 ProviderConfig（不建模型实例）。
+
+        get_chat_model 的选源逻辑抽到这里，供「需要读配置本身」的调用方
+        复用（如视觉能力判定），避免同一套租户过滤条件写两遍。
+
+        ⚠️ 两条分支都必须带 user_id 过滤（同 get_chat_model 的多租户硬约束）。
+
+        Args:
+            user_id: 归属用户 id。
+            provider_id: 指定配置 id；None 时取该用户的默认启用配置。
+
+        Returns:
+            命中的 ProviderConfig；无可用配置时返回 None。
+        """
+        if provider_id:
+            stmt = select(ProviderConfig).where(
+                ProviderConfig.id == provider_id,
+                ProviderConfig.user_id == user_id,
+                ProviderConfig.is_active.is_(True),
+            )
+        else:
+            stmt = select(ProviderConfig).where(
+                ProviderConfig.user_id == user_id,
+                ProviderConfig.is_default.is_(True),
+                ProviderConfig.is_active.is_(True),
+            )
+        return self.session.exec(stmt).one_or_none()
+
     def get_chat_model(
         self,
         user_id: uuid.UUID | None,
@@ -209,21 +299,7 @@ class ProviderManager:
         if hit is not None:
             return hit
 
-        if provider_id:
-            stmt = select(ProviderConfig).where(
-                ProviderConfig.id == provider_id,
-                ProviderConfig.user_id == user_id,
-                ProviderConfig.is_active.is_(True),
-            )
-            pc = self.session.exec(stmt).one_or_none()
-        else:
-            stmt = select(ProviderConfig).where(
-                ProviderConfig.user_id == user_id,
-                ProviderConfig.is_default.is_(True),
-                ProviderConfig.is_active.is_(True),
-            )
-            pc = self.session.exec(stmt).one_or_none()
-
+        pc = self.get_active_config(user_id=user_id, provider_id=provider_id)
         if pc is None:
             raise RuntimeError(
                 "No active provider configured. Create a ProviderConfig first."
@@ -449,6 +525,7 @@ class ProviderManager:
         is_active: bool = True,
         fallback_order: int = 999,
         config: dict | None = None,
+        supports_vision: bool | None = None,
     ) -> ProviderConfig:
         """创建一个新的 Provider 配置并入库。
 
@@ -463,6 +540,7 @@ class ProviderManager:
             is_active: 是否启用，默认 True。
             fallback_order: 回退优先级（越小越优先），默认 999。
             config: 可选，额外扩展配置字典，默认空字典。
+            supports_vision: 视觉能力三态，None=自动（按模型名启发式）。
 
         Returns:
             已入库并刷新的 ProviderConfig 对象。
@@ -478,6 +556,7 @@ class ProviderManager:
             is_active=is_active,
             fallback_order=fallback_order,
             config=config or {},
+            supports_vision=supports_vision,
         )
         self.session.add(obj)
         self.session.commit()

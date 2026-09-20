@@ -2,9 +2,10 @@
 
 多租户规则：所有操作按 user_id 过滤，只能看/改自己的 provider 配置。
 设默认互斥：同一用户只有一条 is_default=True。
-""" 
+"""
 
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,6 +21,8 @@ from app.utils.crypto import decrypt_api_key
 
 router = APIRouter(tags=["providers"])
 
+logger = logging.getLogger(__name__)
+
 class ProviderCreate(BaseModel):
     """创建请求体"""
     name: str
@@ -28,6 +31,8 @@ class ProviderCreate(BaseModel):
     model_name: str
     base_url: str | None = None
     is_default: bool = False
+    # 视觉能力三态：None=自动（按模型名猜），True/False=显式声明
+    supports_vision: bool | None = None
 
 
 class ProviderUpdate(BaseModel):
@@ -37,6 +42,7 @@ class ProviderUpdate(BaseModel):
     model_name: str | None = None
     base_url: str | None = None
     is_default: bool | None = None
+    supports_vision: bool | None = None
 
 class ProviderOut(BaseModel):
     """响应体: 绝不返回明文 api_key"""
@@ -47,6 +53,7 @@ class ProviderOut(BaseModel):
     base_url: str | None
     is_default: bool
     is_active: bool
+    supports_vision: bool | None = None
 
 
 
@@ -77,6 +84,7 @@ def create_provider(
         model_name=body.model_name,
         base_url=body.base_url,
         is_default=body.is_default,
+        supports_vision=body.supports_vision,
     )
     return obj
 
@@ -101,9 +109,21 @@ async def get_provider_balance(
     if pc is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
-    return await query_balance(
+    result = await query_balance(
         base_url=pc.base_url, api_key=decrypt_api_key(pc.api_key)
     )
+    if result.supported:
+        logger.info(
+            "余额查询成功：provider=%s 剩余=%s%s",
+            pc.name,
+            result.remaining,
+            f" {result.currency}" if result.currency else "",
+        )
+    elif result.error:
+        logger.error("余额查询失败：provider=%s %s", pc.name, result.error)
+    else:
+        logger.info("余额查询：provider=%s %s", pc.name, result.detail)
+    return result
 
 
 @router.patch("/providers/{provider_id}", response_model=ProviderOut)
@@ -125,7 +145,12 @@ def update_provider(
         raise HTTPException(status_code=404, detail="Provider not found")
     if body.is_default:
         mgr.clear_other_defaults(user_id=current_user.id, keep_id=provider_id)
-    return mgr.update_provider(provider_id, **body.model_dump(exclude_none=True))
+    fields = body.model_dump(exclude_none=True)
+    # supports_vision 是唯一「None 本身有意义」的字段（None=自动），
+    # exclude_none 会把「改回自动」的请求吃掉，故显式按是否传过来判断。
+    if "supports_vision" in body.model_fields_set:
+        fields["supports_vision"] = body.supports_vision
+    return mgr.update_provider(provider_id, **fields)
 
 
 @router.delete("/providers/{provider_id}")

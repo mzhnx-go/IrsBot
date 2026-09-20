@@ -22,7 +22,7 @@ from sqlmodel import Session, select
 BASE = f"{settings.API_V1_STR}/agent/conversations"
 
 
-async def fake_stream(content, history=None):
+async def fake_stream(content, history=None, attachments=None):
     """模拟 Agent.stream：只产出一个文字块，供 WS 链路跑通。"""
     yield {
         "event": "on_chat_model_stream",

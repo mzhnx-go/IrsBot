@@ -19,7 +19,7 @@ BASE = f"{settings.API_V1_STR}/agent/conversations"
 WS_BASE = f"{settings.API_V1_STR}/agent/chat/ws"
 
 
-async def fake_stream(content, history=None):
+async def fake_stream(content, history=None, attachments=None):
     yield {
         "event": "on_chat_model_stream",
         "data": {"chunk": SimpleNamespace(content="回复:" + content)},
