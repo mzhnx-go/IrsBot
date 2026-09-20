@@ -24,7 +24,7 @@ import useAuth, { isLoggedIn } from "@/hooks/useAuth"
 import { usePublicSettings } from "@/hooks/useDeploymentSettings"
 
 const formSchema = z.object({
-  username: z.email(),
+  username: z.email({ message: "邮箱格式不正确" }),
   password: z
     .string()
     .min(1, { message: "请输入密码" })

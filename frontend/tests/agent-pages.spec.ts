@@ -35,7 +35,8 @@ test("/conversations 搜索框可用", async ({ page }) => {
 test("/stats 指标卡渲染", async ({ page }) => {
   await page.goto("/stats")
   for (const label of ["运行次数", "Token 用量", "平均耗时", "工具调用"]) {
-    await expect(page.getByText(label, { exact: true })).toBeVisible()
+    // 指标卡标签与明细表列名可能同名（如「工具调用」），取第一个即可
+    await expect(page.getByText(label, { exact: true }).first()).toBeVisible()
   }
 })
 

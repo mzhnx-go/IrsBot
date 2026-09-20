@@ -68,7 +68,7 @@ test("Sign up with invalid email", async ({ page }) => {
   )
   await page.getByRole("button", { name: "注册" }).click()
 
-  await expect(page.getByText("Invalid email address")).toBeVisible()
+  await expect(page.getByText("邮箱格式不正确")).toBeVisible()
 })
 
 // 默认部署是单用户模式（注册关闭）。本用例验证**开放注册下**的重复邮箱报错，
@@ -182,7 +182,7 @@ test("Sign up with missing email", async ({ page }) => {
   await fillForm(page, fullName, email, password, password)
   await page.getByRole("button", { name: "注册" }).click()
 
-  await expect(page.getByText("Invalid email address")).toBeVisible()
+  await expect(page.getByText("邮箱格式不正确")).toBeVisible()
 })
 
 test("Sign up with missing password", async ({ page }) => {

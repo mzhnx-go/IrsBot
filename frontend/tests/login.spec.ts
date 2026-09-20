@@ -49,7 +49,7 @@ test("Log in with invalid email", async ({ page }) => {
   await fillForm(page, "invalidemail", firstSuperuserPassword)
   await page.getByRole("button", { name: "登录" }).click()
 
-  await expect(page.getByText("Invalid email address")).toBeVisible()
+  await expect(page.getByText("邮箱格式不正确")).toBeVisible()
 })
 
 test("Log in with invalid password", async ({ page }) => {

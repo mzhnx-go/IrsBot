@@ -23,8 +23,9 @@ export default defineConfig({
   reporter: process.env.CI ? 'blob' : 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:5173',
+    /* 单端口部署：backend 容器托管 frontend/dist，e2e 直接打 8000（见 docs/OPERATIONS.md）。
+       用 127.0.0.1 而非 localhost —— 本机 wslrelay 会占 ::1:8000，走 IPv6 会 404 */
+    baseURL: 'http://127.0.0.1:8000',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -82,10 +83,5 @@ export default defineConfig({
     // },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'bun run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-  },
+  /* 无 webServer：被测对象是 8000 后端托管的 dist 构建产物，非 vite dev server */
 });
