@@ -6,6 +6,10 @@ import useCustomToast from "@/hooks/useCustomToast"
 export interface ToolCall {
   name: string
   phase: "start" | "end"
+  /** 工具入参（后端序列化为字符串并截断） */
+  input?: string
+  /** 工具结果（end 阶段带回） */
+  output?: string
 }
 
 export interface ChatMessage {
@@ -102,20 +106,51 @@ export function useAgentChat(conversationId: string) {
         // AI 回复流式生成中，往最后一条 assistant 消息追加文字
         appendAssistantChunk(msg.content)
       } else if (msg.type === "tool_call") {
-        // 记录工具调用状态（start/end），追加到最后一条 assistant 消息
+        // 与后端 merge_tool_trace 同口径：start 追加一条，
+        // end 回填到同名最近一条未完成的 start，面板只留一行。
+        // 注意：工具通常先于任何 text_chunk 触发，此时还没有 assistant
+        // 消息，要先建一条空占位，否则事件会被直接丢掉、面板不出现。
         setMessages((prev) => {
           const last = prev[prev.length - 1]
-          if (last?.role !== "assistant") return prev
-          return [
-            ...prev.slice(0, -1),
-            {
-              ...last,
-              toolCalls: [
-                ...(last.toolCalls ?? []),
-                { name: msg.name, phase: msg.phase },
-              ],
-            },
-          ]
+          const hasAssistant = last?.role === "assistant"
+          const base = hasAssistant ? prev.slice(0, -1) : prev
+          const target: ChatMessage = hasAssistant
+            ? last
+            : {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: "",
+                streaming: true,
+              }
+          const calls = [...(target.toolCalls ?? [])]
+          if (msg.phase === "start") {
+            calls.push({
+              name: msg.name,
+              phase: "start",
+              input: msg.input,
+            })
+          } else {
+            let idx = -1
+            for (let i = calls.length - 1; i >= 0; i--) {
+              if (calls[i].name === msg.name && calls[i].phase === "start") {
+                idx = i
+                break
+              }
+            }
+            if (idx >= 0)
+              calls[idx] = {
+                ...calls[idx],
+                phase: "end",
+                output: msg.output,
+              }
+            else
+              calls.push({
+                name: msg.name,
+                phase: "end",
+                output: msg.output,
+              })
+          }
+          return [...base, { ...target, toolCalls: calls }]
         })
       } else if (msg.type === "done") {
         // 本轮回复结束；后端回传落库消息 ID，回填给本地乐观消息，

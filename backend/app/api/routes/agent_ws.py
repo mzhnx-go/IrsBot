@@ -13,6 +13,7 @@
 
 协议细节见 docs/protocols/chat-ws-protocol.md
 """
+import json
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
@@ -70,6 +71,8 @@ class WSMsgKey:
     ID = "id"
     USER_MESSAGE_ID = "user_message_id"
     ASSISTANT_MESSAGE_ID = "assistant_message_id"
+    INPUT = "input"
+    OUTPUT = "output"
 
 
 class WSToolPhase:
@@ -77,6 +80,26 @@ class WSToolPhase:
 
     START = "start"
     END = "end"
+
+
+#: 工具入参/结果下发与落库的截断上限（字符）。
+#: 工具输出可能是整个文件内容，不截断会把 WS 帧和 messages 表撑爆；
+#: 折叠面板展示的是"发生了什么"，超长部分截断不影响理解。
+TOOL_TRACE_MAX_CHARS = 4000
+
+
+def _trace_text(value: object) -> str:
+    """把工具入参/结果压成展示用字符串并截断。"""
+    if isinstance(value, str):
+        text = value
+    else:
+        try:
+            text = json.dumps(value, ensure_ascii=False, default=str)
+        except (TypeError, ValueError):
+            text = str(value)
+    if len(text) > TOOL_TRACE_MAX_CHARS:
+        return text[:TOOL_TRACE_MAX_CHARS] + "…（已截断）"
+    return text
 
 
 def build_history_payload(msgs) -> dict:
@@ -99,9 +122,15 @@ def build_history_payload(msgs) -> dict:
             WSMsgKey.ROLE: m.role,
             WSMsgKey.CONTENT: text,
         }
-        # assistant 若带工具调用元数据，一并下发便于前端还原
-        if m.role == WSMessageRole.ASSISTANT and m.tool_calls:
-            item[WSMsgKey.TOOL_CALLS] = m.tool_calls
+        # assistant 若带工具调用轨迹，一并下发便于前端还原折叠面板。
+        # 展示用轨迹存在 content.tool_trace（tool_calls 列留给 LangChain
+        # 规范格式的真实调用，二者不能混用）；兼容直接写在列上的旧数据。
+        if m.role == WSMessageRole.ASSISTANT:
+            trace = content.get("tool_trace") if isinstance(content, dict) else None
+            if trace:
+                item[WSMsgKey.TOOL_CALLS] = trace
+            elif m.tool_calls:
+                item[WSMsgKey.TOOL_CALLS] = m.tool_calls
         items.append(item)
     return {
         WSMsgKey.TYPE: WSMessageType.HISTORY,
@@ -127,17 +156,50 @@ def to_frontend_event(raw: dict) -> dict | None:
             WSMsgKey.TYPE: WSMessageType.TOOL_CALL,
             WSMsgKey.NAME: raw["name"],
             WSMsgKey.PHASE: WSToolPhase.START,
+            WSMsgKey.INPUT: _trace_text(raw.get("data", {}).get("input")),
         }
 
     elif event_type == "on_tool_end":
+        output = raw.get("data", {}).get("output")
+        # ToolMessage 对象取 .content，普通返回值直接用
+        content = getattr(output, "content", output)
         return {
             WSMsgKey.TYPE: WSMessageType.TOOL_CALL,
             WSMsgKey.NAME: raw["name"],
             WSMsgKey.PHASE: WSToolPhase.END,
+            WSMsgKey.OUTPUT: _trace_text(content),
         }
 
     else:
         return None
+
+
+def merge_tool_trace(trace: list[dict], event: dict) -> None:
+    """把 tool_call 事件合并进落库用的轨迹列表。
+
+    start 追加一条；end 回填到**同名最近一条未完成的 start**
+    （连续/并行调用同一工具时按最近未配对的一条合并）。找不到就补一条 end。
+    """
+    if event[WSMsgKey.PHASE] == WSToolPhase.START:
+        trace.append({
+            WSMsgKey.NAME: event[WSMsgKey.NAME],
+            WSMsgKey.PHASE: WSToolPhase.START,
+            WSMsgKey.INPUT: event.get(WSMsgKey.INPUT, ""),
+        })
+        return
+    for entry in reversed(trace):
+        if (
+            entry[WSMsgKey.NAME] == event[WSMsgKey.NAME]
+            and entry[WSMsgKey.PHASE] == WSToolPhase.START
+        ):
+            entry[WSMsgKey.PHASE] = WSToolPhase.END
+            entry[WSMsgKey.OUTPUT] = event.get(WSMsgKey.OUTPUT, "")
+            return
+    trace.append({
+        WSMsgKey.NAME: event[WSMsgKey.NAME],
+        WSMsgKey.PHASE: WSToolPhase.END,
+        WSMsgKey.OUTPUT: event.get(WSMsgKey.OUTPUT, ""),
+    })
 
 @router.websocket("/agent/chat/ws/{conversation_id}")
 async def chat_ws(
@@ -224,6 +286,7 @@ async def chat_ws(
                     user_id=str(current_user.id),
                 )
                 reply = ""
+                tool_trace: list[dict] = []
 
 
                 async for event in agent.stream(
@@ -234,11 +297,20 @@ async def chat_ws(
                         await ws.send_json(msg)
                         if msg[WSMsgKey.TYPE] == WSMessageType.TEXT_CHUNK:
                             reply += msg[WSMsgKey.CONTENT]
+                        elif msg[WSMsgKey.TYPE] == WSMessageType.TOOL_CALL:
+                            merge_tool_trace(tool_trace, msg)
 
+                # 工具轨迹存进 content.tool_trace：tool_calls 列会被
+                # get_context_messages 转成 LangChain AIMessage.tool_calls，
+                # 展示用轨迹格式不同，混写会污染发给模型的上下文
                 assistant_msg = conv_manager.add_message(
                     conv_id=conversation.id,
                     role=WSMessageRole.ASSISTANT,
-                    content=reply,
+                    content=(
+                        {"text": reply, "tool_trace": tool_trace}
+                        if tool_trace
+                        else reply
+                    ),
                 )
                 # done 回传两条落库消息的真实 ID：
                 # 前端消息操作（删除/编辑重发/重新生成）按 ID 调 REST，

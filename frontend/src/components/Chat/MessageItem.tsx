@@ -10,6 +10,7 @@ import {
 import { type ReactNode, useState } from "react"
 
 import MarkdownContent from "@/components/Chat/MarkdownContent"
+import ToolCalls from "@/components/Chat/ToolCalls"
 import type { ChatMessage } from "@/hooks/useAgentChat"
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard"
 
@@ -128,12 +129,10 @@ const MessageItem = ({
             : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5 text-foreground"
         }
       >
-        {/* 工具调用状态行（AI 消息且有工具调用时显示） */}
-        {message.toolCalls?.map((tc, i) => (
-          <p key={i} className="mb-1 text-xs text-muted-foreground">
-            [{tc.phase === "start" ? "调用" : "完成"}] {tc.name}
-          </p>
-        ))}
+        {/* 工具调用折叠面板（AI 消息且有工具调用时显示） */}
+        {message.toolCalls && message.toolCalls.length > 0 && (
+          <ToolCalls calls={message.toolCalls} />
+        )}
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (

@@ -23,6 +23,24 @@ async def fake_stream(content, history=None):
     yield {"event": "on_chain_start", "data": {}}
 
 
+async def fake_stream_with_tool(content, history=None):
+    """模拟带工具调用的流：start 带 dict 入参，end 带 ToolMessage 式输出。"""
+    yield {
+        "event": "on_tool_start",
+        "name": "kb_search",
+        "data": {"input": {"query": "你好", "top_k": 3}},
+    }
+    yield {
+        "event": "on_tool_end",
+        "name": "kb_search",
+        "data": {"output": SimpleNamespace(content="命中 2 条")},
+    }
+    yield {
+        "event": "on_chat_model_stream",
+        "data": {"chunk": SimpleNamespace(content="答案")},
+    }
+
+
 def test_chat_ws_streams_and_finishes(client, superuser_token_headers):
     """收上行消息后应依次收到 text_chunk 与 done，无关事件被跳过"""
     # WS 鉴权走 URL 查询参数（浏览器 WS API 不支持自定义请求头）
@@ -61,3 +79,48 @@ def test_chat_ws_streams_and_finishes(client, superuser_token_headers):
             assert third["type"] == "done"
             assert third["user_message_id"]
             assert third["assistant_message_id"]
+
+
+def test_chat_ws_tool_events_carry_io_and_persist(
+    client, superuser_token_headers
+):
+    """工具事件应带截断后的入参/结果下发；重连后 history 能还原工具轨迹"""
+    token = superuser_token_headers["Authorization"].split(" ", 1)[1]
+    resp = client.post(
+        "/api/v1/agent/conversations",
+        json={"title": "ws-tool-test"},
+        headers=superuser_token_headers,
+    )
+    conv_id = resp.json()["id"]
+
+    with patch("app.api.routes.agent_ws.Agent") as mock_agent:
+        mock_agent.return_value.stream = fake_stream_with_tool
+        with client.websocket_connect(
+            f"/api/v1/agent/chat/ws/{conv_id}?token={token}",
+        ) as ws:
+            ws.receive_json()  # history（空）
+            ws.send_json({"type": "message", "content": "hi"})
+
+            start = ws.receive_json()
+            assert start["type"] == "tool_call" and start["phase"] == "start"
+            assert "kb_search" == start["name"]
+            assert '"query"' in start["input"]  # dict 入参序列化为 JSON 文本
+
+            end = ws.receive_json()
+            assert end["type"] == "tool_call" and end["phase"] == "end"
+            assert end["output"] == "命中 2 条"  # ToolMessage 取 .content
+
+            ws.receive_json()  # text_chunk
+            ws.receive_json()  # done
+
+    # 重连：工具轨迹应从 content.tool_trace 还原
+    with client.websocket_connect(
+        f"/api/v1/agent/chat/ws/{conv_id}?token={token}",
+    ) as ws:
+        history = ws.receive_json()
+        assistant = [m for m in history["messages"] if m["role"] == "assistant"][0]
+        trace = assistant["tool_calls"]
+        assert len(trace) == 1  # start/end 合并为一条
+        assert trace[0]["name"] == "kb_search"
+        assert trace[0]["phase"] == "end"
+        assert trace[0]["output"] == "命中 2 条"
