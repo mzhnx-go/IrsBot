@@ -22,6 +22,8 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # 注意：index=True 会自动生成 ix_provider_models_provider_id，
+    # 不能再显式 create_index 同名索引（DuplicateTable）。
     op.create_table(
         "provider_models",
         sa.Column("id", sa.UUID(), primary_key=False),
@@ -47,11 +49,7 @@ def upgrade() -> None:
             name="uq_provider_models_provider_model",
         ),
     )
-    op.create_index(
-        "ix_provider_models_provider_id", "provider_models", ["provider_id"]
-    )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_provider_models_provider_id", table_name="provider_models")
     op.drop_table("provider_models")
