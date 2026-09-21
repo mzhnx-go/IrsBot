@@ -4,6 +4,7 @@ from app.api.routes import (
     agent,
     agent_ws,
     attachments,
+    audio,
     knowledge_base,
     login,
     logs,
@@ -21,6 +22,7 @@ api_router.include_router(users.router)
 api_router.include_router(utils.router)
 api_router.include_router(agent.router)
 api_router.include_router(attachments.router)
+api_router.include_router(audio.router)
 api_router.include_router(knowledge_base.router)
 api_router.include_router(agent_ws.router)
 api_router.include_router(providers.router)
