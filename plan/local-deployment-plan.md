@@ -1,7 +1,7 @@
 # IrsBot Docker 本地部署实施计划
 
 > 版本：v7.2 ｜ 日期：2026-09-17
-> 上游文档：[istbot-implement-plan.md](./istbot-implement-plan.md)（全局规划）｜ [PROGRESS.md](./PROGRESS.md)（运行态）
+> 上游文档：[irsbot-implement-plan.md](./irsbot-implement-plan.md)（全局规划）｜ [PROGRESS.md](./PROGRESS.md)（运行态）
 > **本文档只覆盖一件事：让 IrsBot 能被「一条命令启动、并且分发给别人」。**
 >
 > ✅ **状态：✅ 已全部完成（2026-09-17）。D1（D1.1–D1.5）→ D2 → D3 → D4 → D5 → D6 → D7 全部实机验收/落地，记录见 [PROGRESS.md](./PROGRESS.md)。**
@@ -921,7 +921,7 @@ Would install 140 packages
 
 | 文档 | 需要的修改 | 状态 |
 |---|---|---|
-| `istbot-implement-plan.md` | 定位改为 Docker 化；L1/L2 作废；写入 18 项验证基线 | ✅ 本轮 |
+| `irsbot-implement-plan.md` | 定位改为 Docker 化；L1/L2 作废；写入 18 项验证基线 | ✅ 本轮 |
 | `PROGRESS.md` | 当前阶段改为 D1–D7；M2/M3 完成；D5.1 盘点完成 | ✅ 本轮 |
 | `astrbot-architecture.md` | 数据库/向量库行回滚为 PostgreSQL/Milvus | ✅ 本轮 |
 | `spec.md` | ~~定位与部署方式同步~~ → **已弃用结案**（2026-09-17）：内容过时且不再维护，改名 `DEPRECATED-spec.md` 并加声明头 | ✅ 以弃用结案 |

@@ -6,7 +6,7 @@
 >
 > **IrsBot 定位（2026-09-16 最新，第五轮修正）**：**本地部署的 AI Agent 应用，单用户使用，Docker 一条命令启动**。用户在**浏览器里对话**（Web 是产品主体，不是控制台），接入自己的 API Key，具备 Skill / Tool / MCP / RAG 能力。
 > **不接 IM**（平台适配器 / 消息事件 / 插件体系整体不做）；**不做网页版**（多用户线上部署已拆分到另一个独立项目）。
-> 本文件的取舍判断均基于此定位，实施计划见 [istbot-implement-plan.md](./istbot-implement-plan.md)，本地化施工详案见 [local-deployment-plan.md](./local-deployment-plan.md)。
+> 本文件的取舍判断均基于此定位，实施计划见 [irsbot-implement-plan.md](./irsbot-implement-plan.md)，本地化施工详案见 [local-deployment-plan.md](./local-deployment-plan.md)。
 
 ---
 

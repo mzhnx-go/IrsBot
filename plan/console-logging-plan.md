@@ -1,11 +1,11 @@
 # IrsBot 日志与控制台功能实施计划
 
 > 版本：v1.1 ｜ 日期：2026-09-21 ｜ **状态：✅ 已全部完成（2026-09-21 实机验收）**
-> 上游文档：[istbot-implement-plan.md](./istbot-implement-plan.md)（全局规划）｜ [PROGRESS.md](./PROGRESS.md)（运行态）
+> 上游文档：[irsbot-implement-plan.md](./irsbot-implement-plan.md)（全局规划）｜ [PROGRESS.md](./PROGRESS.md)（运行态）
 > **本文档只覆盖一件事：为 IrsBot 增加运行时日志体系 + 网页端「控制台」页（实时查看后端日志）。**
 >
 > 依据：
-> - `istbot-implement-plan.md` §8.6 迁移清单保留项：**「16.3 日志分级与脱敏（api_key 不进日志）🔶 保留在本项目」**（本计划 Phase L1 落地）。
+> - `irsbot-implement-plan.md` §8.6 迁移清单保留项：**「16.3 日志分级与脱敏（api_key 不进日志）🔶 保留在本项目」**（本计划 Phase L1 落地）。
 > - §6.1 能力矩阵 #27「日志分级与敏感信息脱敏」P2。
 > - 用户 2026-09-20 提出需求：「为项目添加日志与控制台功能」。
 

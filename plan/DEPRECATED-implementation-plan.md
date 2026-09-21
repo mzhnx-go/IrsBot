@@ -1,4 +1,4 @@
-> ⚠️ **本文件已弃用（2026-09-17）**：仅作历史参考保留。最新权威计划请看 [istbot-implement-plan.md](./istbot-implement-plan.md)，部署详案看 [local-deployment-plan.md](./local-deployment-plan.md)，当前进度看 [PROGRESS.md](./PROGRESS.md)。
+> ⚠️ **本文件已弃用（2026-09-17）**：仅作历史参考保留。最新权威计划请看 [irsbot-implement-plan.md](./irsbot-implement-plan.md)，部署详案看 [local-deployment-plan.md](./local-deployment-plan.md)，当前进度看 [PROGRESS.md](./PROGRESS.md)。
 
 # IrsBot Agent Platform — 详细实施计划 (v2)
 

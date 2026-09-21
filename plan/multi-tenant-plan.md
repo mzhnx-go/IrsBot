@@ -3,7 +3,7 @@
 > 状态：**✅ 已实施（2026-09-18）**——v2 方案编码完成，后端 + 前端 + 33 条测试全过；实施记录见 [PROGRESS.md](./PROGRESS.md) 第八节「部署模式运行时开关」
 > v1 的两个配置键砍掉一个，理由见 **第十一节**；用户确认入口放 `/admin`，其余待确认项按推荐执行
 > 日期：2026-09-18
-> 关联：`plan/istbot-implement-plan.md`（D2 / D2.1 / 8.4「配套：运行时开关」）、`plan/PROGRESS.md`、`plan/local-deployment-plan.md`
+> 关联：`plan/irsbot-implement-plan.md`（D2 / D2.1 / 8.4「配套：运行时开关」）、`plan/PROGRESS.md`、`plan/local-deployment-plan.md`
 > 前置提交：`41cccfd`（注册闸门）、`ef08cc1`（Provider 归属隔离）、`d1630f5`（D2 语义拆分文档同步）
 
 ---
@@ -169,7 +169,7 @@ D2 决策把本地版定为**单用户**，落地方式是 `USERS_OPEN_REGISTRAT
 
 | 文档 | 需改内容 |
 |---|---|
-| `plan/istbot-implement-plan.md` | **D2.1 表述已改**：由「硬约束」→「默认关闭，可由超管在运行时开启」；0.4 复用义务表补了「`app_settings` + `settings_runtime` 可复用」一条；SC D10 由「达成」→「达成并升级」。**运行时机制写在 8.4 的「配套：运行时开关」小节**（8.5 已被 Phase 15 占用，故未新开 8.5；也未新增 `D2.2` 决策号，避免与 `local-deployment-plan.md` 的 `D2.1/D2.2`（启动脚本）撞号），第九节追加第七轮 |
+| `plan/irsbot-implement-plan.md` | **D2.1 表述已改**：由「硬约束」→「默认关闭，可由超管在运行时开启」；0.4 复用义务表补了「`app_settings` + `settings_runtime` 可复用」一条；SC D10 由「达成」→「达成并升级」。**运行时机制写在 8.4 的「配套：运行时开关」小节**（8.5 已被 Phase 15 占用，故未新开 8.5；也未新增 `D2.2` 决策号，避免与 `local-deployment-plan.md` 的 `D2.1/D2.2`（启动脚本）撞号），第九节追加第七轮 |
 | `plan/PROGRESS.md` | 当前阶段、第八节新增「运行时开关」小节、十一节追加进度记录 |
 | `plan/local-deployment-plan.md` | D2 子阶段表的注册闸门行（`.env` → 运行时，`.env` 降为兜底初值） |
 | `.env` / `.env.example` | `USERS_OPEN_REGISTRATION` 注释改为「首次兜底值」 |
@@ -225,7 +225,7 @@ D2 决策把本地版定为**单用户**，落地方式是 `USERS_OPEN_REGISTRAT
    一键。理由 = 你的决策 2 使两个键的组合出现**完全等效的冗余状态**（详见 §十一）。是否接受？
 2. **公开端点**：`GET /utils/public-settings` 匿名可读（只返回 `open_registration`）是否接受？
 3. **入口位置**：开关放在 `/admin`（用户管理页，本来就只有超管能进）是否合适？还是放到「设置」页做成超管专属 tab？
-4. **文档改动**：`istbot-implement-plan.md` 的 **D2.1 要从「硬约束」改回「默认关闭 + 可运行时开启」**，确认可改？
+4. **文档改动**：`irsbot-implement-plan.md` 的 **D2.1 要从「硬约束」改回「默认关闭 + 可运行时开启」**，确认可改？
 
 ## 十一、修订记录（v1 → v2）
 

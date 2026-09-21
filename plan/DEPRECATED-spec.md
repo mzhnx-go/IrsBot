@@ -1,4 +1,4 @@
-> ⚠️ **本文件已弃用（2026-09-17）**：内容仍是「IM 机器人框架」旧定位，与现行「本地部署 Web Agent 应用（不接 IM）」定位严重不符。最新权威计划请看 [istbot-implement-plan.md](./istbot-implement-plan.md)。仅作历史参考保留。
+> ⚠️ **本文件已弃用（2026-09-17）**：内容仍是「IM 机器人框架」旧定位，与现行「本地部署 Web Agent 应用（不接 IM）」定位严重不符。最新权威计划请看 [irsbot-implement-plan.md](./irsbot-implement-plan.md)。仅作历史参考保留。
 
 # AstrBot Core Features Replication Spec
 
@@ -10,7 +10,7 @@
 > 2. **模块调整**：§9 WebUI/Dashboard 从「聊天主界面」重新定位为「配置与运维控制台」
 > 3. **范围收敛**：不做多租户架构；`user_id` 由「租户隔离」降级为「数据归属校验」
 >
-> 实施计划与优先级见 [istbot-implement-plan.md](./istbot-implement-plan.md)。
+> 实施计划与优先级见 [irsbot-implement-plan.md](./irsbot-implement-plan.md)。
 
 ## Why
 
@@ -191,7 +191,7 @@
 - **消息组件链**：`Plain` / `Image` / `At` / `AtAll` / `Reply` / `File` / `Record` / `Forward` / `Node`，支持双向序列化
 - **适配器基类**：`Platform(ABC)`（`run` / `meta` / `send_by_session` / `terminate` / `commit_event`）+ `PlatformMetadata` + `@register_platform_adapter`
 - **接入策略**：**增量接入，不做全量 18 平台**。首批建议 Telegram（验证架构）→ OneBot v11（覆盖 QQ）→ 飞书 / 钉钉
-- 详见 [istbot-implement-plan.md](./istbot-implement-plan.md) Phase 11
+- 详见 [irsbot-implement-plan.md](./irsbot-implement-plan.md) Phase 11
 
 #### 11. 插件体系 (Plugin / Star) ★ 新增
 
@@ -204,7 +204,7 @@
 - **配置驱动**：`_conf_schema.json` 生成默认值 + 完整性校验 + 控制台动态表单渲染
 - **热重载**：`watchfiles` 监听目录 → terminate → unbind → purge modules → reload
 - **归属模型**：本地单部署者下插件为**全局注册**，无租户隔离（同 AstrBot）
-- 详见 [istbot-implement-plan.md](./istbot-implement-plan.md) Phase 13
+- 详见 [irsbot-implement-plan.md](./irsbot-implement-plan.md) Phase 13
 
 ### 数据模型设计
 
@@ -503,7 +503,7 @@ backend/app/
 
 ## Success Criteria
 
-> SC1–SC10 为原标准；SC11–SC14 按 IM 机器人框架定位新增。完整状态见 [istbot-implement-plan.md](./istbot-implement-plan.md) 第四节。
+> SC1–SC10 为原标准；SC11–SC14 按 IM 机器人框架定位新增。完整状态见 [irsbot-implement-plan.md](./irsbot-implement-plan.md) 第四节。
 
 1. ✅ 能完成端到端对话: 用户输入 → Agent 推理 → 工具调用(可选) → 响应输出
 2. ✅ 至少接入 2 种 LLM Provider (OpenAI + Anthropic)

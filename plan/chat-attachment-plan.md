@@ -291,7 +291,7 @@ def _build_user_content(text, atts, supports_vision) -> str | list:
 - **不改历史迁移**：本方案不新增表、不新增列（除决策 2a 的 `supports_vision`，那需要一个新迁移）。
 - **不影响单端口部署**：新增端点走同一后端；前端改动需 `npm run build` 重建 dist。
 - **PROGRESS.md 待办**：本方案落地后新增一条待办并在进度记录追加一行（含踩坑留档）。
-- **文档同步**：`istbot-implement-plan.md` 未覆盖本需求（延伸需求），故只记 PROGRESS.md——与「模型源余额查询」同一处理方式。
+- **文档同步**：`irsbot-implement-plan.md` 未覆盖本需求（延伸需求），故只记 PROGRESS.md——与「模型源余额查询」同一处理方式。
 
 ---
 

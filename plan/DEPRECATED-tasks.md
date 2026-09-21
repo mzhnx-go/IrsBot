@@ -1,11 +1,11 @@
-> ⚠️ **本文件已弃用（2026-09-17）**：任务分解基于「IM 机器人框架」旧定位，勾选状态也早已失真。当前任务与阶段以 [istbot-implement-plan.md](./istbot-implement-plan.md)（第四节 SC 清单）和 [PROGRESS.md](./PROGRESS.md) 为准。仅作历史参考保留。
+> ⚠️ **本文件已弃用（2026-09-17）**：任务分解基于「IM 机器人框架」旧定位，勾选状态也早已失真。当前任务与阶段以 [irsbot-implement-plan.md](./irsbot-implement-plan.md)（第四节 SC 清单）和 [PROGRESS.md](./PROGRESS.md) 为准。仅作历史参考保留。
 
 # Tasks - IrsBot IM 机器人框架 Implementation
 
 > 技术栈: LangChain + LangGraph, uv, SQLAlchemy 2.0, Alembic, FastAPI, React 19
 >
 > **项目定位**：面向本地用户的自托管 IM 机器人框架；Web 仅为控制台。
-> **进度与完整计划见 [istbot-implement-plan.md](./istbot-implement-plan.md)**（本文件为任务拆解视图；Phase 11 起的任务以该文档第八节为准）
+> **进度与完整计划见 [irsbot-implement-plan.md](./irsbot-implement-plan.md)**（本文件为任务拆解视图；Phase 11 起的任务以该文档第八节为准）
 
 ---
 
@@ -286,10 +286,10 @@
 
 ---
 
-## Phase 11 起：见 istbot-implement-plan.md
+## Phase 11 起：见 irsbot-implement-plan.md
 
 > 原 Phase 11（集成测试与优化）已并入新计划。按 IM 机器人框架定位重排后的 Phase 11–16 任务清单，
-> 以 [istbot-implement-plan.md](./istbot-implement-plan.md) 第八节为准。摘要：
+> 以 [irsbot-implement-plan.md](./irsbot-implement-plan.md) 第八节为准。摘要：
 
 | 阶段 | 主题 | 优先级 |
 |---|---|---|
