@@ -26,8 +26,9 @@ test.describe("首进引导与权限可见性", () => {
 
     await page.getByTestId("onboarding-go-providers").click()
     await expect(page).toHaveURL(/\/providers\?new=1/)
+    // 弹窗标题带能力名（P5）：引导进入的是默认的「对话」栏
     await expect(
-      page.getByRole("heading", { name: "新增模型源" }),
+      page.getByRole("heading", { name: "新增对话模型源" }),
     ).toBeVisible()
   })
 
