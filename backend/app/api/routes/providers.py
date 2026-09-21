@@ -6,6 +6,7 @@
 
 
 import logging
+from typing import Literal
 from uuid import UUID
 
 import httpx
@@ -25,10 +26,16 @@ router = APIRouter(tags=["providers"])
 
 logger = logging.getLogger(__name__)
 
+#: 能力维度（P5）。与 core/db/models.py 的 PROVIDER_CAPABILITIES 必须保持一致。
+Capability = Literal["chat", "stt", "tts", "embedding", "rerank"]
+
+
 class ProviderCreate(BaseModel):
     """创建请求体"""
     name: str
     provider_type: str
+    # 能力维度：决定该源出现在哪个 Tab、以及「默认源」的互斥范围
+    capability: Capability = "chat"
     api_key: str
     model_name: str
     base_url: str | None = None
@@ -59,6 +66,7 @@ class ProviderOut(BaseModel):
     id: UUID
     name: str
     provider_type: str
+    capability: str = "chat"
     model_name: str
     base_url: str | None
     is_default: bool
@@ -109,9 +117,19 @@ class ProviderKeysAdd(BaseModel):
 
 
 @router.get("/providers", response_model=list[ProviderOut])
-def list_providers(session: SessionDep, current_user: User = Depends(get_current_user)):
-    """列出当前用户的所有 Provider 配置（默认排最前）。"""
-    return ProviderManager(session).list_providers(current_user.id)
+def list_providers(
+    session: SessionDep,
+    capability: Capability | None = None,
+    current_user: User = Depends(get_current_user),
+):
+    """列出当前用户的所有 Provider 配置（默认排最前）。
+
+    `capability` 可选：不传时返回全部能力（兼容旧调用方与首屏兜底），
+    传了就只返回该能力维度的源。
+    """
+    return ProviderManager(session).list_providers(
+        current_user.id, capability=capability
+    )
 
 
 @router.post("/providers", response_model=ProviderOut)
@@ -120,17 +138,20 @@ def create_provider(
     session: SessionDep,
     current_user: User = Depends(get_current_user),
 ):
-    """新增一条 Provider 配置；若设为默认，先清掉该用户其他默认。"""
+    """新增一条 Provider 配置；若设为默认，先清掉该用户**同能力**的其他默认。"""
     mgr = ProviderManager(session)
 
     if body.is_default:
-        # 互斥清理：新记录还没 id，不需要 keep_id
-        mgr.clear_other_defaults(user_id=current_user.id)
+        # 互斥清理：新记录还没 id，不需要 keep_id。按能力清，不跨维度。
+        mgr.clear_other_defaults(
+            user_id=current_user.id, capability=body.capability
+        )
 
     obj = mgr.create_provider(
         user_id=current_user.id,
         name=body.name,
         provider_type=body.provider_type,
+        capability=body.capability,
         api_key=body.api_key,
         model_name=body.model_name,
         base_url=body.base_url,
@@ -194,7 +215,7 @@ def update_provider(
     session: SessionDep,
     current_user: User = Depends(get_current_user),
 ):
-    """更新 Provider 配置；设为默认时清理其他默认。"""
+    """更新 Provider 配置；设为默认时清理**同能力**的其他默认。"""
     mgr = ProviderManager(session)
 
     stmt = select(ProviderConfig).where(
@@ -205,7 +226,10 @@ def update_provider(
     if pc is None:
         raise HTTPException(status_code=404, detail="Provider not found")
     if body.is_default:
-        mgr.clear_other_defaults(user_id=current_user.id, keep_id=provider_id)
+        # 按该源自己的能力清，不跨维度（capability 创建后不可改）
+        mgr.clear_other_defaults(
+            user_id=current_user.id, keep_id=provider_id, capability=pc.capability
+        )
     fields = body.model_dump(exclude_none=True, exclude={"timeout_seconds", "proxy_url", "extra_headers"})
     # supports_vision 是唯一「None 本身有意义」的字段（None=自动），
     # exclude_none 会把「改回自动」的请求吃掉，故显式按是否传过来判断。

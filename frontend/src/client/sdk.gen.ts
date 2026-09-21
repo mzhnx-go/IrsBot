@@ -3,7 +3,7 @@
 import type { CancelablePromise } from './core/CancelablePromise';
 import { OpenAPI } from './core/OpenAPI';
 import { request as __request } from './core/request';
-import type { AgentCreateConversationData, AgentCreateConversationResponse, AgentListConversationsData, AgentListConversationsResponse, AgentRenameConversationData, AgentRenameConversationResponse, AgentDeleteConversationData, AgentDeleteConversationResponse, AgentSetConversationStatusData, AgentSetConversationStatusResponse, AgentExportConversationData, AgentExportConversationResponse, AgentListConversationMessagesData, AgentListConversationMessagesResponse, AgentDeleteConversationMessageData, AgentDeleteConversationMessageResponse, AgentTruncateConversationMessagesData, AgentTruncateConversationMessagesResponse, AgentChatData, AgentChatResponse, AgentCreateMcpServerData, AgentCreateMcpServerResponse, AgentListMcpServersData, AgentListMcpServersResponse, AgentGetMcpServerData, AgentGetMcpServerResponse, AgentUpdateMcpServerData, AgentUpdateMcpServerResponse, AgentDeleteMcpServerData, AgentDeleteMcpServerResponse, AgentConnectMcpServerData, AgentConnectMcpServerResponse, AgentCreatePersonaRouteData, AgentCreatePersonaRouteResponse, AgentListPersonasRouteData, AgentListPersonasRouteResponse, AgentGetPersonaRouteData, AgentGetPersonaRouteResponse, AgentUpdatePersonaRouteData, AgentUpdatePersonaRouteResponse, AgentDeletePersonaRouteData, AgentDeletePersonaRouteResponse, AgentBindConversationPersonaData, AgentBindConversationPersonaResponse, AgentListSkillsResponse, AgentGetSkillDetailData, AgentGetSkillDetailResponse, AgentDeleteSkillData, AgentDeleteSkillResponse, AgentScanSkillsResponse, AgentInstallSkillData, AgentInstallSkillResponse, AgentStatsOverviewData, AgentStatsOverviewResponse, AgentStatsRecentRunsData, AgentStatsRecentRunsResponse, AgentUploadAttachmentData, AgentUploadAttachmentResponse, KnowledgeBaseListKbsResponse, KnowledgeBaseCreateKbData, KnowledgeBaseCreateKbResponse, KnowledgeBaseListTrashResponse, KnowledgeBaseRestoreTrashedDocumentData, KnowledgeBaseRestoreTrashedDocumentResponse, KnowledgeBasePurgeTrashedDocumentData, KnowledgeBasePurgeTrashedDocumentResponse, KnowledgeBaseGetKbData, KnowledgeBaseGetKbResponse, KnowledgeBaseDeleteKbData, KnowledgeBaseDeleteKbResponse, KnowledgeBaseUploadKbDocumentData, KnowledgeBaseUploadKbDocumentResponse, KnowledgeBaseListKbDocumentsData, KnowledgeBaseListKbDocumentsResponse, KnowledgeBaseDeleteKbDocumentData, KnowledgeBaseDeleteKbDocumentResponse, KnowledgeBaseQueryKbData, KnowledgeBaseQueryKbResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginResetPasswordData, LoginResetPasswordResponse, LogsReadLogsData, LogsReadLogsResponse, PrivateCreateUserData, PrivateCreateUserResponse, ProvidersListProvidersResponse, ProvidersCreateProviderData, ProvidersCreateProviderResponse, ProvidersGetProviderBalanceData, ProvidersGetProviderBalanceResponse, ProvidersUpdateProviderData, ProvidersUpdateProviderResponse, ProvidersDeleteProviderData, ProvidersDeleteProviderResponse, ProvidersListProviderModelsData, ProvidersListProviderModelsResponse, ProvidersAddProviderModelData, ProvidersAddProviderModelResponse, ProvidersFetchProviderModelsData, ProvidersFetchProviderModelsResponse, ProvidersDeleteProviderModelData, ProvidersDeleteProviderModelResponse, ProvidersListProviderKeysData, ProvidersListProviderKeysResponse, ProvidersAddProviderKeysData, ProvidersAddProviderKeysResponse, ProvidersToggleProviderKeyData, ProvidersToggleProviderKeyResponse, ProvidersDeleteProviderKeyData, ProvidersDeleteProviderKeyResponse, SettingsReadDeploymentSettingsResponse, SettingsUpdateDeploymentSettingsData, SettingsUpdateDeploymentSettingsResponse, SettingsReadToolPermissionsResponse, SettingsUpdateToolPermissionsData, SettingsUpdateToolPermissionsResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersReadMySystemPromptResponse, UsersUpdateMySystemPromptData, UsersUpdateMySystemPromptResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsHealthCheckResponse, UtilsReadPublicSettingsResponse } from './types.gen';
+import type { AgentCreateConversationData, AgentCreateConversationResponse, AgentListConversationsData, AgentListConversationsResponse, AgentRenameConversationData, AgentRenameConversationResponse, AgentDeleteConversationData, AgentDeleteConversationResponse, AgentSetConversationStatusData, AgentSetConversationStatusResponse, AgentExportConversationData, AgentExportConversationResponse, AgentListConversationMessagesData, AgentListConversationMessagesResponse, AgentDeleteConversationMessageData, AgentDeleteConversationMessageResponse, AgentTruncateConversationMessagesData, AgentTruncateConversationMessagesResponse, AgentChatData, AgentChatResponse, AgentCreateMcpServerData, AgentCreateMcpServerResponse, AgentListMcpServersData, AgentListMcpServersResponse, AgentGetMcpServerData, AgentGetMcpServerResponse, AgentUpdateMcpServerData, AgentUpdateMcpServerResponse, AgentDeleteMcpServerData, AgentDeleteMcpServerResponse, AgentConnectMcpServerData, AgentConnectMcpServerResponse, AgentCreatePersonaRouteData, AgentCreatePersonaRouteResponse, AgentListPersonasRouteData, AgentListPersonasRouteResponse, AgentGetPersonaRouteData, AgentGetPersonaRouteResponse, AgentUpdatePersonaRouteData, AgentUpdatePersonaRouteResponse, AgentDeletePersonaRouteData, AgentDeletePersonaRouteResponse, AgentBindConversationPersonaData, AgentBindConversationPersonaResponse, AgentListSkillsResponse, AgentGetSkillDetailData, AgentGetSkillDetailResponse, AgentDeleteSkillData, AgentDeleteSkillResponse, AgentScanSkillsResponse, AgentInstallSkillData, AgentInstallSkillResponse, AgentStatsOverviewData, AgentStatsOverviewResponse, AgentStatsRecentRunsData, AgentStatsRecentRunsResponse, AgentUploadAttachmentData, AgentUploadAttachmentResponse, KnowledgeBaseListKbsResponse, KnowledgeBaseCreateKbData, KnowledgeBaseCreateKbResponse, KnowledgeBaseListTrashResponse, KnowledgeBaseRestoreTrashedDocumentData, KnowledgeBaseRestoreTrashedDocumentResponse, KnowledgeBasePurgeTrashedDocumentData, KnowledgeBasePurgeTrashedDocumentResponse, KnowledgeBaseGetKbData, KnowledgeBaseGetKbResponse, KnowledgeBaseDeleteKbData, KnowledgeBaseDeleteKbResponse, KnowledgeBaseUploadKbDocumentData, KnowledgeBaseUploadKbDocumentResponse, KnowledgeBaseListKbDocumentsData, KnowledgeBaseListKbDocumentsResponse, KnowledgeBaseDeleteKbDocumentData, KnowledgeBaseDeleteKbDocumentResponse, KnowledgeBaseQueryKbData, KnowledgeBaseQueryKbResponse, LoginLoginAccessTokenData, LoginLoginAccessTokenResponse, LoginTestTokenResponse, LoginResetPasswordData, LoginResetPasswordResponse, LogsReadLogsData, LogsReadLogsResponse, PrivateCreateUserData, PrivateCreateUserResponse, ProvidersListProvidersData, ProvidersListProvidersResponse, ProvidersCreateProviderData, ProvidersCreateProviderResponse, ProvidersGetProviderBalanceData, ProvidersGetProviderBalanceResponse, ProvidersUpdateProviderData, ProvidersUpdateProviderResponse, ProvidersDeleteProviderData, ProvidersDeleteProviderResponse, ProvidersListProviderModelsData, ProvidersListProviderModelsResponse, ProvidersAddProviderModelData, ProvidersAddProviderModelResponse, ProvidersFetchProviderModelsData, ProvidersFetchProviderModelsResponse, ProvidersDeleteProviderModelData, ProvidersDeleteProviderModelResponse, ProvidersListProviderKeysData, ProvidersListProviderKeysResponse, ProvidersAddProviderKeysData, ProvidersAddProviderKeysResponse, ProvidersToggleProviderKeyData, ProvidersToggleProviderKeyResponse, ProvidersDeleteProviderKeyData, ProvidersDeleteProviderKeyResponse, SettingsReadDeploymentSettingsResponse, SettingsUpdateDeploymentSettingsData, SettingsUpdateDeploymentSettingsResponse, SettingsReadToolPermissionsResponse, SettingsUpdateToolPermissionsData, SettingsUpdateToolPermissionsResponse, UsersReadUsersData, UsersReadUsersResponse, UsersCreateUserData, UsersCreateUserResponse, UsersReadUserMeResponse, UsersDeleteUserMeResponse, UsersUpdateUserMeData, UsersUpdateUserMeResponse, UsersUpdatePasswordMeData, UsersUpdatePasswordMeResponse, UsersReadMySystemPromptResponse, UsersUpdateMySystemPromptData, UsersUpdateMySystemPromptResponse, UsersRegisterUserData, UsersRegisterUserResponse, UsersReadUserByIdData, UsersReadUserByIdResponse, UsersUpdateUserData, UsersUpdateUserResponse, UsersDeleteUserData, UsersDeleteUserResponse, UtilsHealthCheckResponse, UtilsReadPublicSettingsResponse } from './types.gen';
 
 export class AgentService {
     /**
@@ -1019,19 +1019,30 @@ export class ProvidersService {
     /**
      * List Providers
      * 列出当前用户的所有 Provider 配置（默认排最前）。
+     *
+     * `capability` 可选：不传时返回全部能力（兼容旧调用方与首屏兜底），
+     * 传了就只返回该能力维度的源。
+     * @param data The data for the request.
+     * @param data.capability
      * @returns ProviderOut Successful Response
      * @throws ApiError
      */
-    public static listProviders(): CancelablePromise<ProvidersListProvidersResponse> {
+    public static listProviders(data: ProvidersListProvidersData = {}): CancelablePromise<ProvidersListProvidersResponse> {
         return __request(OpenAPI, {
             method: 'GET',
-            url: '/api/v1/providers'
+            url: '/api/v1/providers',
+            query: {
+                capability: data.capability
+            },
+            errors: {
+                422: 'Validation Error'
+            }
         });
     }
     
     /**
      * Create Provider
-     * 新增一条 Provider 配置；若设为默认，先清掉该用户其他默认。
+     * 新增一条 Provider 配置；若设为默认，先清掉该用户**同能力**的其他默认。
      * @param data The data for the request.
      * @param data.requestBody
      * @returns ProviderOut Successful Response
@@ -1075,7 +1086,7 @@ export class ProvidersService {
     
     /**
      * Update Provider
-     * 更新 Provider 配置；设为默认时清理其他默认。
+     * 更新 Provider 配置；设为默认时清理**同能力**的其他默认。
      * @param data The data for the request.
      * @param data.providerId
      * @param data.requestBody

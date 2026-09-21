@@ -237,6 +237,7 @@ class ProviderManager:
         self,
         user_id: uuid.UUID | None,
         provider_id: uuid.UUID | None = None,
+        capability: str = "chat",
     ) -> ProviderConfig | None:
         """解析本次实际生效的 ProviderConfig（不建模型实例）。
 
@@ -244,10 +245,13 @@ class ProviderManager:
         复用（如视觉能力判定），避免同一套租户过滤条件写两遍。
 
         ⚠️ 两条分支都必须带 user_id 过滤（同 get_chat_model 的多租户硬约束）。
+        ⚠️ 还必须带 capability 过滤（P5）：默认源现在是「每种能力一条」，
+        不带这个条件会把 embedding 源的默认挑给对话用。
 
         Args:
             user_id: 归属用户 id。
             provider_id: 指定配置 id；None 时取该用户的默认启用配置。
+            capability: 能力维度，默认 "chat"。
 
         Returns:
             命中的 ProviderConfig；无可用配置时返回 None。
@@ -256,11 +260,13 @@ class ProviderManager:
             stmt = select(ProviderConfig).where(
                 ProviderConfig.id == provider_id,
                 ProviderConfig.user_id == user_id,
+                ProviderConfig.capability == capability,
                 ProviderConfig.is_active.is_(True),
             )
         else:
             stmt = select(ProviderConfig).where(
                 ProviderConfig.user_id == user_id,
+                ProviderConfig.capability == capability,
                 ProviderConfig.is_default.is_(True),
                 ProviderConfig.is_active.is_(True),
             )
@@ -458,7 +464,8 @@ class ProviderManager:
         """调用 LLM，并在主 Provider 失败时自动回退到其他启用中的 Provider。
 
         按 fallback_order 升序依次尝试**该用户**所有启用中的 Provider，直到成功
-        或超过最大重试次数。
+        或超过最大重试次数。候选只含 `capability="chat"` 的源（P5）——回退链
+        里混进 embedding/stt 源会拿着对话消息去调不兼容的接口。
 
         Args:
             user_id: 归属用户 id；候选源只在该用户的 ProviderConfig 中挑选。
@@ -476,6 +483,7 @@ class ProviderManager:
             select(ProviderConfig)
             .where(
                 ProviderConfig.user_id == user_id,
+                ProviderConfig.capability == "chat",
                 ProviderConfig.is_active.is_(True),
             )
             .order_by(ProviderConfig.fallback_order)
@@ -511,12 +519,13 @@ class ProviderManager:
     # -- Provider CRUD ---------------------------------------------
 
     def list_providers(
-        self, user_id: uuid.UUID | None = None
+        self, user_id: uuid.UUID | None = None, capability: str | None = None
     ) -> list[ProviderConfig]:
         """列出 Provider 配置。
 
         Args:
             user_id: 可选，只列出该用户的 Provider；为 None 时列出全部。
+            capability: 可选，只列出该能力维度的源（P5）；为 None 时不过滤。
 
         Returns:
             ProviderConfig 对象列表（is_default 优先，其余按 fallback_order）。
@@ -524,6 +533,8 @@ class ProviderManager:
         stmt = select(ProviderConfig)
         if user_id is not None:
             stmt = stmt.where(ProviderConfig.user_id == user_id)
+        if capability is not None:
+            stmt = stmt.where(ProviderConfig.capability == capability)
         stmt = stmt.order_by(
             col(ProviderConfig.is_default).desc(),
             ProviderConfig.fallback_order,
@@ -531,19 +542,27 @@ class ProviderManager:
         return list(self.session.exec(stmt).all())
 
     def clear_other_defaults(
-        self, user_id: uuid.UUID, keep_id: uuid.UUID | None = None
+        self,
+        user_id: uuid.UUID,
+        keep_id: uuid.UUID | None = None,
+        capability: str = "chat",
     ) -> None:
-        """把该用户 is_default=True 的 Provider 全部置 False。
+        """把该用户**该能力下** is_default=True 的 Provider 全部置 False。
 
         用于设新默认前的互斥清理。keep_id 不为 None 时会跳过自己
         （PATCH 更新场景：不能把正在更新的那条也清了）。
 
+        ⚠️ 互斥范围是 (user_id, capability)——不能跨能力清默认，否则给
+        embedding 源设默认会把对话默认源一起清掉。
+
         Args:
             user_id: 目标用户 id。
             keep_id: 需要保留为默认的那条 Provider id；None 表示全清。
+            capability: 能力维度，默认 "chat"。
         """
         stmt = select(ProviderConfig).where(
             ProviderConfig.user_id == user_id,
+            ProviderConfig.capability == capability,
             ProviderConfig.is_default.is_(True),
         )
         if keep_id is not None:
@@ -565,6 +584,7 @@ class ProviderManager:
         fallback_order: int = 999,
         config: dict | None = None,
         supports_vision: bool | None = None,
+        capability: str = "chat",
     ) -> ProviderConfig:
         """创建一个新的 Provider 配置并入库。
 
@@ -580,6 +600,7 @@ class ProviderManager:
             fallback_order: 回退优先级（越小越优先），默认 999。
             config: 可选，额外扩展配置字典，默认空字典。
             supports_vision: 视觉能力三态，None=自动（按模型名启发式）。
+            capability: 能力维度，默认 "chat"。
 
         Returns:
             已入库并刷新的 ProviderConfig 对象。
@@ -588,6 +609,7 @@ class ProviderManager:
             user_id=user_id,
             name=name,
             provider_type=provider_type,
+            capability=capability,
             api_key=encrypt_api_key(api_key),
             model_name=model_name,
             base_url=base_url,
@@ -724,8 +746,9 @@ class ProviderManager:
         get_chat_model() / get_embedding_model() 取默认的路径会直接失败
         （RuntimeError: No active provider configured）。
 
-        接替者只在该用户的**其余启用中**（is_active=True）配置里按 fallback_order
-        升序挑第一条；若没有可接替的，则保持无默认（此时也确实没有可用源）。
+        接替者只在该用户的**其余启用中**（is_active=True）**同能力**（P5）配置里
+        按 fallback_order 升序挑第一条；若没有可接替的，则保持无默认（此时也确实
+        没有可用源）。跨能力挑会把 embedding 源顶成对话默认源。
 
         Args:
             provider_id: 目标 ProviderConfig 的 id。
@@ -743,6 +766,7 @@ class ProviderManager:
         # 同一事务 flush 时会短暂出现两条默认而撞索引。
         # 删除与晋升在同一事务内完成，对读方不存在「无默认空窗」。
         was_default = obj.is_default
+        capability = obj.capability  # flush 后对象失效，先取出来
         self.session.delete(obj)
         self.session.flush()
         if was_default:
@@ -750,6 +774,7 @@ class ProviderManager:
                 select(ProviderConfig)
                 .where(
                     ProviderConfig.user_id == obj.user_id,
+                    ProviderConfig.capability == capability,
                     ProviderConfig.id != obj.id,
                     ProviderConfig.is_active.is_(True),
                 )

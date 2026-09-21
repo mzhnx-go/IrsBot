@@ -354,12 +354,15 @@ export type ProviderBalanceOut = {
 export type ProviderCreate = {
     name: string;
     provider_type: string;
+    capability?: 'chat' | 'stt' | 'tts' | 'embedding' | 'rerank';
     api_key: string;
     model_name: string;
     base_url?: (string | null);
     is_default?: boolean;
     supports_vision?: (boolean | null);
 };
+
+export type capability = 'chat' | 'stt' | 'tts' | 'embedding' | 'rerank';
 
 /**
  * 密钥行：只回打码形态，绝不含明文/密文
@@ -411,6 +414,7 @@ export type ProviderOut = {
     id: string;
     name: string;
     provider_type: string;
+    capability?: string;
     model_name: string;
     base_url: (string | null);
     is_default: boolean;
@@ -897,6 +901,10 @@ export type PrivateCreateUserData = {
 };
 
 export type PrivateCreateUserResponse = (UserPublic);
+
+export type ProvidersListProvidersData = {
+    capability?: ('chat' | 'stt' | 'tts' | 'embedding' | 'rerank' | null);
+};
 
 export type ProvidersListProvidersResponse = (Array<ProviderOut>);
 

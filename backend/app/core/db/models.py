@@ -116,6 +116,18 @@ class ProviderKey(SQLModel, table=True):
     )
 
 
+#: Provider 能力维度（P5）。同一用户**每种能力各自**可有一条默认源，
+#: 所以「设为默认」的互斥范围是 (user_id, capability) 而不是 user_id。
+#: 与 api/routes/providers.py 的 `Capability` Literal 必须保持一致。
+PROVIDER_CAPABILITIES: tuple[str, ...] = (
+    "chat",
+    "stt",
+    "tts",
+    "embedding",
+    "rerank",
+)
+
+
 class ProviderConfig(SQLModel, table=True):
     """LLM 供应商配置表。
 
@@ -127,6 +139,7 @@ class ProviderConfig(SQLModel, table=True):
         user_id: 所属用户，级联删除。
         name: 配置显示名称。
         provider_type: 供应商类型，"openai" | "anthropic" | "gemini"。
+        capability: 能力维度，"chat"（默认）| "stt" | "tts" | "embedding" | "rerank"。
         api_key: API 密钥。
         base_url: 自定义 API 地址（兼容 OpenAI 协议的中转站等）。
         model_name: 默认使用的模型名。
@@ -140,13 +153,14 @@ class ProviderConfig(SQLModel, table=True):
 
     __tablename__ = "provider_configs"
 
-    # DB 级约束：同一用户最多一条 is_default=True 的配置。
-    # 应用层的互斥清零（clear_default）只是「尽力而为」，并发写入仍可能产生
-    # 两条默认源；部分唯一索引在数据库层面兜底（只约束 is_default=true 的行）。
+    # DB 级约束：同一用户**每种能力**最多一条 is_default=True 的配置。
+    # 应用层的互斥清零（clear_other_defaults）只是「尽力而为」，并发写入仍可能
+    # 产生两条默认源；部分唯一索引在数据库层面兜底（只约束 is_default=true 的行）。
     __table_args__ = (
         Index(
-            "uq_provider_configs_default_per_user",
+            "uq_provider_configs_default_per_user_capability",
             "user_id",
+            "capability",
             unique=True,
             postgresql_where=text("is_default"),
         ),
@@ -162,6 +176,14 @@ class ProviderConfig(SQLModel, table=True):
     provider_type: str = Field(
         sa_type=String(50), max_length=50
     )  # "openai" | "anthropic" | "gemini"
+    # 能力维度（P5）：该源提供哪类能力。chat=对话（默认，兼容存量数据），
+    # 其余为 stt/tts/embedding/rerank。同一用户每种能力各自一条默认源。
+    capability: str = Field(
+        default="chat",
+        sa_type=String(20),
+        max_length=20,
+        sa_column_kwargs={"server_default": "chat"},
+    )
     api_key: str = Field(sa_type=Text)  # 加密存储
     base_url: str | None = Field(default=None, sa_type=String(500), max_length=500)
     model_name: str = Field(sa_type=String(100), max_length=100)

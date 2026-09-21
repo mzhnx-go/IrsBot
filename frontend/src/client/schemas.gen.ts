@@ -1328,6 +1328,12 @@ export const ProviderCreateSchema = {
             type: 'string',
             title: 'Provider Type'
         },
+        capability: {
+            type: 'string',
+            enum: ['chat', 'stt', 'tts', 'embedding', 'rerank'],
+            title: 'Capability',
+            default: 'chat'
+        },
         api_key: {
             type: 'string',
             title: 'Api Key'
@@ -1542,6 +1548,11 @@ export const ProviderOutSchema = {
         provider_type: {
             type: 'string',
             title: 'Provider Type'
+        },
+        capability: {
+            type: 'string',
+            title: 'Capability',
+            default: 'chat'
         },
         model_name: {
             type: 'string',

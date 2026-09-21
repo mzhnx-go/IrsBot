@@ -395,3 +395,123 @@ def test_balance_uses_stored_key_and_parses_upstream(
     # 落库的是密文，但发给上游的必须是解密后的明文 key
     assert captured["headers"]["Authorization"] == "Bearer sk-plain-balance-key"
     assert captured["url"] == "https://api.deepseek.com/user/balance"
+
+
+# ── P5 能力维度（capability）──────────────────────────────────
+
+
+def test_create_provider_with_capability(
+    client: TestClient, superuser_token_headers: dict, db: Session
+) -> None:
+    """POST 带 capability：响应与库中都是该能力，而不是默认的 chat。"""
+    created = _create_provider(
+        client, superuser_token_headers, capability="embedding"
+    )
+    assert created["capability"] == "embedding"
+
+    row = db.exec(
+        select(ProviderConfig).where(ProviderConfig.id == uuid.UUID(created["id"]))
+    ).one()
+    assert row.capability == "embedding"
+
+
+def test_create_provider_defaults_capability_to_chat(
+    client: TestClient, superuser_token_headers: dict
+) -> None:
+    """不传 capability → chat（存量调用方的兼容行为）。"""
+    created = _create_provider(client, superuser_token_headers)
+    assert created["capability"] == "chat"
+
+
+def test_create_invalid_capability_422(
+    client: TestClient, superuser_token_headers: dict
+) -> None:
+    """能力取值受 Literal 约束，写错直接 422，不会落成脏数据。"""
+    res = client.post(
+        f"{settings.API_V1_STR}/providers",
+        headers=superuser_token_headers,
+        json={
+            "name": f"{_NAME_PREFIX}bad-cap",
+            "provider_type": "openai",
+            "api_key": "sk-x",
+            "model_name": "gpt-4o",
+            "capability": "vision",
+        },
+    )
+    assert res.status_code == 422, res.text
+
+
+def test_list_providers_filters_by_capability(
+    client: TestClient, superuser_token_headers: dict
+) -> None:
+    """?capability= 过滤只回该能力的源；不传则全部（含种子对话源）。"""
+    emb = _create_provider(
+        client, superuser_token_headers, capability="embedding"
+    )
+    chat = _create_provider(client, superuser_token_headers, capability="chat")
+
+    res = client.get(
+        f"{settings.API_V1_STR}/providers",
+        headers=superuser_token_headers,
+        params={"capability": "embedding"},
+    )
+    assert res.status_code == 200, res.text
+    ids = [p["id"] for p in res.json()]
+    assert emb["id"] in ids
+    assert chat["id"] not in ids
+    assert all(p["capability"] == "embedding" for p in res.json())
+
+    # 不传筛选：两种能力都在
+    all_ids = [
+        p["id"]
+        for p in client.get(
+            f"{settings.API_V1_STR}/providers", headers=superuser_token_headers
+        ).json()
+    ]
+    assert {emb["id"], chat["id"]} <= set(all_ids)
+
+
+def test_embedding_default_does_not_clear_chat_default(
+    client: TestClient, superuser_token_headers: dict, db: Session
+) -> None:
+    """给嵌入源设默认，不能清掉该用户的对话默认源（互斥按能力分维）。"""
+    seed = db.exec(
+        select(ProviderConfig).where(ProviderConfig.name == "default")
+    ).one()
+    assert seed.is_default is True, "前置：种子对话源默认应在"
+
+    _create_provider(
+        client, superuser_token_headers, capability="embedding", is_default=True
+    )
+
+    db.refresh(seed)
+    assert seed.is_default is True, "对话默认源被跨能力清掉了（P5 回归点）"
+
+    defaults = db.exec(
+        select(ProviderConfig).where(
+            ProviderConfig.user_id == seed.user_id,
+            ProviderConfig.is_default.is_(True),
+        )
+    ).all()
+    assert {r.capability for r in defaults} == {"chat", "embedding"}
+
+
+def test_patch_cannot_change_capability(
+    client: TestClient, superuser_token_headers: dict, db: Session
+) -> None:
+    """capability 创建后不可改：PATCH 里带上也被忽略（避免换能力撞默认索引）。"""
+    created = _create_provider(
+        client, superuser_token_headers, capability="tts"
+    )
+    res = client.patch(
+        f"{settings.API_V1_STR}/providers/{created['id']}",
+        headers=superuser_token_headers,
+        json={"name": f"{_NAME_PREFIX}renamed", "capability": "chat"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["capability"] == "tts"
+
+    row = db.exec(
+        select(ProviderConfig).where(ProviderConfig.id == uuid.UUID(created["id"]))
+    ).one()
+    assert row.capability == "tts"
