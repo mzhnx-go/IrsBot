@@ -6,22 +6,26 @@ import {
   type ProviderUpdate,
 } from "@/client"
 import useCustomToast from "@/hooks/useCustomToast"
+import type { ProviderCapability } from "@/components/Providers/capabilities"
 import { handleError } from "@/utils"
 
 /**
- * Provider 管理的统一数据 hook（Task 10.5）。
+ * Provider 管理的统一数据 hook（Task 10.5 / P5 能力维度）。
  *
- * - providersQuery: 列表查询（缓存 key "providers"）
+ * - providersQuery: 列表查询（缓存 key ["providers", capability]）——
+ *   能力维度参与 key，切 Tab 时各自缓存，互不覆盖
  * - createProvider / updateProvider / deleteProvider: 三个写操作，
- *   成功后自动失效列表缓存，UI 自动刷新
+ *   成功后按前缀失效 ["providers"]（带能力的 key 一并失效）
+ *
+ * @param capability 能力维度；不传表示「全部能力」（首屏兜底 / 引导页判断用）
  */
-const useProviders = () => {
+const useProviders = (capability?: ProviderCapability) => {
   const queryClient = useQueryClient()
   const { showSuccessToast, showErrorToast } = useCustomToast()
 
   const providersQuery = useQuery({
-    queryKey: ["providers"],
-    queryFn: () => ProvidersService.listProviders(),
+    queryKey: ["providers", capability ?? "all"],
+    queryFn: () => ProvidersService.listProviders({ capability }),
   })
 
   const createProvider = useMutation({

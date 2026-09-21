@@ -1,16 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
-  ArrowDownUp,
-  Braces,
   Download,
-  Mic,
-  MessagesSquare,
   Plus,
   Search,
   SquarePen,
   Trash2 as TrashIcon,
   Trash2,
-  Volume2,
   Wallet,
 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -22,6 +17,12 @@ import {
   type ProviderOut,
   ProvidersService,
 } from "@/client"
+import {
+  CAPABILITY_TABS,
+  capabilityLabel,
+  MODEL_NAME_PLACEHOLDER,
+  type ProviderCapability,
+} from "@/components/Providers/capabilities"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -61,16 +62,9 @@ import { z } from "zod"
 import { useForm } from "react-hook-form"
 
 // ── 能力 Tab 栏（AstrBot 风格）────────────────────────────────
-// 「对话」是现有能力；其余四类供应商为前端占位，后端能力待实现。
-// TODO(待实现)：语音转文字 / 文字转语音 / 嵌入 / 重排序供应商的
-// 数据模型、CRUD 端点与 Agent 集成。届时 Tab 放开为 enabled。
-const CAPABILITY_TABS = [
-  { key: "chat", label: "对话", icon: MessagesSquare, enabled: true },
-  { key: "stt", label: "语音转文字", icon: Mic, enabled: false },
-  { key: "tts", label: "文字转语音", icon: Volume2, enabled: false },
-  { key: "embedding", label: "嵌入", icon: Braces, enabled: false },
-  { key: "rerank", label: "重排序", icon: ArrowDownUp, enabled: false },
-] as const
+// 「对话」是既有能力；stt / tts / embedding / rerank 四类自 P5 起是真实
+// 供应商类别（各有一套独立的模型源清单与默认源），不再是占位。
+// 元数据见 capabilities.ts。
 
 const formSchema = z.object({
   name: z.string().min(1, { message: "名称必填" }),
@@ -102,11 +96,13 @@ const VISION_FROM_FORM = (v: "auto" | "yes" | "no") =>
 
 const AddProviderDialog = ({
   initialOpen = false,
+  capability,
 }: {
   initialOpen?: boolean
+  capability: ProviderCapability
 }) => {
   const [isOpen, setIsOpen] = useState(initialOpen)
-  const { createProvider } = useProviders()
+  const { createProvider } = useProviders(capability)
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -127,11 +123,15 @@ const AddProviderDialog = ({
       {
         name: data.name,
         provider_type: data.provider_type,
+        capability,
         api_key: data.api_key,
         model_name: data.model_name,
         base_url: data.base_url || undefined,
         is_default: data.is_default,
-        supports_vision: VISION_FROM_FORM(data.supports_vision),
+        // 视觉能力只对对话有意义；其余能力不提交（落 null=自动，无副作用）
+        ...(capability === "chat"
+          ? { supports_vision: VISION_FROM_FORM(data.supports_vision) }
+          : {}),
       },
       {
         onSuccess: () => {
@@ -152,9 +152,10 @@ const AddProviderDialog = ({
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>新增模型源</DialogTitle>
+          <DialogTitle>新增{capabilityLabel(capability)}模型源</DialogTitle>
           <DialogDescription>
-            添加一套模型 API 配置。API Key 会加密后存储，且不会再显示。
+            添加一套{capabilityLabel(capability)}能力的模型 API 配置。API Key
+            会加密后存储，且不会再显示。
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -229,7 +230,7 @@ const AddProviderDialog = ({
                     </FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="如：qwen-plus"
+                        placeholder={MODEL_NAME_PLACEHOLDER[capability]}
                         type="text"
                         {...field}
                       />
@@ -257,34 +258,37 @@ const AddProviderDialog = ({
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="supports_vision"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>视觉能力</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="选择视觉能力" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="auto">
-                          自动判断（按模型名）
-                        </SelectItem>
-                        <SelectItem value="yes">支持视觉</SelectItem>
-                        <SelectItem value="no">不支持视觉</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      传图片时据此决定：支持则把图片直接发给模型，否则提示当前
-                      模型看不了图。
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* 视觉能力只与对话相关；嵌入/语音类供应商没有这一维 */}
+              {capability === "chat" && (
+                <FormField
+                  control={form.control}
+                  name="supports_vision"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>视觉能力</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="选择视觉能力" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="auto">
+                            自动判断（按模型名）
+                          </SelectItem>
+                          <SelectItem value="yes">支持视觉</SelectItem>
+                          <SelectItem value="no">不支持视觉</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        传图片时据此决定：支持则把图片直接发给模型，否则提示当前
+                        模型看不了图。
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -297,7 +301,9 @@ const AddProviderDialog = ({
                         onCheckedChange={(v) => field.onChange(Boolean(v))}
                       />
                     </FormControl>
-                    <FormLabel className="!mt-0">设为默认模型源</FormLabel>
+                    <FormLabel className="!mt-0">
+                      设为默认{capabilityLabel(capability)}模型源
+                    </FormLabel>
                   </FormItem>
                 )}
               />
@@ -476,7 +482,12 @@ interface ProviderDetailProps {
 
 /** key={provider.id} 重挂载：切换选中项时表单回到该供应商的当前值 */
 const ProviderDetail = ({ provider }: ProviderDetailProps) => {
-  const { updateProvider } = useProviders()
+  // 能力维度：决定「默认模型名 / 设为默认」的文案与视觉行是否出现。
+  // 老数据可能没有该字段，按 chat 兜底（与后端列默认值一致）。
+  const capability = (provider.capability ?? "chat") as ProviderCapability
+  const capLabel = capabilityLabel(capability)
+  // 带上能力：与左侧清单共用同一份 query 缓存，避免多打一次无筛选的列表
+  const { updateProvider } = useProviders(capability)
 
   const [name, setName] = useState(provider.name)
   // API Key：后端从不回传明文——留空 = 不修改，输入新值才进 PATCH
@@ -602,39 +613,44 @@ const ProviderDetail = ({ provider }: ProviderDetailProps) => {
             placeholder="https://…/v1"
           />
         </SettingRow>
-        <SettingRow label="默认模型名" description="对话默认使用的模型">
+        <SettingRow label="默认模型名" description={`${capLabel}使用的默认模型`}>
           <Input
             value={modelName}
             onChange={(e) => setModelName(e.target.value)}
           />
         </SettingRow>
-        <SettingRow label="设为默认" description="对话使用标记为默认的模型源">
+        <SettingRow
+          label="设为默认"
+          description={`${capLabel}使用标记为默认的模型源`}
+        >
           <Switch
             checked={isDefault}
             onCheckedChange={setIsDefault}
             data-testid="provider-default-switch"
           />
         </SettingRow>
-        <SettingRow
-          label="视觉能力"
-          description="传图片时：支持则直接发给模型，否则提示看不了图"
-        >
-          <Select
-            value={supportsVision}
-            onValueChange={(v) =>
-              setSupportsVision(v as "auto" | "yes" | "no")
-            }
+        {capability === "chat" && (
+          <SettingRow
+            label="视觉能力"
+            description="传图片时：支持则直接发给模型，否则提示看不了图"
           >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto">自动判断（按模型名）</SelectItem>
-              <SelectItem value="yes">支持视觉</SelectItem>
-              <SelectItem value="no">不支持视觉</SelectItem>
-            </SelectContent>
-          </Select>
-        </SettingRow>
+            <Select
+              value={supportsVision}
+              onValueChange={(v) =>
+                setSupportsVision(v as "auto" | "yes" | "no")
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">自动判断（按模型名）</SelectItem>
+                <SelectItem value="yes">支持视觉</SelectItem>
+                <SelectItem value="no">不支持视觉</SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingRow>
+        )}
       </div>
 
       {/* 高级配置：随「保存配置」一并提交（后端存 config JSON） */}
@@ -1065,9 +1081,16 @@ const ProviderSettings = ({
 }: {
   autoOpenNew?: boolean
 }) => {
-  const { providersQuery, deleteProvider } = useProviders()
+  // 当前查看的能力维度（P5）：切 Tab = 换一份模型源清单与默认源
+  const [capability, setCapability] = useState<ProviderCapability>("chat")
+  const { providersQuery, deleteProvider } = useProviders(capability)
   // 未选中任何项时右侧显示空态（与 AstrBot 一致），不自动选中
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  // 切能力后旧选中项已不在当前清单里，清掉避免右侧显示上一个 Tab 的源
+  useEffect(() => {
+    setSelectedId(null)
+  }, [capability])
 
   if (providersQuery.isPending) {
     return null
@@ -1082,19 +1105,19 @@ const ProviderSettings = ({
       <div className="flex flex-wrap items-center gap-2">
         {CAPABILITY_TABS.map((tab) => {
           const Icon = tab.icon
+          const active = tab.key === capability
           return (
             <button
               key={tab.key}
               type="button"
-              disabled={!tab.enabled}
-              title={tab.enabled ? undefined : "待实现"}
+              onClick={() => setCapability(tab.key)}
+              aria-pressed={active}
               data-testid={`provider-tab-${tab.key}`}
               className={cn(
                 "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors",
-                tab.key === "chat"
+                active
                   ? "bg-muted font-medium text-foreground"
                   : "text-muted-foreground hover:bg-muted/60",
-                !tab.enabled && "cursor-not-allowed opacity-50 hover:bg-transparent",
               )}
             >
               <Icon className="size-4" />
@@ -1110,11 +1133,14 @@ const ProviderSettings = ({
         <div className="rounded-xl border p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-semibold">模型源</h2>
-            <AddProviderDialog initialOpen={autoOpenNew} />
+            <AddProviderDialog
+              initialOpen={autoOpenNew}
+              capability={capability}
+            />
           </div>
           {providers.length === 0 ? (
             <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              还没有模型源，点击右上角「新增」添加
+              还没有{capabilityLabel(capability)}模型源，点击右上角「新增」添加
             </p>
           ) : (
             <div className="flex flex-col gap-2.5">
