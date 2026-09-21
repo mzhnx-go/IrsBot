@@ -17,7 +17,7 @@ from app.api.deps import SessionDep, get_current_user
 from app.core.agent.provider import ProviderManager
 from app.core.agent.provider_balance import ProviderBalanceOut, query_balance
 from app.core.agent.provider_models import fetch_upstream_models
-from app.core.db.models import ProviderConfig, ProviderModel
+from app.core.db.models import ProviderConfig, ProviderKey, ProviderModel
 from app.core.db.sqlmodel_models import User
 from app.utils.crypto import decrypt_api_key
 
@@ -87,6 +87,26 @@ class ProviderModelCreate(BaseModel):
     display_name: str | None = Field(default=None, max_length=200)
 
 
+class ProviderKeyOut(BaseModel):
+    """密钥行：只回打码形态，绝不含明文/密文"""
+    id: UUID
+    key_mask: str
+    is_active: bool
+    fail_count: int
+    cooldown_until: str | None = None
+    last_used_at: str | None = None
+
+
+class ProviderKeysOut(BaseModel):
+    items: list[ProviderKeyOut]
+    count: int
+
+
+class ProviderKeysAdd(BaseModel):
+    """「添加更多」批量粘贴：一行一个 Key"""
+    keys: list[str] = Field(min_length=1)
+
+
 
 @router.get("/providers", response_model=list[ProviderOut])
 def list_providers(session: SessionDep, current_user: User = Depends(get_current_user)):
@@ -140,13 +160,19 @@ async def get_provider_balance(
     if pc is None:
         raise HTTPException(status_code=404, detail="Provider not found")
 
+    mgr = ProviderManager(session)
+    key_plain, key_row_id = mgr.resolve_api_key(pc)
     result = await query_balance(
         base_url=pc.base_url,
-        api_key=decrypt_api_key(pc.api_key),
+        api_key=key_plain,
         timeout_seconds=pc.timeout_seconds,
         proxy_url=pc.proxy_url,
         extra_headers=pc.extra_headers or None,
     )
+    if result.error:
+        mgr.mark_key_failure(key_row_id)
+    else:
+        mgr.mark_key_success(key_row_id)
     if result.supported:
         logger.info(
             "余额查询成功：provider=%s 剩余=%s%s",
@@ -259,18 +285,22 @@ async def fetch_provider_models(
     上游失败翻译为中文 502/504：Key 无效 / 不可达 / 超时，便于用户排障。
     """
     pc = _get_owned_provider(provider_id, session, current_user)
+    mgr = ProviderManager(session)
+    key_plain, key_row_id = mgr.resolve_api_key(pc)
     try:
         models = await fetch_upstream_models(
             provider_type=pc.provider_type,
             base_url=pc.base_url,
-            api_key=decrypt_api_key(pc.api_key),
+            api_key=key_plain,
             timeout_seconds=pc.timeout_seconds,
             proxy_url=pc.proxy_url,
             extra_headers=pc.extra_headers or None,
         )
     except httpx.TimeoutException:
+        mgr.mark_key_failure(key_row_id)
         raise HTTPException(status_code=504, detail="拉取超时，请稍后再试或调大超时时间")
     except httpx.HTTPStatusError as exc:
+        mgr.mark_key_failure(key_row_id)
         status = exc.response.status_code
         if status in (401, 403):
             raise HTTPException(status_code=502, detail="API Key 无效或无权限获取模型列表")
@@ -278,9 +308,11 @@ async def fetch_provider_models(
             status_code=502, detail=f"服务商返回错误（HTTP {status}）"
         )
     except httpx.HTTPError:
+        mgr.mark_key_failure(key_row_id)
         raise HTTPException(
             status_code=502, detail="无法连接到服务商，请检查网络与 API 地址"
         )
+    mgr.mark_key_success(key_row_id)
 
     if not models:
         raise HTTPException(status_code=502, detail="服务商返回了空的模型列表")
@@ -345,6 +377,127 @@ def delete_provider_model(
     session.delete(row)
     session.commit()
     return {"message": "模型已移除"}
+
+
+# ── 多 API Key（「添加更多」）─────────────────────────────────
+
+
+def _mask_key(plain: str) -> str:
+    """明文 Key 打码：前 4 后 4，中间星号；过短则全遮。"""
+    if len(plain) <= 12:
+        return "****"
+    return f"{plain[:4]}****{plain[-4:]}"
+
+
+def _list_keys(session: Session, provider_id: UUID) -> list[ProviderKeyOut]:
+    rows = session.exec(
+        select(ProviderKey)
+        .where(ProviderKey.provider_id == provider_id)
+        .order_by(ProviderKey.created_at)
+    ).all()
+    items = []
+    for r in rows:
+        plain = decrypt_api_key(r.encrypted_key)
+        items.append(
+            ProviderKeyOut(
+                id=r.id,
+                key_mask=_mask_key(plain),
+                is_active=r.is_active,
+                fail_count=r.fail_count,
+                cooldown_until=r.cooldown_until.isoformat() if r.cooldown_until else None,
+                last_used_at=r.last_used_at.isoformat() if r.last_used_at else None,
+            )
+        )
+    return items
+
+
+@router.get("/providers/{provider_id}/keys", response_model=ProviderKeysOut)
+def list_provider_keys(
+    provider_id: UUID,
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+):
+    """列出该供应商的密钥行（打码）。"""
+    pc = _get_owned_provider(provider_id, session, current_user)
+    items = _list_keys(session, pc.id)
+    return ProviderKeysOut(items=items, count=len(items))
+
+
+@router.post("/providers/{provider_id}/keys", response_model=ProviderKeysOut)
+def add_provider_keys(
+    provider_id: UUID,
+    body: ProviderKeysAdd,
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+):
+    """批量添加 Key（一行一个，去重、去空白）。"""
+    from app.utils.crypto import encrypt_api_key
+
+    pc = _get_owned_provider(provider_id, session, current_user)
+    existing = {
+        decrypt_api_key(r.encrypted_key)
+        for r in session.exec(
+            select(ProviderKey).where(ProviderKey.provider_id == pc.id)
+        ).all()
+    }
+    added = 0
+    for raw in body.keys:
+        key = raw.strip()
+        if not key or key in existing:
+            continue
+        session.add(ProviderKey(provider_id=pc.id, encrypted_key=encrypt_api_key(key)))
+        existing.add(key)
+        added += 1
+    if added:
+        session.commit()
+    logger.info("密钥批量添加：provider=%s 新增 %d 把", pc.name, added)
+    items = _list_keys(session, pc.id)
+    return ProviderKeysOut(items=items, count=len(items))
+
+
+@router.patch("/providers/{provider_id}/keys/{key_id}", response_model=ProviderKeyOut)
+def toggle_provider_key(
+    provider_id: UUID,
+    key_id: UUID,
+    body: dict,
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+):
+    """启停一把 Key（停用后不参与轮换）。"""
+    _get_owned_provider(provider_id, session, current_user)
+    row = session.get(ProviderKey, key_id)
+    if row is None or row.provider_id != provider_id:
+        raise HTTPException(status_code=404, detail="密钥不存在")
+    if "is_active" in body:
+        row.is_active = bool(body["is_active"])
+        if not row.is_active:
+            row.fail_count = 0
+            row.cooldown_until = None
+        session.commit()
+        session.refresh(row)
+    items = _list_keys(session, provider_id)
+    return next(i for i in items if i.id == key_id)
+
+
+@router.delete("/providers/{provider_id}/keys/{key_id}")
+def delete_provider_key(
+    provider_id: UUID,
+    key_id: UUID,
+    session: SessionDep,
+    current_user: User = Depends(get_current_user),
+):
+    """删除一把 Key（404 = 不存在或不是自己的）。"""
+    _get_owned_provider(provider_id, session, current_user)
+    row = session.get(ProviderKey, key_id)
+    if row is None or row.provider_id != provider_id:
+        raise HTTPException(status_code=404, detail="密钥不存在")
+    session.delete(row)
+    session.commit()
+    remaining = _list_keys(session, provider_id)
+    if not remaining:
+        # 最后一行被删：留一个空提示由前端处理（api_key 列仍可回落）
+        logger.warning("供应商 %s 的密钥行已清空，取 Key 将回落 api_key 列", provider_id)
+    return {"message": "密钥已删除"}
 
 
 @router.delete("/providers/{provider_id}")

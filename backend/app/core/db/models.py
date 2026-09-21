@@ -75,6 +75,47 @@ class ProviderModel(SQLModel, table=True):
     )
 
 
+class ProviderKey(SQLModel, table=True):
+    """供应商的多把 API Key（P8「添加更多」）。
+
+    轮换策略：每次取 Key 选 `last_used_at` 最旧的可用行（顺序轮换）；
+    连败 3 次（401/403/429）进入 5 分钟冷却。迁移时把
+    provider_configs.api_key 回填为首行，无行时 resolve 回落到该列。
+
+    Attributes:
+        id: 主键，UUID 自动生成。
+        provider_id: 所属供应商，级联删除。
+        encrypted_key: 加密密文（enc:v1:）。
+        is_active: 手动启停。
+        last_used_at: 最近一次被轮换选中的时间。
+        fail_count: 连续失败计数（成功不重置时由调用方自行清零）。
+        cooldown_until: 冷却截止时间（非空 = 冷却中）。
+        created_at: 创建时间（UTC）。
+    """
+
+    __tablename__ = "provider_keys"
+
+    id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        primary_key=True,
+        sa_type=UUID(as_uuid=True),
+    )
+    provider_id: uuid.UUID = Field(
+        foreign_key="provider_configs.id", ondelete="CASCADE", index=True
+    )
+    encrypted_key: str = Field(sa_type=Text)
+    is_active: bool = True
+    last_used_at: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True), nullable=True))
+    fail_count: int = 0
+    cooldown_until: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True), nullable=True))
+    created_at: datetime | None = Field(
+        default_factory=get_datetime_utc,
+        sa_column=Column(
+            DateTime(timezone=True), default=get_datetime_utc, nullable=False
+        ),
+    )
+
+
 class ProviderConfig(SQLModel, table=True):
     """LLM 供应商配置表。
 

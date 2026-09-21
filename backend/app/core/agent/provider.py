@@ -10,12 +10,14 @@
 import logging
 import uuid
 from collections import OrderedDict
+from datetime import timedelta
 from typing import Any
 
 import httpx
 from sqlmodel import Session, col, select
 
-from app.core.db.models import ProviderConfig
+from app.core.db.models import ProviderConfig, ProviderKey
+from app.core.db.sqlmodel_models import get_datetime_utc
 from app.utils.crypto import decrypt_api_key, encrypt_api_key
 
 logger = logging.getLogger(__name__)
@@ -296,22 +298,24 @@ class ProviderManager:
         """
         from langchain.chat_models import init_chat_model
 
-        # pc 先读再算缓存键：高级配置（config JSON）参与签名，改配置即换实例。
-        # 代价是每次调用一次主键 SELECT（对比 LLM 请求耗时可忽略）。
+        # pc 先读再算缓存键：高级配置与轮换选中的 Key 都参与签名，
+        # 改配置或轮换到另一把 Key 都会得到新实例。
         pc = self.get_active_config(user_id=user_id, provider_id=provider_id)
         if pc is None:
             raise RuntimeError(
                 "No active provider configured. Create a ProviderConfig first."
             )
-
         advanced_sig = (
             f"{pc.timeout_seconds}|{pc.proxy_url or ''}|"
             f"{sorted((pc.extra_headers or {}).items())}"
         )
         # ⚠️ cache key 必须含 user_id：否则不同用户用同一 provider_id=None 时
         #    会命中同一缓存条目，拿到别人的模型实例。
+        pc_key_row: uuid.UUID | None
+        api_key_plain, pc_key_row = self.resolve_api_key(pc)
         cache_key = (
-            f"{user_id}:{provider_id}:{model_name}:{temperature}:{advanced_sig}"
+            f"{user_id}:{provider_id}:{model_name}:{temperature}:"
+            f"{advanced_sig}:{pc_key_row or 'legacy'}"
         )
         hit = self._chat_cache.get_hit(cache_key)
         if hit is not None:
@@ -320,7 +324,7 @@ class ProviderManager:
         kwargs: dict[str, Any] = {
             "model": model_name or pc.model_name,
             "temperature": temperature,
-            "api_key": decrypt_api_key(pc.api_key),
+            "api_key": api_key_plain,
         }
         if pc.base_url:
             kwargs["base_url"] = pc.base_url
@@ -596,7 +600,87 @@ class ProviderManager:
         self.session.add(obj)
         self.session.commit()
         self.session.refresh(obj)
+        # 多 Key 体系：创建时同步写入第一行（provider_keys 为权威来源，
+        # api_key 列仅作无行时的回落）
+        self.session.add(
+            ProviderKey(provider_id=obj.id, encrypted_key=obj.api_key)
+        )
+        self.session.commit()
         return obj
+
+    # ── 多 API Key（P8）：轮换 / 冷却 / CRUD ─────────────────────
+
+    #: 连败达到该次数进入冷却
+    KEY_FAIL_THRESHOLD = 3
+    #: 冷却时长（分钟）
+    KEY_COOLDOWN_MINUTES = 5
+
+    def resolve_api_key(self, pc: ProviderConfig) -> tuple[str, uuid.UUID | None]:
+        """轮换取一把可用 Key。
+
+        顺序轮换：在「启用且未冷却」的行里选 `last_used_at` 最旧的，
+        选中即刷新 last_used_at。全部冷却时如实报错；无行（异常态）
+        回落到 api_key 列。
+
+        Returns:
+            (明文 Key, ProviderKey 行 id)。行 id 为 None 表示用了回落列。
+
+        Raises:
+            RuntimeError: 该供应商存在 Key 但全部处于冷却中。
+        """
+        rows = self.session.exec(
+            select(ProviderKey)
+            .where(ProviderKey.provider_id == pc.id, ProviderKey.is_active)
+            .order_by(
+                col(ProviderKey.last_used_at).asc().nulls_first(),
+            )
+        ).all()
+        now = get_datetime_utc()
+        available = [
+            r
+            for r in rows
+            if r.cooldown_until is None or r.cooldown_until <= now
+        ]
+        if not available:
+            if rows:
+                raise RuntimeError(
+                    "该模型源的所有 API Key 都处于失败冷却中，请稍后再试或更换 Key"
+                )
+            # 无行：回落 api_key 列（兼容异常态 / 手工改库）
+            return decrypt_api_key(pc.api_key), None
+
+        row = available[0]
+        row.last_used_at = now
+        self.session.commit()
+        return decrypt_api_key(row.encrypted_key), row.id
+
+    def mark_key_failure(self, key_row_id: uuid.UUID | None) -> None:
+        """记录一次上游鉴权/限流失败；连败达阈值进入冷却。
+
+        key_row_id 为 None（回落列）时不处理。成功重置由调用方
+        `mark_key_success` 触发。
+        """
+        if key_row_id is None:
+            return
+        row = self.session.get(ProviderKey, key_row_id)
+        if row is None:
+            return
+        row.fail_count += 1
+        if row.fail_count >= self.KEY_FAIL_THRESHOLD:
+            row.cooldown_until = get_datetime_utc() + timedelta(
+                minutes=self.KEY_COOLDOWN_MINUTES
+            )
+            row.fail_count = 0
+        self.session.commit()
+
+    def mark_key_success(self, key_row_id: uuid.UUID | None) -> None:
+        """成功后重置失败计数（不清冷却——冷却到期自动恢复）。"""
+        if key_row_id is None:
+            return
+        row = self.session.get(ProviderKey, key_row_id)
+        if row is not None and row.fail_count:
+            row.fail_count = 0
+            self.session.commit()
 
     def update_provider(
         self, provider_id: uuid.UUID, **fields
@@ -619,6 +703,16 @@ class ProviderManager:
                     v = encrypt_api_key(v)
                 if hasattr(obj, k):
                     setattr(obj, k, v)
+            if "api_key" in fields:
+                # 多 Key 体系同步：用户在设置区填新 Key = 重置凭据，
+                # 清空全部轮换行、写入唯一新行（可预期，不产生漂移）
+                for row in self.session.exec(
+                    select(ProviderKey).where(ProviderKey.provider_id == obj.id)
+                ).all():
+                    self.session.delete(row)
+                self.session.add(
+                    ProviderKey(provider_id=obj.id, encrypted_key=obj.api_key)
+                )
             self.session.commit()
             self.session.refresh(obj)
         return obj
