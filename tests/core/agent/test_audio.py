@@ -361,3 +361,19 @@ def test_upstream_detail_falls_back_to_status():
         audio._upstream_detail(httpx.Response(500, text="boom", request=req))
         == "boom"
     )
+
+
+def test_upstream_detail_understands_fastapi_style_detail():
+    """兼容网关回 {"detail": ...} 时也要抠出原因（实机 A/B 撞到过）。
+
+    真实场景：把 base_url 指向一个 FastAPI 写的网关（如 LiteLLM）的
+    非音频路径，上游回的就是 {"detail":"Not Found"}；只认 error.message
+    会把整段 JSON 当文案展示给用户。
+    """
+    req = httpx.Request("POST", "https://x/v1/audio/transcriptions")
+    assert (
+        audio._upstream_detail(
+            httpx.Response(404, json={"detail": "Not Found"}, request=req)
+        )
+        == "Not Found"
+    )

@@ -87,7 +87,12 @@ def _capability_label(capability: str) -> str:
 
 
 def _upstream_detail(resp: httpx.Response) -> str:
-    """从上游错误响应里尽量抠出一句可读的原因。"""
+    """从上游错误响应里尽量抠出一句可读的原因。
+
+    OpenAI 兼容协议用 {"error": {"message": ...}}，但 OpenAI **兼容网关**
+    五花八门：LiteLLM / FastAPI 系网关直接回 {"detail": "..."}，
+    所以两种都认，认不出才退回状态码。
+    """
     try:
         payload = resp.json()
     except ValueError:
@@ -98,8 +103,9 @@ def _upstream_detail(resp: httpx.Response) -> str:
             return str(err["message"])[:_MAX_DETAIL]
         if isinstance(err, str):
             return err[:_MAX_DETAIL]
-        if payload.get("message"):
-            return str(payload["message"])[:_MAX_DETAIL]
+        for key in ("message", "detail"):
+            if payload.get(key):
+                return str(payload[key])[:_MAX_DETAIL]
     return (resp.text or "").strip()[:_MAX_DETAIL] or f"HTTP {resp.status_code}"
 
 
