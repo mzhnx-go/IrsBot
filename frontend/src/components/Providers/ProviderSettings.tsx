@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 
 import {
+  type ProviderKeyOut,
   type ProviderModelOut,
   type ProviderOut,
   ProvidersService,
@@ -500,6 +501,8 @@ const ProviderDetail = ({ provider }: ProviderDetailProps) => {
     })),
   )
   const [headersEditing, setHeadersEditing] = useState(false)
+  // 多 Key 面板（P8）：批量粘贴 + 启停/删除，轮换在后端进行
+  const [keysOpen, setKeysOpen] = useState(false)
 
   const handleSave = () => {
     if (!name.trim() || !modelName.trim()) return
@@ -570,24 +573,26 @@ const ProviderDetail = ({ provider }: ProviderDetailProps) => {
         </SettingRow>
         <SettingRow
           label="API Key"
-          description="已加密存储。留空表示不修改；输入新值则覆盖"
+          description="已加密存储。留空表示不修改；输入新值则覆盖全部密钥"
         >
-          <div className="flex items-center gap-2">
-            <PasswordInput
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="••••••••••••••••"
-            />
-            {/* TODO(待实现)：多 Key 轮换（后端需 ProviderKey 表与轮询策略） */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              disabled
-              title="待实现"
-            >
-              添加更多
-            </Button>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <PasswordInput
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="••••••••••••••••"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => setKeysOpen((v) => !v)}
+                data-testid="provider-keys-toggle"
+              >
+                {keysOpen ? "收起密钥" : "添加更多"}
+              </Button>
+            </div>
+            {keysOpen && <ProviderKeysPanel providerId={provider.id} />}
           </div>
         </SettingRow>
         <SettingRow label="API 地址" description="自定义 API 端点 URL（可选）">
@@ -923,6 +928,132 @@ const ModelsSection = ({ providerId }: { providerId: string }) => {
           ))}
         </ul>
       )}
+    </div>
+  )
+}
+
+// ── 多 API Key 面板：批量添加 + 启停/删除（轮换在后端） ─────────
+
+const ProviderKeysPanel = ({ providerId }: { providerId: string }) => {
+  const [keys, setKeys] = useState<ProviderKeyOut[]>([])
+  const [batch, setBatch] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await ProvidersService.listProviderKeys({ providerId })
+      setKeys(res.items)
+    } catch {
+      // 静默：面板仍可添加
+    } finally {
+      setLoading(false)
+    }
+  }, [providerId])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const handleAdd = async () => {
+    const list = batch
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    if (list.length === 0) return
+    setSaving(true)
+    try {
+      const res = await ProvidersService.addProviderKeys({
+        providerId,
+        requestBody: { keys: list },
+      })
+      setKeys(res.items)
+      setBatch("")
+      toast.success(`已添加 ${res.count} 把密钥`)
+    } catch (e) {
+      toast.error(apiErrMsg(e, "添加失败，请重试"))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleToggle = async (id: string, active: boolean) => {
+    try {
+      await ProvidersService.toggleProviderKey({
+        providerId,
+        keyId: id,
+        requestBody: { is_active: active },
+      })
+      setKeys((prev) =>
+        prev.map((k) => (k.id === id ? { ...k, is_active: active } : k)),
+      )
+    } catch (e) {
+      toast.error(apiErrMsg(e, "操作失败，请重试"))
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await ProvidersService.deleteProviderKey({ providerId, keyId: id })
+      setKeys((prev) => prev.filter((k) => k.id !== id))
+    } catch (e) {
+      toast.error(apiErrMsg(e, "删除失败，请重试"))
+    }
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border border-dashed p-3" data-testid="provider-keys-panel">
+      <p className="text-xs font-medium">密钥清单（轮换使用，连败自动冷却）</p>
+      {loading ? null : keys.length === 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          暂无密钥行——当前使用创建时的 Key，粘贴添加后开始轮换
+        </p>
+      ) : (
+        <ul className="mt-2 flex flex-col gap-1.5">
+          {keys.map((k) => (
+            <li key={k.id} className="flex items-center justify-between gap-2 text-xs">
+              <code className="truncate rounded bg-muted px-1.5 py-0.5 font-mono">
+                {k.key_mask}
+              </code>
+              {k.cooldown_until && (
+                <Badge variant="outline" className="text-destructive">
+                  冷却中
+                </Badge>
+              )}
+              <div className="flex shrink-0 items-center gap-2">
+                <Switch
+                  checked={k.is_active}
+                  onCheckedChange={(v) => void handleToggle(k.id, v)}
+                  aria-label={`启停 ${k.key_mask}`}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-6 text-muted-foreground hover:text-destructive"
+                  aria-label={`删除 ${k.key_mask}`}
+                  onClick={() => void handleDelete(k.id)}
+                >
+                  <Trash2 />
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-2 flex flex-col gap-2">
+        <textarea
+          value={batch}
+          onChange={(e) => setBatch(e.target.value)}
+          placeholder={"批量粘贴，一行一个 Key：\nsk-xxxxxxxx\nsk-yyyyyyyy"}
+          rows={3}
+          className="w-full resize-none rounded-md border border-input bg-transparent p-2 font-mono text-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+        />
+        <div className="flex justify-end">
+          <LoadingButton size="sm" loading={saving} onClick={handleAdd}>
+            添加（{batch.split("\n").filter((s) => s.trim()).length}）
+          </LoadingButton>
+        </div>
+      </div>
     </div>
   )
 }

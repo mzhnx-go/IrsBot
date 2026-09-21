@@ -1370,6 +1370,90 @@ export const ProviderCreateSchema = {
     description: '创建请求体'
 } as const;
 
+export const ProviderKeyOutSchema = {
+    properties: {
+        id: {
+            type: 'string',
+            format: 'uuid',
+            title: 'Id'
+        },
+        key_mask: {
+            type: 'string',
+            title: 'Key Mask'
+        },
+        is_active: {
+            type: 'boolean',
+            title: 'Is Active'
+        },
+        fail_count: {
+            type: 'integer',
+            title: 'Fail Count'
+        },
+        cooldown_until: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Cooldown Until'
+        },
+        last_used_at: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Last Used At'
+        }
+    },
+    type: 'object',
+    required: ['id', 'key_mask', 'is_active', 'fail_count'],
+    title: 'ProviderKeyOut',
+    description: '密钥行：只回打码形态，绝不含明文/密文'
+} as const;
+
+export const ProviderKeysAddSchema = {
+    properties: {
+        keys: {
+            items: {
+                type: 'string'
+            },
+            type: 'array',
+            minItems: 1,
+            title: 'Keys'
+        }
+    },
+    type: 'object',
+    required: ['keys'],
+    title: 'ProviderKeysAdd',
+    description: '「添加更多」批量粘贴：一行一个 Key'
+} as const;
+
+export const ProviderKeysOutSchema = {
+    properties: {
+        items: {
+            items: {
+                '$ref': '#/components/schemas/ProviderKeyOut'
+            },
+            type: 'array',
+            title: 'Items'
+        },
+        count: {
+            type: 'integer',
+            title: 'Count'
+        }
+    },
+    type: 'object',
+    required: ['items', 'count'],
+    title: 'ProviderKeysOut'
+} as const;
+
 export const ProviderModelCreateSchema = {
     properties: {
         model_id: {

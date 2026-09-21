@@ -362,6 +362,30 @@ export type ProviderCreate = {
 };
 
 /**
+ * 密钥行：只回打码形态，绝不含明文/密文
+ */
+export type ProviderKeyOut = {
+    id: string;
+    key_mask: string;
+    is_active: boolean;
+    fail_count: number;
+    cooldown_until?: (string | null);
+    last_used_at?: (string | null);
+};
+
+/**
+ * 「添加更多」批量粘贴：一行一个 Key
+ */
+export type ProviderKeysAdd = {
+    keys: Array<(string)>;
+};
+
+export type ProviderKeysOut = {
+    items: Array<ProviderKeyOut>;
+    count: number;
+};
+
+/**
  * 「自定义模型」请求体
  */
 export type ProviderModelCreate = {
@@ -926,6 +950,36 @@ export type ProvidersDeleteProviderModelData = {
 };
 
 export type ProvidersDeleteProviderModelResponse = (unknown);
+
+export type ProvidersListProviderKeysData = {
+    providerId: string;
+};
+
+export type ProvidersListProviderKeysResponse = (ProviderKeysOut);
+
+export type ProvidersAddProviderKeysData = {
+    providerId: string;
+    requestBody: ProviderKeysAdd;
+};
+
+export type ProvidersAddProviderKeysResponse = (ProviderKeysOut);
+
+export type ProvidersToggleProviderKeyData = {
+    keyId: string;
+    providerId: string;
+    requestBody: {
+        [key: string]: unknown;
+    };
+};
+
+export type ProvidersToggleProviderKeyResponse = (ProviderKeyOut);
+
+export type ProvidersDeleteProviderKeyData = {
+    keyId: string;
+    providerId: string;
+};
+
+export type ProvidersDeleteProviderKeyResponse = (unknown);
 
 export type SettingsReadDeploymentSettingsResponse = (DeploymentSettingsPublic);
 
