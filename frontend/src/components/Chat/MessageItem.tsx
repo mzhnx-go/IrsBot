@@ -2,9 +2,12 @@ import {
   ArrowUp,
   Check,
   Copy,
+  Loader2,
   Pencil,
   RefreshCw,
+  Square,
   Trash2,
+  Volume2,
   X,
 } from "lucide-react"
 import { type ReactNode, useState } from "react"
@@ -24,21 +27,30 @@ interface MessageItemProps {
   onDelete: (dbId: string) => void
   onRegenerate: () => void
   onEditResend: (dbId: string, newContent: string) => void
+  /** 朗读：由上层持有播放器，保证全页面同一时刻只播一条 */
+  onSpeak: (id: string, markdown: string) => void
+  /** 当前正在播放/正在合成的消息 id */
+  speakingId: string | null
+  speakLoadingId: string | null
 }
 
 const ActionButton = ({
   label,
   onClick,
+  testId,
   children,
 }: {
   label: string
   onClick: () => void
+  /** e2e 定位用（同一操作条里有多个同名图标按钮时靠它区分） */
+  testId?: string
   children: ReactNode
 }) => (
   <button
     type="button"
     title={label}
     aria-label={label}
+    data-testid={testId}
     onClick={onClick}
     className="rounded-md p-1.5 text-muted-foreground transition-colors duration-100 hover:bg-muted hover:text-foreground active:scale-95"
   >
@@ -53,6 +65,9 @@ const MessageItem = ({
   onDelete,
   onRegenerate,
   onEditResend,
+  onSpeak,
+  speakingId,
+  speakLoadingId,
 }: MessageItemProps) => {
   const isUser = message.role === "user"
   const [copied, setCopied] = useState(false)
@@ -61,6 +76,8 @@ const MessageItem = ({
   const [, copy] = useCopyToClipboard()
 
   const canAct = !!message.dbId && !disabled && !message.streaming
+  const isSpeaking = speakingId === message.id
+  const isSpeakLoading = speakLoadingId === message.id
 
   const handleCopy = () => {
     copy(message.content)
@@ -190,6 +207,22 @@ const MessageItem = ({
             }}
           >
             <Pencil className="size-3.5" />
+          </ActionButton>
+        )}
+        {/* 朗读：整段合成后播放（不做流式）；再点一次停止 */}
+        {!isUser && (
+          <ActionButton
+            label={isSpeaking ? "停止朗读" : "朗读"}
+            testId="message-speak-button"
+            onClick={() => onSpeak(message.id, message.content)}
+          >
+            {isSpeakLoading ? (
+              <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" />
+            ) : isSpeaking ? (
+              <Square className="size-3.5 fill-current" />
+            ) : (
+              <Volume2 className="size-3.5" />
+            )}
           </ActionButton>
         )}
         {isLast && !isUser && (

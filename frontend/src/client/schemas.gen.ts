@@ -129,6 +129,30 @@ export const Body_agent_install_skillSchema = {
     title: 'Body_agent-install_skill'
 } as const;
 
+export const Body_agent_transcribe_audioSchema = {
+    properties: {
+        file: {
+            type: 'string',
+            contentMediaType: 'application/octet-stream',
+            title: 'File'
+        },
+        language: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Language'
+        }
+    },
+    type: 'object',
+    required: ['file'],
+    title: 'Body_agent-transcribe_audio'
+} as const;
+
 export const Body_agent_upload_attachmentSchema = {
     properties: {
         conversation_id: {
@@ -1747,6 +1771,30 @@ export const PublicSettingsSchema = {
 因此不构成额外泄露；而登录页必须在**鉴权之前**拿到它。`
 } as const;
 
+export const SpeechInSchema = {
+    properties: {
+        text: {
+            type: 'string',
+            title: 'Text'
+        },
+        voice: {
+            anyOf: [
+                {
+                    type: 'string'
+                },
+                {
+                    type: 'null'
+                }
+            ],
+            title: 'Voice'
+        }
+    },
+    type: 'object',
+    required: ['text'],
+    title: 'SpeechIn',
+    description: '合成请求：text 必填，voice 不传则用上游默认音色。'
+} as const;
+
 export const StatsDailyPointSchema = {
     properties: {
         date: {
@@ -1984,6 +2032,19 @@ export const ToolPermissionsUpdateSchema = {
     type: 'object',
     title: 'ToolPermissionsUpdate',
     description: '更新工具权限（只更新提供的字段）'
+} as const;
+
+export const TranscriptionOutSchema = {
+    properties: {
+        text: {
+            type: 'string',
+            title: 'Text'
+        }
+    },
+    type: 'object',
+    required: ['text'],
+    title: 'TranscriptionOut',
+    description: '识别结果（前端把它填进输入框，用户确认后再发送）。'
 } as const;
 
 export const TrashDocumentOutSchema = {

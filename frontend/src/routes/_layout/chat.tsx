@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { ArrowUp, Loader2, Square } from "lucide-react"
+import { ArrowUp, Loader2, Mic, Square } from "lucide-react"
 import { type FormEvent, useEffect, useRef, useState } from "react"
 import { AgentService } from "@/client"
 import { AttachmentChips } from "@/components/Chat/AttachmentChips"
@@ -10,6 +10,7 @@ import MessageItem from "@/components/Chat/MessageItem"
 import PersonaPicker from "@/components/Chat/PersonaPicker"
 import { useAgentChat } from "@/hooks/useAgentChat"
 import { useChatAttachments } from "@/hooks/useChatAttachments"
+import { useSpeak, useTranscribe } from "@/hooks/useVoice"
 
 export const Route = createFileRoute("/_layout/chat")({
   // 会话 ID 走 URL search param（/chat?c=<uuid>）：
@@ -92,6 +93,10 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
   const [stopping, setStopping] = useState(false)
   const { pending, addFiles, remove, clear, readyAttachments } =
     useChatAttachments(conversationId)
+  const transcribe = useTranscribe()
+  // 朗读播放器提到聊天室这一层：每条消息各自持有一个实例的话，
+  // 「点 A 再点 B」会出现两条同时朗读
+  const { speak, playingId, loadingId } = useSpeak()
   const queryClient = useQueryClient()
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -141,6 +146,14 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
     sendMessage(content, readyAttachments() ?? [])
     setInput("")
     clear()
+  }
+
+  // 语音输入：识别结果只填进输入框、不直接发送——识别必然有错字，
+  // 让用户过一眼再发，比"说出来就发出去"稳妥。
+  const handleVoice = async () => {
+    const text = await transcribe.toggle()
+    if (!text) return
+    setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text))
   }
 
   return (
@@ -211,6 +224,9 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
                 onDelete={deleteMessage}
                 onRegenerate={regenerate}
                 onEditResend={editAndResend}
+                onSpeak={(id, md) => void speak(id, md)}
+                speakingId={playingId}
+                speakLoadingId={loadingId}
               />
             ))}
             <div ref={bottomRef} />
@@ -226,6 +242,15 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
         className="sticky bottom-4 mx-auto w-full max-w-3xl pb-[env(safe-area-inset-bottom)]"
       >
         <AttachmentChips items={pending} onRemove={remove} />
+        {/* 录音中给一条明确提示：麦克风已开却不显示状态，用户会不确定录没录上 */}
+        {transcribe.isRecording && (
+          <p
+            data-testid="chat-recording-hint"
+            className="px-1 pb-1 text-xs text-destructive"
+          >
+            正在录音…点击麦克风结束
+          </p>
+        )}
         <div className="flex items-end gap-2 rounded-2xl border border-input bg-background px-4 py-2 shadow-sm transition-shadow duration-[150ms] ease-out focus-within:border-[var(--chat-accent)] focus-within:shadow-[0_0_0_3px_rgba(22,93,255,0.15)]">
           {/* 「＋」上传入口固定在输入框内左侧（与发送按钮同一条自对齐基线） */}
           <AttachmentMenu onPick={addFiles} disabled={!isConnected} />
@@ -233,13 +258,17 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={
-              isStreaming
-                ? "AI 回复中…"
-                : connState === "reconnecting"
-                  ? "正在重连，请稍候…"
-                  : connState === "closed"
-                    ? "连接已断开，请刷新页面重试"
-                    : "输入消息…"
+              transcribe.isTranscribing
+                ? "正在识别语音…"
+                : transcribe.isRecording
+                  ? "正在录音…"
+                  : isStreaming
+                    ? "AI 回复中…"
+                    : connState === "reconnecting"
+                      ? "正在重连，请稍候…"
+                      : connState === "closed"
+                        ? "连接已断开，请刷新页面重试"
+                        : "输入消息…"
             }
             rows={1}
             disabled={!isConnected}
@@ -254,6 +283,42 @@ function ChatRoom({ conversationId }: { conversationId: string }) {
             }}
             className="max-h-40 min-h-6 w-full resize-none bg-transparent py-1.5 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
           />
+          {/* 语音输入：录音 → 识别 → 文本进输入框（不自动发送）。
+              不支持的浏览器（非安全上下文）保持可见但禁用并给出原因 */}
+          <button
+            type="button"
+            aria-label={transcribe.isRecording ? "结束录音" : "语音输入"}
+            data-testid="chat-mic-button"
+            data-status={transcribe.status}
+            title={
+              transcribe.isSupported
+                ? undefined
+                : "当前浏览器或访问方式不支持录音（需 HTTPS 或 127.0.0.1）"
+            }
+            disabled={
+              !transcribe.isSupported ||
+              transcribe.isTranscribing ||
+              !isConnected
+            }
+            onClick={() => void handleVoice()}
+            className={`flex size-8 shrink-0 items-center justify-center self-end rounded-full transition-colors duration-100 active:scale-90 motion-reduce:transform-none disabled:cursor-not-allowed disabled:opacity-50 ${
+              transcribe.isRecording
+                ? "bg-destructive/10 text-destructive"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            {transcribe.isTranscribing ? (
+              <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <Mic
+                className={`size-4 ${
+                  transcribe.isRecording
+                    ? "animate-pulse motion-reduce:animate-none"
+                    : ""
+                }`}
+              />
+            )}
+          </button>
           {isStreaming ? (
             /* 流式中：发送按钮变身为停止按钮；点击发 interrupt，
                等后端收尾 done 后 isStreaming 自动置假复位 */

@@ -31,6 +31,11 @@ export type Body_agent_install_skill = {
     skill_zip: string;
 };
 
+export type Body_agent_transcribe_audio = {
+    file: string;
+    language?: (string | null);
+};
+
 export type Body_agent_upload_attachment = {
     conversation_id: string;
     file: string;
@@ -455,6 +460,14 @@ export type PublicSettings = {
 };
 
 /**
+ * 合成请求：text 必填，voice 不传则用上游默认音色。
+ */
+export type SpeechIn = {
+    text: string;
+    voice?: (string | null);
+};
+
+/**
  * 单日聚合点（UTC 日期）
  */
 export type StatsDailyPoint = {
@@ -532,6 +545,13 @@ export type ToolPermissionsPublic = {
 export type ToolPermissionsUpdate = {
     shell_enabled?: (boolean | null);
     file_write_enabled?: (boolean | null);
+};
+
+/**
+ * 识别结果（前端把它填进输入框，用户确认后再发送）。
+ */
+export type TranscriptionOut = {
+    text: string;
 };
 
 /**
@@ -813,6 +833,18 @@ export type AgentUploadAttachmentData = {
 };
 
 export type AgentUploadAttachmentResponse = (AttachmentOut);
+
+export type AgentTranscribeAudioData = {
+    formData: Body_agent_transcribe_audio;
+};
+
+export type AgentTranscribeAudioResponse = (TranscriptionOut);
+
+export type AgentSynthesizeSpeechData = {
+    requestBody: SpeechIn;
+};
+
+export type AgentSynthesizeSpeechResponse = (unknown);
 
 export type KnowledgeBaseListKbsResponse = (Array<KBOut>);
 
