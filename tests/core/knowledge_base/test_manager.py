@@ -63,6 +63,14 @@ class TestUploadDocument:
 
         monkeypatch.setattr(manager.DocumentParser, "parse", fake_parse)
 
+        # 凭据解析（P9a）要查库，而这里是 FakeSession → 桩掉；
+        # 解析结果是否被传给向量库由下面的断言单独盯住
+        monkeypatch.setattr(
+            manager,
+            "resolve_embedding_function",
+            lambda session, user_id: "fake-embedding-function",
+        )
+
         fake_store = MagicMock()
         monkeypatch.setattr(
             manager, "VectorStore", MagicMock(return_value=fake_store)
@@ -85,6 +93,11 @@ class TestUploadDocument:
         assert rec.status == "done"
         assert rec.chunks_count == 2
         fake_store.add_documents.assert_called_once()
+        # 解析出的向量化函数原样传给向量库（P9a 接线点）
+        assert (
+            manager.VectorStore.call_args.kwargs["embedding_function"]
+            == "fake-embedding-function"
+        )
 
     @pytest.mark.asyncio
     async def test_upload_sets_error_on_failure(self, monkeypatch, tmp_path):
@@ -186,3 +199,34 @@ class TestQuery:
 
         assert retriever_cls.call_count == 1  # 只建了一次索引
         assert fake_retriever.retrieve.call_count == 2  # 但查了两次
+
+    def test_query_threads_user_id_into_credential_resolution(self, monkeypatch):
+        """P9a：检索必须带 user_id 才会走用户配的嵌入/重排序模型源"""
+        from app.core.knowledge_base import manager
+
+        fake_store = MagicMock()
+        fake_store.get_all_documents.return_value = [Document("语料")]
+        monkeypatch.setattr(
+            manager, "VectorStore", MagicMock(return_value=fake_store)
+        )
+        monkeypatch.setattr(manager, "HybridRetriever", MagicMock())
+
+        seen = {}
+
+        def fake_embed(session, user_id):
+            seen["embed"] = user_id
+            return "ef"
+
+        def fake_rerank(session, user_id):
+            seen["rerank"] = user_id
+            return None
+
+        monkeypatch.setattr(manager, "resolve_embedding_function", fake_embed)
+        monkeypatch.setattr(manager, "resolve_rerank_endpoint", fake_rerank)
+
+        uid = uuid.uuid4()
+        KBManager(session=FakeSession()).query(
+            uuid.UUID(KB_ID), "问题", user_id=uid
+        )
+
+        assert seen == {"embed": uid, "rerank": uid}

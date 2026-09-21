@@ -92,8 +92,11 @@ async def knowledge_base_query(
         mgr = KBManager(session=session)
         sections: list[str] = []
         for kb in kbs:
-            # 每个库内部走同一套混合检索（向量 + BM25 + RRF）
-            docs = mgr.query(kb_id=kb.id, query=query, top_k=top_k)
+            # 每个库内部走同一套混合检索（向量 + BM25 + RRF）；
+            # 带上 user_id 是为了让嵌入/重排序走用户配的模型源（P9a）
+            docs = mgr.query(
+                kb_id=kb.id, query=query, top_k=top_k, user_id=user_id
+            )
             if docs:
                 sections.append(f"【知识库：{kb.name}】\n{mgr.get_retrieval_context(docs)}")
                 # 记录引用来源（供前端「检索来源」展示，不进 LLM 上下文）

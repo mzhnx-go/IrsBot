@@ -101,3 +101,62 @@ def test_rerank_module_uses_settings_candidate_constant():
     """RERANK_CANDIDATES 配置存在且为正，供 HybridRetriever 截断候选"""
     assert settings.RERANK_CANDIDATES >= 1
     assert reranker._RERANK_TIMEOUT_SECONDS == 5.0
+
+
+# ---------- P9a：显式端点（用户配的 rerank 模型源） ----------
+
+
+def test_rerank_explicit_endpoint_wins_over_env_and_switch():
+    """传了 endpoint 就用它：请求打向该源的 Key / 地址 / 模型"""
+    from app.core.knowledge_base.endpoints import RerankEndpoint
+
+    ep = RerankEndpoint(
+        api_key="sk-provider-key",
+        base_url="https://rr.example.com/v1",
+        model="BAAI/bge-reranker-v2-m3",
+    )
+    p, calls = _patch_post({"results": [{"index": 2, "relevance_score": 0.9}]})
+    with p, patch.object(settings, "ENABLE_RERANK", False):
+        result = rerank("查询", DOCS, top_n=1, endpoint=ep)
+
+    assert [d.page_content for d in result] == ["C 高相关内容"]
+    assert calls["url"].startswith("https://rr.example.com/v1/rerank")
+    assert calls["kwargs"]["headers"]["Authorization"] == "Bearer sk-provider-key"
+    assert calls["kwargs"]["json"]["model"] == "BAAI/bge-reranker-v2-m3"
+
+
+def test_rerank_explicit_endpoint_still_degrades_on_error():
+    """端点显式传入时同样降级——上游挂了不能把检索打挂"""
+    from app.core.knowledge_base.endpoints import RerankEndpoint
+
+    ep = RerankEndpoint(
+        api_key="sk-k", base_url="https://rr.example.com/v1", model="m"
+    )
+    p, _ = _patch_post(None, raise_exc=httpx.ConnectError("network down"))
+    with p:
+        assert rerank("查询", DOCS, top_n=2, endpoint=ep) == DOCS[:2]
+
+
+def test_hybrid_retriever_passes_endpoint_to_rerank():
+    """检索器把构造期解析好的端点原样交给 rerank（P9a 接线点）"""
+    from app.core.knowledge_base.endpoints import RerankEndpoint
+    from app.core.knowledge_base import retrieval
+
+    class FakeStore:
+        def search(self, query, top_k):
+            return [Document("向量命中")]
+
+    ep = RerankEndpoint(api_key="k", base_url="https://rr/v1", model="m")
+    retriever = retrieval.HybridRetriever(
+        FakeStore(), [Document("语料")], rerank_endpoint=ep
+    )
+    seen = {}
+
+    def fake_rerank(query, docs, top_n, endpoint=None):
+        seen["endpoint"] = endpoint
+        return docs[:top_n]
+
+    with patch.object(retrieval, "rerank", side_effect=fake_rerank):
+        retriever.retrieve("查询", top_k=1)
+
+    assert seen["endpoint"] == ep

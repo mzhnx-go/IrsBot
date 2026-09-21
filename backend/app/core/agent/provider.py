@@ -392,6 +392,10 @@ class ProviderManager:
         get_chat_model（否则会越权使用他人的密钥）；user_id 为 None 时
         fail closed（查不到任何源）。
 
+        ⚠️ 还必须带 `capability="embedding"` 过滤（P9a）：默认源是「每种能力一条」，
+        不带这个条件会把**对话**默认源当成嵌入源用（拿对话模型名去请求 embedding，
+        上游直接报错）。
+
         Args:
             user_id: 归属用户 id，限定只能取该用户自己的 ProviderConfig。
             provider_id: ProviderConfig 的 id；为 None 时取该用户的默认且启用中的配置。
@@ -407,12 +411,14 @@ class ProviderManager:
             stmt = select(ProviderConfig).where(
                 ProviderConfig.id == provider_id,
                 ProviderConfig.user_id == user_id,
+                ProviderConfig.capability == "embedding",
                 ProviderConfig.is_active.is_(True),
             )
             pc = self.session.exec(stmt).one_or_none()
         else:
             stmt = select(ProviderConfig).where(
                 ProviderConfig.user_id == user_id,
+                ProviderConfig.capability == "embedding",
                 ProviderConfig.is_default.is_(True),
                 ProviderConfig.is_active.is_(True),
             )

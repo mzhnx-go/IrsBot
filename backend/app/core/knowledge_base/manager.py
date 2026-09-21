@@ -8,6 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.core.db.models import Document as DocumentRecord  # 这是"数据库记录"
 from app.core.knowledge_base.chunkers import Chunkers
+from app.core.knowledge_base.endpoints import (
+    resolve_embedding_function,
+    resolve_rerank_endpoint,
+)
 from app.core.knowledge_base.parsers import DocumentParser
 from app.core.knowledge_base.retrieval import HybridRetriever
 from app.core.knowledge_base.vec_store import VectorStore
@@ -68,8 +72,13 @@ class KBManager:
             for chunk in chunks:
                 chunk.metadata["doc_id"] = str(record.id)
 
-            # 向量化写入 Milvus
-            VectorStore(kb_id=str(record.kb_id)).add_documents(chunks)
+            # 向量化写入 Milvus：凭据优先用户配的「嵌入」默认源，回落 .env（P9a）
+            VectorStore(
+                kb_id=str(record.kb_id),
+                embedding_function=resolve_embedding_function(
+                    self._session, getattr(record, "user_id", None)
+                ),
+            ).add_documents(chunks)
 
             record.status = "done"
             record.chunks_count = len(chunks)
@@ -82,16 +91,36 @@ class KBManager:
 
         return record
 
-    def _get_retriever(self, kb_id: str, candidate_top_k: int) -> HybridRetriever | None:
+    def _get_retriever(
+        self,
+        kb_id: str,
+        candidate_top_k: int,
+        user_id: uuid.UUID | None = None,
+    ) -> HybridRetriever | None:
         """获取缓存的检索器；没有则构建并缓存
+
+        Args:
+            kb_id: 知识库 id（缓存键）。
+            candidate_top_k: 每路检索的候选数。
+            user_id: 归属用户，用于解析「嵌入 / 重排序」的模型源（P9a）；
+                None 表示回落 `.env`。
 
         Returns:
             HybridRetriever，语料为空（知识库无数据）时返回 None
+
+        ⚠️ 缓存键只用 kb_id、**不含 user_id**：`invalidate_kb_cache(kb_id)` 是按
+        这个键失效的，改键会让「上传/删除文档后清缓存」静默失效（继续用旧的 BM25
+        索引——比不缓存更糟）。知识库归属单一用户，同一 kb 换用户不会发生；
+        **换嵌入模型源需要重建 collection**（向量维度可能不同），属运维动作，
+        不在缓存层兜底。
         """
         cached = _retriever_cache.get(kb_id)
         if cached is not None:
             return cached
-        store = VectorStore(kb_id=kb_id)
+        store = VectorStore(
+            kb_id=kb_id,
+            embedding_function=resolve_embedding_function(self._session, user_id),
+        )
         corpus = store.get_all_documents()
         if not corpus:
             store.close()
@@ -101,6 +130,7 @@ class KBManager:
             vector_store=store,
             documents=corpus,
             candidate_top_k=candidate_top_k,
+            rerank_endpoint=resolve_rerank_endpoint(self._session, user_id),
         )
         _retriever_cache[kb_id] = retriever
         return retriever
@@ -111,6 +141,7 @@ class KBManager:
         query: str,
         top_k: int = 4,
         candidate_top_k: int = 10,
+        user_id: uuid.UUID | None = None,
     ) -> list[Document]:
         """对知识库发起混合检索：向量语义 + BM25 关键词 → RRF 融合
 
@@ -119,11 +150,14 @@ class KBManager:
             query: 用户的检索问题
             top_k: 最终返回的命中小块数
             candidate_top_k: 每路检索先取的候选数（融合后再收敛到 top_k）
+            user_id: 归属用户，用于选「嵌入 / 重排序」模型源（P9a）
 
         Returns:
             相关度降序的 Document 列表（metadata 含来源）
         """
-        retriever = self._get_retriever(str(kb_id), candidate_top_k)
+        retriever = self._get_retriever(
+            str(kb_id), candidate_top_k, user_id=user_id
+        )
         if retriever is None:
             return []
         return retriever.retrieve(query, top_k=top_k)

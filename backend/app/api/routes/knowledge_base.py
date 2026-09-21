@@ -346,7 +346,9 @@ def query_kb(
     """知识库检索：返回命中的块 + 拼好的上下文"""
     kb = _get_owned_kb(kb_id, session, current_user)
     mgr = KBManager(session=session)
-    results = mgr.query(kb_id=kb.id, query=body.query, top_k=body.top_k)
+    results = mgr.query(
+        kb_id=kb.id, query=body.query, top_k=body.top_k, user_id=current_user.id
+    )
     context = mgr.get_retrieval_context(results)
     return KBQueryResponse(
         results=[

@@ -28,6 +28,13 @@ _startup_logger.info(
 )
 _startup_logger.info("=" * 52)
 
+# P9a：嵌入/重排序已可走「模型源」体系；.env 里还留着旧凭据时提示可迁移（不改行为）
+from app.core.knowledge_base.endpoints import (  # noqa: E402
+    log_embedding_migration_hint,
+)
+
+log_embedding_migration_hint()
+
 
 def custom_generate_unique_id(route: APIRoute) -> str:
     return f"{route.tags[0]}-{route.name}"

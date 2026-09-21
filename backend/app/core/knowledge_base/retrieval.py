@@ -131,6 +131,7 @@ class HybridRetriever:
         vector_store,
         documents: list[Document],
         candidate_top_k: int = 10,
+        rerank_endpoint=None,
     ):
         """初始化混合检索器
 
@@ -138,10 +139,13 @@ class HybridRetriever:
             vector_store: 已写入同一批分块的 VectorStore 实例
             documents: 与向量库对应的分块语料（供 BM25 建索引）
             candidate_top_k: 每路检索取的候选数（融合后收敛到最终 top-k）
+            rerank_endpoint: 重排上游端点（P9a，由
+                `endpoints.resolve_rerank_endpoint` 解析）；None 表示回落 `.env`
         """
         self._vector_store = vector_store
         self._bm25 = BM25Retriever(documents)
         self._candidate_top_k = candidate_top_k
+        self._rerank_endpoint = rerank_endpoint
 
     def retrieve(self, query: str, top_k: int = 4) -> list[Document]:
         """混合检索
@@ -159,4 +163,4 @@ class HybridRetriever:
         # 重排段：融合候选截到 RERANK_CANDIDATES 后送 cross-encoder 精排；
         # 开关关闭或 API 失败时 rerank() 内部降级为原序截断，行为与旧版一致
         candidates = fused[: settings.RERANK_CANDIDATES]
-        return rerank(query, candidates, top_n=top_k)
+        return rerank(query, candidates, top_n=top_k, endpoint=self._rerank_endpoint)

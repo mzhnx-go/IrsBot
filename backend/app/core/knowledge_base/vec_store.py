@@ -6,21 +6,24 @@
 - 检索: 查询文本 → embedding → 相似度搜索 → top-k Document
 """
 
+from typing import Any
+
 from langchain_core.documents import Document
 from langchain_milvus import Milvus as MilvusVectorStore
 from langchain_openai import OpenAIEmbeddings
 from pymilvus import MilvusClient
 
 from app.core.config import settings
+from app.core.knowledge_base.endpoints import env_embedding_function
 
 
 def get_embedding_model() -> OpenAIEmbeddings:
-    """创建 Embedding 模型实例（SiliconFlow，OpenAI 兼容格式）"""
-    return OpenAIEmbeddings(
-        model=settings.EMBEDDING_MODEL,
-        api_key=settings.EMBEDDING_API_KEY,
-        base_url=settings.EMBEDDING_BASE_URL or None,
-    )
+    """创建 Embedding 模型实例（.env 的 SiliconFlow，OpenAI 兼容格式）。
+
+    保留此入口供无用户上下文的场景与测试使用；RAG 活链路走
+    `endpoints.resolve_embedding_function`（用户默认嵌入源优先，本函数兜底）。
+    """
+    return env_embedding_function()
 
 
 def _collection_name(kb_id: str) -> str:
@@ -35,9 +38,18 @@ def _collection_name(kb_id: str) -> str:
 class VectorStore:
     """向量存储管理器（每个知识库实例化一个）"""
 
-    def __init__(self, kb_id: str):
+    def __init__(self, kb_id: str, embedding_function: Any | None = None):
+        """初始化。
+
+        Args:
+            kb_id: 知识库 id。
+            embedding_function: 向量化函数；None 表示用 `.env` 的嵌入配置
+                （写/查向量的调用方应显式传入 `resolve_embedding_function()`
+                的结果，以便走用户配的嵌入模型源——P9a）。
+        """
         self.kb_id = kb_id
         self.collection_name = _collection_name(kb_id)
+        self._embedding_function = embedding_function
         self.client = MilvusClient(uri=settings.MILVUS_URI)
 
     def _get_store(self) -> MilvusVectorStore:
@@ -49,7 +61,7 @@ class VectorStore:
         return MilvusVectorStore(
             connection_args={"uri": settings.MILVUS_URI},
             collection_name=self.collection_name,
-            embedding_function=get_embedding_model(),
+            embedding_function=self._embedding_function or get_embedding_model(),
         )
 
     def add_documents(self, documents: list[Document]) -> list[str]:

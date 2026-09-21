@@ -147,6 +147,29 @@ class TestCapabilityDefaults:
         assert mgr.get_active_config(uid, capability="embedding").id == emb.id
 
 
+class TestEmbeddingLookup:
+    def test_chat_default_is_not_offered_as_embedding_model(self, db: Session):
+        """P9a 回归：不带 capability 过滤时，取嵌入模型会拿对话默认源顶上。"""
+        mgr = ProviderManager(db)
+        uid = _uid()
+        _mk(mgr, uid, name="chat-only", capability="chat", is_default=True)
+
+        with pytest.raises(RuntimeError, match="No active embedding provider"):
+            mgr.get_embedding_model(user_id=uid)
+
+    def test_uses_embedding_default(self, db: Session):
+        mgr = ProviderManager(db)
+        uid = _uid()
+        _mk(mgr, uid, name="chat", capability="chat", is_default=True)
+        emb = _mk(mgr, uid, name="emb", capability="embedding", is_default=True)
+        db.refresh(emb)
+        emb.model_name = "BAAI/bge-m3"
+        db.commit()
+
+        model = mgr.get_embedding_model(user_id=uid)
+        assert model.model == "BAAI/bge-m3"
+
+
 class TestCapabilityIndexAtDbLevel:
     def test_same_capability_second_default_rejected(self, db: Session):
         """同一 (user_id, capability) 第二条默认源必须被部分唯一索引拒绝。"""
