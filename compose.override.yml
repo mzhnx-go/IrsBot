@@ -24,7 +24,7 @@ services:
   #    （数据在 D:\Milvus\volumes\milvus，删容器不会丢数据）
 
   milvus:
-    image: milvusdb/milvus:v2.6.14
+    image: milvusdb/milvus:v3.0.2
     restart: unless-stopped
     # Milvus 需要这一项，否则部分系统上会因 seccomp 限制启动失败
     security_opt:
