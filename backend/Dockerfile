@@ -3,7 +3,7 @@
 #    "current Python version (3.10.x) is not compatible with the locked requirement"。
 #    选 3.13 而非 3.12 的理由：本机 .venv 即 3.13.0，且 294 单测 + 18 集成测试
 #    已在该版本上实跑通过 → 镜像与本地环境完全一致，避免"本地能跑、容器报错"。
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1
 
